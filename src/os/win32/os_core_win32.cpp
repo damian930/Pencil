@@ -672,6 +672,72 @@ U32 os_get_number_of_threads()
   return (U32)info.dwNumberOfProcessors;
 }
 
+// note: returns rgba pixels in that order. The first pixel is the top left pixel
+OS_Image os_take_screenshot(Arena* arena)
+{   
+  // Getting the compatible dc to the application size
+  HDC screen_dc = GetDC(0);
+  HDC screen_compatible_dc = CreateCompatibleDC(screen_dc);
+  Assert(screen_compatible_dc != 0);
+
+  int screen_width = GetSystemMetrics(SM_CXSCREEN);
+  int screen_height = GetSystemMetrics(SM_CYSCREEN);
+  
+  HBITMAP bitmap_handle = CreateCompatibleBitmap(screen_dc, screen_width, screen_height);
+  Assert(bitmap_handle != 0);
+  
+  HGDIOBJ obj = SelectObject(screen_compatible_dc, bitmap_handle);
+  Assert(obj != 0);
+
+  BOOL blit_succ = BitBlt(screen_compatible_dc, 0, 0, screen_width, screen_height, screen_dc, 0, 0, SRCCOPY);
+  Assert(blit_succ);
+
+  BITMAP bitmap = {};
+  int get_succ = GetObject(bitmap_handle, sizeof(BITMAP), &bitmap);
+  Assert(get_succ != 0);
+
+  BITMAPINFO bm_info = {};
+  bm_info.bmiHeader.biSize = sizeof(bm_info.bmiHeader);
+  bm_info.bmiHeader.biWidth = bitmap.bmWidth;
+  bm_info.bmiHeader.biHeight = -bitmap.bmHeight;
+  bm_info.bmiHeader.biPlanes = 1;
+  bm_info.bmiHeader.biBitCount = 32;
+  bm_info.bmiHeader.biCompression = BI_RGB;
+
+  U32 bitmap_size = ((bitmap.bmWidth * bm_info.bmiHeader.biBitCount + 31) / 32) * 4 * bitmap.bmHeight;
+  bm_info.bmiHeader.biSizeImage = bitmap_size;
+
+  U8* buffer = ArenaPushArr(arena, U8, bitmap_size);
+
+  // copy the data into the buffer
+  int get_bits_succ = GetDIBits(screen_dc, bitmap_handle, 0, (UINT)bitmap.bmHeight, buffer, (BITMAPINFO*)&bm_info, DIB_RGB_COLORS);
+  Assert(get_bits_succ);
+
+  // Swapping win32 order to the valid order 
+  for (U64 i = 0; i < bitmap_size;)
+  {
+    U8* blue  = buffer + (i++);
+    U8* green = buffer + (i++);
+    U8* red   = buffer + (i++);
+    U8* alpha = buffer + (i++);
+    SwapValues(U8, *blue, *red);
+  }
+  
+  OS_Image image = {};
+  image.data = buffer;
+  image.width = screen_width;
+  image.height = screen_height;
+  return image;
+}
+
+// todo: This is here for debug for now
+void make_window_not_capture_events()
+{
+  HWND widnow_handle = GetActiveWindow();
+  LONG_PTR ret = SetWindowLongPtrA(widnow_handle, GWL_EXSTYLE, WS_EX_LAYERED|WS_EX_TRANSPARENT);
+  Assert(ret != 0);
+}
+
 ///////////////////////////////////////////////////////////
 // - todo
 //

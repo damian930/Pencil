@@ -81,7 +81,7 @@ if not exist build mkdir build
 :: Possible compilations targets
 pushd build
 
-if "%pencil%"=="1"   set build_succ=1 && %compile% ../src/pencil_main.cpp ../src/os/win32/os_core_win32.cpp %linker% /OUT:"pencil.exe"
+if "%pencil%"=="1"   set build_succ=1 && %compile% ../src/main_pencil.cpp ../src/os/win32/os_core_win32.cpp %linker% /OUT:"pencil.exe"
 
 popd
 

@@ -1,0 +1,34 @@
+Goals:
+- Be able to draw anywhere on the screen
+- Take screenshots of the screen with all the drawing on the screen
+- Be able to remove drawing with ctrl+z and then back with ctrl+y as ussual
+- Be able to switch the app off when it is not needed 
+- The app shoud have some ui for more advanced features, but for most of the time it 
+  will be transparent and the user will just toggle in on/off with a shourtcut and then draw on the scree  
+
+todo:
+- Transparent window for the app, no bordres, nothing, kinda like the screen shot app for windows
+- Start drawing
+- Create a global hook for windoes to use to intercept events of other processes
+
+ideas:
+- I cant have a pencil window be transparent and at the same time consume inputs, 
+  cause then all the mouse inputs will be going to drawing.
+    One way to fix it would be to have 2 state: draw state, interaction state.
+    In the draw state we consume all the inputs for draw part.
+    In the interaction state, we dont draw, but we still see the drawing that we have made.
+    There we can also have a couple of shortcuts made by the app for the user to switch to the draw mode.
+    Or to switch to the interaction mode.
+    Or to just clear all the stuff.
+    Those might be allowed to be cross state.
+  This will require us to get the inputs in the interaction state and just give them somehow 
+  to the rest of the windows.
+
+- I could just remove the animation for the window and the have a shortcut for it to appear.
+  This is not that great, cause then if i still want to have stuff be draw and interact, it is imposible.
+  Sice the draw window will get minimized. 
+
+- Since we want to draw and then interact and still see the drawing, it would be great to have it 
+  all the time be onthe screen, for that we need to be able to give inputs back to the os for disctribution.
+
+

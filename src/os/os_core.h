@@ -113,9 +113,6 @@ OS_Thread os_thread_alloc(OS_Thread_proc_ft* proc_func, void* caller_data);
 void os_thread_release(OS_Thread* handle);
 void os_thread_join(OS_Thread handle);
 
-// TODO: Fix thread 
-// TODO: Add semafore stuff
-
 // - mutexes
 OS_Mutex os_mutex_alloc();
 void os_mutex_release(OS_Mutex* handle);
@@ -139,6 +136,15 @@ void os_semaphore_signal(OS_Semaphore sem);
 // - other
 void os_sleep(U64 milliseconds);
 U32 os_get_number_of_threads();
+
+
+struct OS_Image { // For now the convention is PX (U8 r, U8 g, U8 b, U8 a);
+  U8* data;
+  U64 width;  // px
+  U64 height; // px
+};
+OS_Image os_take_screenshot(Arena* arena);
+void make_window_not_capture_events();
 
 // - todo:
 Str8_list os_test_list_directory(Arena* arena, Str8 dir_path);
