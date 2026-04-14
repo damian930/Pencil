@@ -21,6 +21,8 @@
 #undef CloseWindow
 #undef ShowCursor
 #undef Rectangle
+#include "dwmapi.h"
+#pragma comment(lib, "dwmapi.lib")
 
 LRESULT hook_proc_test(
   _In_ int    nCode,
@@ -36,18 +38,26 @@ int main()
   allocate_thread_context();
   os_win32_set_thread_context(get_thread_context()); // todo: This is a flaw of the os system and the fact that we link in
   ui_init();
-  
+
+  OS_Handle hook_dll = os_load_dll(Str8FromC("win32_event_hook1.dll"));
+  // U64* count = (U64*)os_load_proc_from_dll(hook_dll, Str8FromC("left_mouse_down_event_count"));
+  HOOKPROC hook_proc = (HOOKPROC)os_load_proc_from_dll(hook_dll, Str8FromC("win32_hook_proc"));
+
+  HHOOK hook_handle = SetWindowsHookExA(WH_CALLWNDPROC, hook_proc, (HINSTANCE)hook_dll.u64, 0);
+
+  for (;;)
+  {
+
+    // printf("%lld \n", *count);
+  }
+
+  os_unload_dll(&hook_dll);
+  return 0;
+
   InitWindow(800, 600, "Pencil");
   SetWindowState(FLAG_WINDOW_RESIZABLE);
-  // SetWindowState(FLAG_WINDOW_UNDECORATED);
-  // SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
-  // SetWindowState(FLAG_WINDOW_TOPMOST);
-  // SetWindowState(FLAG_WINDOW_TRANSPARENT);
-  // SetWindowState(FLAG_WINDOW_MAXIMIZED);
-
-  HHOOK hook_handle = SetWindowsHookExA(WH_CALLWNDPROC, hook_proc_test, 0, GetThreadId(GetCurrentThread()));
-  Assert(hook_handle != NULL);
-  BreakPoint();
+  SetWindowState(FLAG_WINDOW_UNDECORATED);
+  SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
 
   Arena* frame_arena = arena_alloc(Megabytes(64));
   for (;!WindowShouldClose();)
@@ -66,14 +76,9 @@ int main()
       screen_shot_texture = LoadTextureFromImage(rl_image);
     }
 
-    if (IsKeyDown(KEY_A)) { printf("Event \n"); }
-    if (IsKeyDown(KEY_ENTER)) { 
-      make_window_not_capture_events(); 
-    }
-
     DeferLoop(BeginDrawing(), EndDrawing())
     {   
-      DrawTexturePro(screen_shot_texture, Rectangle{0, 0, (F32)screen_shot_texture.width, (F32)screen_shot_texture.height}, Rectangle{0.0f, 0.0f, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+      // DrawTexturePro(screen_shot_texture, Rectangle{0, 0, (F32)screen_shot_texture.width, (F32)screen_shot_texture.height}, Rectangle{0.0f, 0.0f, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
     }
 
     UnloadTexture(screen_shot_texture);

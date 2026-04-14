@@ -82,6 +82,7 @@ if not exist build mkdir build
 pushd build
 
 if "%pencil%"=="1"   set build_succ=1 && %compile% ../src/main_pencil.cpp ../src/os/win32/os_core_win32.cpp %linker% /OUT:"pencil.exe"
+if "%win32_event_hook%"=="1"   set build_succ=1 && %compile% ../src/win32_hook_procedure.cpp  %linker% /DLL /OUT:"win32_event_hook1.dll" /Map
 
 popd
 

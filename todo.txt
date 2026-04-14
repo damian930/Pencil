@@ -7,28 +7,40 @@ Goals:
   will be transparent and the user will just toggle in on/off with a shourtcut and then draw on the scree  
 
 todo:
-- Transparent window for the app, no bordres, nothing, kinda like the screen shot app for windows
-- Start drawing
-- Create a global hook for windoes to use to intercept events of other processes
+- Test hooks for getting events from the system
+- Read what martins said on discord about the gpu api instead of bitblt
 
-ideas:
-- I cant have a pencil window be transparent and at the same time consume inputs, 
-  cause then all the mouse inputs will be going to drawing.
-    One way to fix it would be to have 2 state: draw state, interaction state.
-    In the draw state we consume all the inputs for draw part.
-    In the interaction state, we dont draw, but we still see the drawing that we have made.
-    There we can also have a couple of shortcuts made by the app for the user to switch to the draw mode.
-    Or to switch to the interaction mode.
-    Or to just clear all the stuff.
-    Those might be allowed to be cross state.
-  This will require us to get the inputs in the interaction state and just give them somehow 
-  to the rest of the windows.
+idea:
+- I dont think i need to intercept inputs on windows and then give some of them back.
+  I dont really feel like that would do much, most of the inputs are still shared,
+  so we would have to inroduce 2 state, the draw state and the app interaction state
+  either way. Also it is harder to inroduce hooks to the system. Might be better to just
+  create a global shortcut like for screenshots on windows and it will just open a window
+  with no animation and put it in place to then draw. Then the same shortcut will
+  make that window to just be removed with no animation. This might also make it simpler
+  since the user wont have to have a redraw widnow running all the time
+- The screen shot utility on windows just takes a screen shot and then you can get the part that you want 
+  from it and save it.
+  I dont need that cause i want to be able to play Heartstone and draw onthe scren, for that i need the 
+  dresktop to keep drawin. For that i would then need to be able to draw the desktop on the window.
+  So i need to be able to open the draw window, close window, draw the desktop in it, so looks like i draw on the desktop.
 
-- I could just remove the animation for the window and the have a shortcut for it to appear.
-  This is not that great, cause then if i still want to have stuff be draw and interact, it is imposible.
-  Sice the draw window will get minimized. 
+- I want to be able to draw on the screen while it is updating. So if i am wating a videa and i draw i
+  want that video to keep playing and i will render it. 
+  I also want to be able to see the drawing after i stop drawing and start interaction with the app.
+  For that i need to have a window that draw all the rest of the thing.
+  For that we need to have 2 things. Maximized or fullscreen window with no border or animation,
+  inside of it we render the desktop. Intercept all the inputs. If we are in the draw mode, then we 
+  use them to draw. If we are in the interaction mode, then we pass the inputs back to the system.
+  This will allow us to have a shortcut that will switch between those 2 and let us quickly 
+  draw and then use the desktop like ussual. 
+  Details:
+    - What about the task bar? Do hooks also intercept the events to the task bar?
+      If they dont i wil only be able to support drawing in the Maximized app area.
+      If they do, then i will be able to draw everywhere.
+  Or maybe we dont need hooks if there is a way to just make a window sit on top of other windows 
+  but just pass through event in the interaction mode and not do it in the draw mode.
 
-- Since we want to draw and then interact and still see the drawing, it would be great to have it 
-  all the time be onthe screen, for that we need to be able to give inputs back to the os for disctribution.
-
-
+- IPC the data you need. Since we just pass the events through, just pass them in
+  and whene we draw we wont need much, since the window is fullscreen, we will just 
+  have it be using its own events
