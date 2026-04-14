@@ -47,9 +47,10 @@ Arena* ui_build_arena()
   return ctx->build_arenas[ctx->build_generation % ArrayCount(ctx->build_arenas)];
 }
 
-F32 ui_mouse_x()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
-F32 ui_mouse_y()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
-Vec2_F32 ui_mouse() { return vec2_f32_make(ui_mouse_x(), ui_mouse_y()); }
+F32 ui_get_mouse_x()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
+F32 ui_get_mouse_y()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
+Vec2_F32 ui_get_mouse() { return vec2_f32_make(ui_get_mouse_x(), ui_get_mouse_y()); }
+
 
 void ui_set_text_measuring_function(UI_text_measuring_ft* fp)
 {
@@ -529,6 +530,7 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
 
 void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset)
 {
+  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
   // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
   Rectangle raylib_rect = { root->final_on_screen_rect.x, root->final_on_screen_rect.y, root->final_on_screen_rect.width, root->final_on_screen_rect.height };
 

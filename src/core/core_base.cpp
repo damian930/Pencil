@@ -162,6 +162,16 @@ B32 is_point_inside_rectV(Vec2_F32 v, Rect r)
 	return is_inside;	
 }
 
+B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end)
+{
+	// This formula uses cross product. I dont understand why this works, but this is the formula
+	F32 equation_left_side  = (line_end.y - line_start.y) * (point.x - line_start.x);
+	F32 equation_right_side = (point.y - line_start.y) * (line_end.x - line_start.x);
+	F32 diff = abs_f32(equation_left_side) - abs_f32(equation_right_side);
+	B32 is_inside = (abs_f32(diff) < 0.01);
+	return is_inside;
+}
+
 
 #endif
 

@@ -6,11 +6,34 @@
 ///////////////////////////////////////////////////////////
 // - Simple widgets
 //
+void ui_label_c(const char* c_str)
+{
+  U8* str_data = (U8*)const_cast<char*>(c_str);
+  Str8 str = str8_manuall(str_data, strlen(c_str));
+  ui_label(str);
+}
+
 void ui_label(Str8 str)
 {
-  ui_set_next_size_x(ui_text_size());
-  ui_set_next_size_y(ui_text_size());
+  ui_set_next_size_x(ui_text_size()); ui_set_next_size_y(ui_text_size());
   UI_Box* box = ui_box_make(str, UI_Box_flag__draw_text_contents);
+}
+
+void ui_label_fmt(const char* fmt, ...)
+{
+  va_list argptr;
+  va_start(argptr, fmt);
+  Scratch scratch = get_scratch(0, 0);
+  U64 buffer_count = 128;
+  U8* buffer = ArenaPushArr(scratch.arena, U8, buffer_count);
+  int err = vsnprintf((char*)buffer, buffer_count, fmt, argptr);
+  if (err < 0) { Assert(0); }
+  else if (err >= buffer_count) { Assert(0); }
+  else if (err < buffer_count) { /* All good */ }
+  va_end(argptr);
+  Str8 str = str8_manuall(buffer, (U64)err);
+  ui_label(str);
+  end_scratch(&scratch);
 }
 
 void ui_spacer(UI_Size size)

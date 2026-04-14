@@ -182,7 +182,7 @@ struct UI_Context {
 
   Str8 currently_active_box_id; // This is for semantic ui meaning
   
-  // === todo: I dont know how to explaine this fully even to myself at this moment
+  // === todo: I dont know how to explaine this fully even to myself at this moment --> this is for inputs, not semantic meaning 
   Str8 currently_interacted_with_box_id;
   B32 currently_interacted_with_box__is_down;
   B32 currently_interacted_with_box__left_box_while_was_down;
@@ -231,9 +231,9 @@ void ui_set_context(UI_Context* context);
 
 // - Simple getters
 Arena* ui_build_arena();
-F32 ui_mouse_x();
-F32 ui_mouse_y();
-Vec2_F32 ui_mouse();
+F32 ui_get_mouse_x();
+F32 ui_get_mouse_y();
+Vec2_F32 ui_get_mouse();
 
 // - Text measure function stuff
 void ui_set_text_measuring_function(UI_text_measuring_ft* fp);

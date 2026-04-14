@@ -4,9 +4,6 @@
 #include "windows.h"
 #pragma comment(lib, "user32.lib")
 
-// extern "C" __declspec( dllexport )
-// U64 left_mouse_down_event_count = 0;
-
 extern "C" __declspec( dllexport )
 U64 win32_hook_proc(int code, U64 w_param, U64 l_param)
 {

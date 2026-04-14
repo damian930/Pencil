@@ -173,6 +173,7 @@ void RLI_init(U64 time_in_ms_until_first_keyboard_key_repeat_event,
               U64 time_in_ms_between_keyboard_key_repeat_events);
 void RLI_release();
 
+// todo: This is a bade name, shoud be some like create frame inputs 
 RLI_Event_list* RLI_get_frame_inputs();
 // void RLI_end_inputs();
 

@@ -4,7 +4,9 @@
 #include "ui/ui_core.h"
 
 // - Simple widgets
+void ui_label_c(const char* c_str);
 void ui_label(Str8 str);
+void ui_label_fmt(const char* fmt, ...);
 void ui_spacer(UI_Size size);
 UI_Actions ui_button(Str8 str, RLI_Event_list* rli_events); // todo: Remove the fucking rli events from there dude
 
@@ -16,7 +18,7 @@ void ui_layout_stack_end();
 
 // - Padded box
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
-void fui_padded_box_end(UI_Size size);
+void ui_padded_box_end(UI_Size size);
 #define UI_PaddedBox(size, axis) DeferLoop(ui_padded_box_begin(size, axis), ui_padded_box_end(size))
 
 // - Wrapper
@@ -24,11 +26,91 @@ void ui_wrapper_begin(Axis2 axis);
 void ui_wrapper_end();
 #define UI_Wrapper(axis) DeferLoop(ui_wrapper_begin(axis), ui_wrapper_end())
 
+// - Slider
+struct UI_Slider_style {
+  F32 width;
+  F32 height;
+  F32 corner_r;
+  const char* fmt_str;
+  
+  V4 hover_color;
+  V4 no_hover_color;
+  V4 slided_part_color;
+  V4 text_color;
+
+  // add: padding from the walls of the slider to the thumb 
+};
+F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, RLI_Event_list* rli_event_list)
+{
+  UI_Actions slider_actions = ui_actions_from_id(slider_id, rli_event_list);
+
+  if (slider_actions.is_hovered) {
+    ui_set_next_color(slider_style->hover_color);
+  } else {
+    ui_set_next_color(slider_style->no_hover_color);
+  }
+  ui_set_next_size_x(ui_px(slider_style->width));
+  ui_set_next_size_y(ui_px(slider_style->height));
+  ui_set_next_corner_radius(slider_style->corner_r);
+  ui_set_next_layout_axis(Axis2__x);
+  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow);
+
+  B32 is_data_present = true;
+
+  Rect slider_box_rect = {};
+  {
+    UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_id);
+    is_data_present &= slider_box_data.is_found;
+    slider_box_rect = slider_box_data.on_screen_rect;
+  }
+
+  F32 thumb_container_width = slider_box_rect.width;
+  F32 max_thumb_offset = thumb_container_width;
+  F32 value_ratio = current_value / (max - min);
+  clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
+  F32 thumb_offset = max_thumb_offset * value_ratio;
+
+  if (slider_actions.is_down)
+  {
+    V2 mouse_pos = ui_get_mouse();
+    thumb_offset = mouse_pos.x - slider_box_rect.x;
+  }
+  clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
+
+  UI_Parent(slider_box)
+  {
+    ui_set_next_size_x(ui_px(thumb_offset));
+    ui_set_next_size_y(ui_px(slider_style->height));
+    ui_set_next_corner_radius(slider_style->corner_r);
+    ui_set_next_color(slider_style->slided_part_color);
+    UI_Box* thumb_box = ui_box_make(Str8{}, 0);
+  }
+
+  UI_Parent(slider_box)
+  {
+    ui_set_next_flags(UI_Box_flag__floating);
+    UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
+    {
+      ui_set_next_text_color(slider_style->text_color);
+      ui_label_fmt(slider_style->fmt_str, current_value);
+    }
+  }
+
+  // todo: Draw text in the middle of the slider 
+
+
+  F32 new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
+  return new_value;
+
+  // todo: Think about this, you dont really have to have last frame data for the slider if the data for 
+  //       the slider is fixed like with 1 strcitness and px size type.
+}
+
 // - Text input field 
 U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 
 U64 __ui_move_with_control_right(Str8 str, U64 current_pos);
 
-enum UI_Text_op_kind {
+enum UI_Text_op_kind {  
   UI_Text_op_kind__NONE,
   UI_Text_op_kind__move_cursor,
   UI_Text_op_kind__delete_section,
@@ -77,7 +159,9 @@ struct UI_Text_edit_box_state {
   U64 right_bound;
 };
 
-B32 ui_text_edit_box(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64 buffer_current_size, U64 cursor_pos, U64 section_start_pos, RLI_Event_list* rli_events)
+// note: This is for viewing the thing only. All the data is from the outside
+//       Also might be a good idea to call this text_box_read_only
+B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64 buffer_current_size, U64 cursor_pos, U64 section_start_pos, RLI_Event_list* rli_events)
 {
   clamp_u64_inplace(&cursor_pos, 0, buffer_max_size);
   clamp_u64_inplace(&section_start_pos, 0, buffer_max_size);
@@ -304,6 +388,15 @@ B32 ui_text_edit_box(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_st
   }
 
   return is_text_editing_done;
+}
+
+void ui_text_box_mutates(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64* buffer_current_size, U64* cursor_pos, U64* section_start_pos, RLI_Event_list* rli_events)
+{
+  Scratch scratch = get_scratch(0, 0);
+  UI_Text_op_list text_op_list = ui_text_op_list_from_rli_events(scratch.arena, rli_events);
+  ui_aply_text_ops(text_op_list, text_buffer, buffer_max_size, buffer_current_size, cursor_pos, section_start_pos);
+  ui_text_edit_box_static(edit_box_id, placeholder_str, edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, *buffer_current_size, *cursor_pos, *section_start_pos, rli_events);
+  end_scratch(&scratch);
 }
 
 #endif

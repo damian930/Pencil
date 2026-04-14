@@ -1,14 +1,22 @@
 Goals:
-- Be able to draw anywhere on the screen
-- Take screenshots of the screen with all the drawing on the screen
-- Be able to remove drawing with ctrl+z and then back with ctrl+y as ussual
-- Be able to switch the app off when it is not needed 
-- The app shoud have some ui for more advanced features, but for most of the time it 
-  will be transparent and the user will just toggle in on/off with a shourtcut and then draw on the scree  
+- simple drawing
+- change pen size
+- change pen color 
+- pen styles:
+  - regular line
+  - arrow 
+  - marker 
+  - blurere
+  - eraser
 
 todo:
-- Test hooks for getting events from the system
-- Read what martins said on discord about the gpu api instead of bitblt
+- smooth drawing lines
+- ability to change the size of the brush
+- ability to remove the last drawn and get it back
+
+- Create a global hot key (--It does not work for some reason--)
+- Create a global hook that will switch between modes based on the state,
+  the state is changed by the hot key.
 
 idea:
 - I dont think i need to intercept inputs on windows and then give some of them back.

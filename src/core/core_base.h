@@ -534,6 +534,7 @@ union Vec2_F32 {
 	F32 v[2];
 };
 typedef Vec2_F32 Vec2;
+typedef Vec2_F32 V2;
 
 tu_specific Vec2_F32 vec2_f32_make(F32 x, F32 y) { Vec2_F32 v = { x, y }; return v; }
 tu_specific B32 vec2_f32_match(Vec2_F32 v1, Vec2_F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
@@ -548,6 +549,7 @@ struct Rect {
 tu_specific Vec2_F32 rect_dims(Rect rect);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(Vec2_F32 v, Rect r);
+tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
 
 // note: this is static inline just cause i didnt care to move it to cpp file
 tu_specific B32 __is_memory_zero(U8* p, U64 size)
@@ -588,6 +590,7 @@ union Vec4_F32 {
 	struct { F32 r; F32 g; F32 b; F32 a; };
 };
 typedef Vec4_F32 Vec4;
+typedef Vec4_F32 V4;
 
 tu_specific Vec4_F32 vec4_f32_make(F32 x, F32 y, F32 z, F32 w) { Vec4_F32 v = { x, y, z, w }; return v; }
 
