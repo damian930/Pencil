@@ -56,9 +56,11 @@ struct Draw_record {
   Node_with_points* last_node_with_points;
   U64 nodes_count;
   
+  Draw_record* prev;
+  
   // Free list part
-  B32 _is_active;
   Draw_record* _next_free;
+  B32 _is_active;
 };
 
 struct G_state {
@@ -147,7 +149,6 @@ void update_pencil(G_state* G)
   if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
   {
     G->is_mid_drawing = false;
-    // G->current_draw_record = 0;
   }
 
   // Drawing or about to start drawing
@@ -158,8 +159,11 @@ void update_pencil(G_state* G)
     { 
       G->is_mid_drawing = true;
       
-      Assert(G->current_draw_record == 0);
-      G->current_draw_record = get_available_draw_record_from_pool(G);
+      Draw_record* new_draw_record = get_available_draw_record_from_pool(G);
+      new_draw_record->prev = G->current_draw_record; 
+
+      G->current_draw_record = new_draw_record;
+      
       Node_with_points* new_node = get_available_node_of_points_from_pool(G); // These nodes are just lists, so there is nothing to set up for them to work after getting the pool memory for them
       G->current_draw_record->first_node_with_points = new_node; 
       G->current_draw_record->last_node_with_points  = new_node; 
@@ -225,50 +229,50 @@ void update_pencil(G_state* G)
   } 
   else if (IsKeyPressed(KEY_BACKSPACE))
   {
-    // todo: Right now if yo press this twice it crashes on 0 pointer G->current_draw_record;
-
-    // If backspace is pressed, we have to remove the last draw_record from memory 
-    // and also remove it from the draw_texture
-    
-    // Removing the record from draw_texure
-    for (Node_with_points* node = G->current_draw_record->first_node_with_points; node; node = node->next)
+    if (G->current_draw_record)
     {
-      for (U64 p_index = 0; p_index < node->points_count; p_index += 1)
+      // Removing the record from draw_texure
+      for (Node_with_points* node = G->current_draw_record->first_node_with_points; node; node = node->next)
       {
-        Temp_arena temp = temp_arena_begin(G->frame_arena);
-        U32* px_to_update = ArenaPush(temp.arena, U32);
-        ((U8*)(px_to_update))[0] = 0;   // (U8)G->pen_color.r;
-        ((U8*)(px_to_update))[1] = 0;   // (U8)G->pen_color.g;
-        ((U8*)(px_to_update))[2] = 0;   // (U8)G->pen_color.b;
-        ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
-        V2 point = node->points[p_index];
-        Rectangle affected_rect = { point.x, point.y, 1, 1 };
-        UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
-        temp_arena_end(&temp);
+        for (U64 p_index = 0; p_index < node->points_count; p_index += 1)
+        {
+          Temp_arena temp = temp_arena_begin(G->frame_arena);
+          U32* px_to_update = ArenaPush(temp.arena, U32);
+          ((U8*)(px_to_update))[0] = 0;   // (U8)G->pen_color.r;
+          ((U8*)(px_to_update))[1] = 0;   // (U8)G->pen_color.g;
+          ((U8*)(px_to_update))[2] = 0;   // (U8)G->pen_color.b;
+          ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
+          V2 point = node->points[p_index];
+          Rectangle affected_rect = { point.x, point.y, 1, 1 };
+          UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
+          temp_arena_end(&temp);
+        }
       }
+  
+      // Puting the used point nodes by the last draw record back into the pool
+      {
+        G->current_draw_record->last_node_with_points->next = G->first_free_node_with_points;
+        Node_with_points* node_stack_head_p = G->current_draw_record->first_node_with_points;
+        Node_with_points* next_p = node_stack_head_p->next;
+        *node_stack_head_p = Node_with_points{};
+        node_stack_head_p->next = next_p;
+        node_stack_head_p->_is_active = false;
+        G->first_free_node_with_points = node_stack_head_p;
+      }
+      
+      Draw_record* record_to_remove = G->current_draw_record;
+      G->current_draw_record = G->current_draw_record->prev;
+
+      // Puting the used draw_record back into the pool
+      {
+        *record_to_remove = Draw_record{};
+        record_to_remove->_is_active = false;
+        record_to_remove->_next_free = G->first_free_draw_record;
+        G->first_free_draw_record = record_to_remove;
+      }
+  
     }
 
-    // Puting the used point nodes by the last draw record back into the pool
-    {
-      G->current_draw_record->last_node_with_points->next = G->first_free_node_with_points;
-      Node_with_points* node_stack_head_p = G->current_draw_record->first_node_with_points;
-      Node_with_points* next_p = node_stack_head_p->next;
-      *node_stack_head_p = Node_with_points{};
-      node_stack_head_p->next = next_p;
-      node_stack_head_p->_is_active = false;
-      G->first_free_node_with_points = node_stack_head_p;
-    }
-
-    // Puting the used draw_record back into the pool
-    {
-      Draw_record* record = G->current_draw_record;
-      *record = Draw_record{};
-      record->_is_active = false;
-      record->_next_free = G->first_free_draw_record;
-      G->first_free_draw_record = record;
-    }
-
-    G->current_draw_record = 0;
   }
 }
 
