@@ -23,43 +23,6 @@
 #undef ShowCursor
 #undef Rectangle
 
-// note: This is for hooks, which i dont yet use
-// #include "dwmapi.h"
-// #pragma comment(lib, "dwmapi.lib")
-
-struct Node_with_points {
-  // B32 is_active;
-  // Node_with_points* next;
-  V2 points[100];
-  U16 points_count;
-};
-StaticAssert(ArrayCount(Node_with_points::points) <= u16_max);
-
-struct Draw_record {
-  Node_with_points* node_with_points;
-};
-
-struct G_state {
-  Arena* frame_arena;
-  Texture draw_texture;
-  U64 pen_size;
-  V4 pen_color;
-
-
-  // Draw_record draw_record;
-  Arena* arena_for_nodes_with_points;
-  U64 nodes_with_points_count;
-  Node_with_points* first_node_with_points;
-  
-  // note: This is for later 
-  // Draw_record draw_reconds[10];
-
-  B32 is_mid_drawing;
-};
-
-// Ring buffer or draw recconds
-// Each reccond is a line, a line is the thing we drew while holding the left mouse button down 
-
 V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
 { 
   Scratch scratch = get_scratch(0, 0);
@@ -70,13 +33,61 @@ V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
   return result;
 }
 
-Node_with_points* get_current_node_with_points(const G_state* G)
-{
-  Assert(G->nodes_with_points_count > 0);
-  Node_with_points* node = G->first_node_with_points + (G->nodes_with_points_count - 1);
-  return node;
-}
+// note: This is for hooks, which i dont yet use
+// #include "dwmapi.h"
+// #pragma comment(lib, "dwmapi.lib")
 
+// todo: Add a way to have multiple draw records and go back between each one
+// todo: Since records are infinite, maku sure you dont run out of space 
+
+struct Node_with_points {
+  V2 points[100];
+  U16 points_count;
+  Node_with_points* next; // This is shared with the free list 
+  Node_with_points* prev; 
+
+  // Free list part
+  B32 _is_active;
+};
+StaticAssert(ArrayCount(Node_with_points::points) <= u16_max);
+
+struct Draw_record {
+  Node_with_points* first_node_with_points;
+  Node_with_points* last_node_with_points;
+  U64 nodes_count;
+  
+  // Free list part
+  B32 _is_active;
+  Draw_record* _next_free;
+};
+
+struct G_state {
+  Arena* frame_arena;
+  Texture draw_texture;
+  U64 pen_size;
+  V4 pen_color;
+
+  // Pool of draw_records  
+  Arena* arena_for_draw_records;
+  Draw_record* first_draw_record;
+  U64 allocated_draw_records_count;
+  Draw_record* first_free_draw_record;
+
+  // Pool of nodes_with_points
+  Arena* arena_for_nodes_with_points;
+  Node_with_points* first_node_with_points;
+  U64 allocated_nodes_with_points_count;
+  Node_with_points* first_free_node_with_points;
+
+  // Stuff for while drawing
+  B32 is_mid_drawing;
+  Draw_record* current_draw_record;
+};
+
+// Ring buffer or draw recconds
+// Each reccond is a line, a line is the thing we drew while holding the left mouse button down 
+
+/*
 void store_point(G_state* G, V2 point)
 {
   Node_with_points* current_node_with_points = get_current_node_with_points(G);
@@ -91,83 +102,173 @@ void store_point(G_state* G, V2 point)
   V2* new_point = current_node_with_points->points + (current_node_with_points->points_count++);
   *new_point = point;
 }
+*/
+
+Node_with_points* get_available_node_of_points_from_pool(G_state* G)
+{
+  Node_with_points* node = G->first_free_node_with_points;
+  if (node)
+  {
+    G->first_free_node_with_points = G->first_free_node_with_points->next;
+    *node = Node_with_points{};
+  }
+  else
+  {
+    node = ArenaPush(G->arena_for_nodes_with_points, Node_with_points);
+    G->allocated_nodes_with_points_count += 1;
+  }
+  node->_is_active = true;
+  return node;
+}
+
+Draw_record* get_available_draw_record_from_pool(G_state* G)
+{
+  Draw_record* draw_record = G->first_free_draw_record;
+  if (draw_record)
+  {
+    G->first_free_draw_record = G->first_free_draw_record->_next_free;
+    *draw_record = Draw_record{};
+  }
+  else 
+  {
+    draw_record = ArenaPush(G->arena_for_draw_records, Draw_record);
+    G->allocated_draw_records_count += 1;
+  }
+  draw_record->_is_active = true;
+  return draw_record;
+}
 
 void update_pencil(G_state* G)
 {
-  static B32 done_with_the_first_draw = false;
-  if (G->is_mid_drawing && IsMouseButtonUp(MOUSE_BUTTON_LEFT))
+  Assert(G->first_draw_record != 0);
+  Assert(G->first_node_with_points != 0);
+  
+  // User is no longer holding the mouse, have to end drawing mode 
+  if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
   {
-    done_with_the_first_draw = true;
+    G->is_mid_drawing = false;
+    // G->current_draw_record = 0;
   }
 
-  // note: for now we can only draw once
-  if (done_with_the_first_draw == false && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+  // Drawing or about to start drawing
+  if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
   {
-    // Setting up the new Draw_record to be filled
+    // Starting to draw a new record
     if (!G->is_mid_drawing) 
     { 
       G->is_mid_drawing = true;
-      // G->draw_record = Draw_record{};
-      Assert(G->first_node_with_points == ArenaCurrentPos(G->arena_for_nodes_with_points, Node_with_points));
-      G->nodes_with_points_count = 0;
-      arena_clear(G->arena_for_nodes_with_points);
       
-      ArenaPush(G->arena_for_nodes_with_points, Node_with_points);
-      G->nodes_with_points_count += 1;
+      Assert(G->current_draw_record == 0);
+      G->current_draw_record = get_available_draw_record_from_pool(G);
+      Node_with_points* new_node = get_available_node_of_points_from_pool(G); // These nodes are just lists, so there is nothing to set up for them to work after getting the pool memory for them
+      G->current_draw_record->first_node_with_points = new_node; 
+      G->current_draw_record->last_node_with_points  = new_node; 
+      G->current_draw_record->nodes_count = 0; 
+    }
+
+    Vector2 mouse_pos = GetMousePosition();
+
+    // note: Count of a linked to node cant be zero
+    Assert(G->current_draw_record && G->current_draw_record->_is_active);
+    Assert(G->current_draw_record->first_node_with_points != 0);
+    Assert(G->current_draw_record->last_node_with_points != 0);
+    
+    Node_with_points* last_node = G->current_draw_record->last_node_with_points;
+    B32 prev_point_exists = false;
+    V2 prev_point = {};
+    
+    // Adding a new node up front if the last one is full
+    if (last_node->points_count == ArrayCount(last_node->points))
+    {
+      Node_with_points* new_node = get_available_node_of_points_from_pool(G);
+      DllPushBack_Name(G->current_draw_record, new_node, first_node_with_points, last_node_with_points, next, prev);
+      G->current_draw_record->nodes_count += 1;
+      last_node = new_node;
     }
     
-    if (G->is_mid_drawing)
+    // Checking if the last point exists 
+    if (last_node->points_count == 0 && last_node->prev != 0)
     {
-      Vector2 mouse_pos = GetMousePosition();
-  
-      // Updating the current Draw_record we are creating
-      Assert(G->nodes_with_points_count > 0);
-      Node_with_points* current_node = get_current_node_with_points(G);
-      if (current_node->points_count == 0) // 
-      {
-        store_point(G, { mouse_pos.x, mouse_pos.y }); // Just store 
-      }
-      else 
-      {
-        // Get the last one, see if it is the same as the possible new one and if it is, then dont store the new one
-        V2 last_stored_point = current_node->points[current_node->points_count - 1];
-        if (last_stored_point.x != mouse_pos.x || last_stored_point.y != mouse_pos.y)
-        {
-          store_point(G, { mouse_pos.x, mouse_pos.y });
-        }
-      }
-  
-      // Updating the drawing texture on the GPU
+      Assert(last_node->prev->points_count == ArrayCount(last_node->prev->points), "Why the fuck do you have a 0 filled node that has an unfilled prev node ???"); 
+      prev_point = last_node->prev->points[last_node->prev->points_count - 1];
+      prev_point_exists = true;
+    }
+    else 
+    {
+      prev_point = last_node->points[last_node->points_count - 1];
+      prev_point_exists = true;
+    }
+
+    // Storing the new points
+    B32 shoud_draw_point = false;
+    if (!prev_point_exists || mouse_pos.x != prev_point.x || mouse_pos.y != prev_point.y)
+    {
+      Assert(last_node->points_count != ArrayCount(last_node->points)); // Just checking
+      V2* point = last_node->points + (last_node->points_count++);
+      point->x = mouse_pos.x;
+      point->y = mouse_pos.y;
+      shoud_draw_point = true;
+    }
+
+    if (shoud_draw_point)
+    {
       Temp_arena temp = temp_arena_begin(G->frame_arena);
       U32* px_to_update = ArenaPush(temp.arena, U32);
-      ((U8*)(px_to_update))[0] = G->pen_color.r;
-      ((U8*)(px_to_update))[1] = G->pen_color.g;
-      ((U8*)(px_to_update))[2] = G->pen_color.b;
-      ((U8*)(px_to_update))[3] = G->pen_color.a;
+      ((U8*)(px_to_update))[0] = 255; // (U8)G->pen_color.r;
+      ((U8*)(px_to_update))[1] = 50; // (U8)G->pen_color.g;
+      ((U8*)(px_to_update))[2] = 255; // (U8)G->pen_color.b;
+      ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
       Rectangle affected_rect = { mouse_pos.x, mouse_pos.y, 1, 1 };
       UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
       temp_arena_end(&temp);
     }
   } 
-  else if (IsKeyDown(KEY_BACKSPACE))
+  else if (IsKeyPressed(KEY_BACKSPACE))
   {
-    // Remove the last Draw_recond from the draw_texture
-    for (U64 node_index = 0; node_index < G->nodes_with_points_count; node_index += 1)
+    // todo: Right now if yo press this twice it crashes on 0 pointer G->current_draw_record;
+
+    // If backspace is pressed, we have to remove the last draw_record from memory 
+    // and also remove it from the draw_texture
+    
+    // Removing the record from draw_texure
+    for (Node_with_points* node = G->current_draw_record->first_node_with_points; node; node = node->next)
     {
-      Node_with_points* node = G->first_node_with_points + node_index;
-      for (U64 point_index = 0; point_index < node->points_count; point_index += 1)
+      for (U64 p_index = 0; p_index < node->points_count; p_index += 1)
       {
-        V2 point = node->points[point_index];
-        U32 px_to_remove = 0;
-        ((U8*)(&px_to_remove))[3] = 255;
-        Rectangle update_rect = { point.x, point.y, 1, 1 };
-        UpdateTextureRec(G->draw_texture, update_rect, &px_to_remove);
+        Temp_arena temp = temp_arena_begin(G->frame_arena);
+        U32* px_to_update = ArenaPush(temp.arena, U32);
+        ((U8*)(px_to_update))[0] = 0;   // (U8)G->pen_color.r;
+        ((U8*)(px_to_update))[1] = 0;   // (U8)G->pen_color.g;
+        ((U8*)(px_to_update))[2] = 0;   // (U8)G->pen_color.b;
+        ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
+        V2 point = node->points[p_index];
+        Rectangle affected_rect = { point.x, point.y, 1, 1 };
+        UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
+        temp_arena_end(&temp);
       }
     }
 
-    G->nodes_with_points_count = 0;
-    G->first_node_with_points = ArenaCurrentPos(G->arena_for_nodes_with_points, Node_with_points);
-    arena_clear(G->arena_for_nodes_with_points);
+    // Puting the used point nodes by the last draw record back into the pool
+    {
+      G->current_draw_record->last_node_with_points->next = G->first_free_node_with_points;
+      Node_with_points* node_stack_head_p = G->current_draw_record->first_node_with_points;
+      Node_with_points* next_p = node_stack_head_p->next;
+      *node_stack_head_p = Node_with_points{};
+      node_stack_head_p->next = next_p;
+      node_stack_head_p->_is_active = false;
+      G->first_free_node_with_points = node_stack_head_p;
+    }
+
+    // Puting the used draw_record back into the pool
+    {
+      Draw_record* record = G->current_draw_record;
+      *record = Draw_record{};
+      record->_is_active = false;
+      record->_next_free = G->first_free_draw_record;
+      G->first_free_draw_record = record;
+    }
+
+    G->current_draw_record = 0;
   }
 }
 
@@ -184,11 +285,15 @@ int main()
   Font font_roboto = LoadFont("../data/Roboto.ttf");
 
   G_state G = {};
+
   G.frame_arena = arena_alloc(Megabytes(64));
-  G.arena_for_nodes_with_points = arena_alloc(Megabytes(64));
-  G.first_node_with_points = ArenaCurrentPos(G.arena_for_nodes_with_points, Node_with_points);
   G.pen_size = 1;
-  G.pen_color = { 0, 0, 255, 255 };
+
+  G.arena_for_draw_records = arena_alloc(Megabytes(64));
+  G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
+  
+  G.arena_for_nodes_with_points = arena_alloc(Megabytes(64));;
+  G.first_node_with_points = ArenaCurrentPos(G.arena_for_nodes_with_points, Node_with_points);
 
   G.draw_texture = {};
   {

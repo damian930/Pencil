@@ -35,6 +35,10 @@ void arena_release(Arena* arena)
 
 U8* arena_push_nozero(Arena* arena, U64 size_to_push)
 {
+  // note: I have houd this too happend some times when you write some code with state for the first time.
+  //       You forget to init the arena. Debuggers dont show this very well, so i just added this.
+  if (arena == 0) { BreakPoint(); } 
+
   if (arena->bytes_used + size_to_push > arena->bytes_allocated)
   {
     BreakPoint();
