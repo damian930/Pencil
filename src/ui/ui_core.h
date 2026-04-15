@@ -9,6 +9,7 @@
   - If ther is a parent box and it has a single child and child fills the whole parent, 
     if we get actions for both of them, only parent will produce interacted with events.
     Not sure if its a problem, but think aobut it.
+  - there are no assert right now it place that show that you use the ui bulding part of the ui core before ui begin the build process
 */
 
 typedef Vec2_F32 (UI_text_measuring_ft) (Str8 text, Font font, F32 font_size);

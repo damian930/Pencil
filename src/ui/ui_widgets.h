@@ -157,6 +157,154 @@ UI_Text_op* ui_text_op_list_push(Arena* arena, UI_Text_op_list* list, UI_Text_op
 UI_Text_op_list ui_text_op_list_from_rli_events(Arena* arena, RLI_Event_list* event_list);
 void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start);
 
+///////////////////////////////////////////////////////////
+// - Attempt to redo text edit box again (this shoud like like the text edit box for the search bar on youtube)
+//
+// struct UI_Text_edit_box_style {
+//   F32 width_in_px;
+//   Font font;
+//   F32 font_size;
+//   // V4 text_color;
+//   // add: value that specifies how many simbols are minimum on a side to start changing clip offset
+// };
+// void ui_text_edit_box(
+//   const UI_Text_edit_box_style* edit_box_style, 
+//   U8* text_buffer, 
+//   U64 text_buffer_max_size, // todo: I feel like for displaying this is not really needed 
+//   U64 text_buffer_current_size, 
+//   U64 cursor, 
+//   U64 section,
+//   RLI_Event_list* rli_events,
+//   U64* left_wall_index,
+//   U64* right_wall_index //,
+//   // B32* is_first_time
+// ) {
+//   Str8 text_buffer_as_str = str8_manuall(text_buffer, text_buffer_current_size);
+
+//   if (cursor > *right_wall_index) 
+//   {
+//     // note: cursor is more than 0 here always 
+//     *right_wall_index = cursor;
+    
+//     F32 accumulated_text_width = 0.0f;
+//     for (U64 test_left_wall_index = *right_wall_index - 1;; )
+//     {
+//       Str8 test_char_str = str8_substring(text_buffer_as_str, test_left_wall_index, test_left_wall_index + 1);
+//       V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
+//       accumulated_text_width += dims.x;
+//       if (accumulated_text_width > edit_box_style->width_in_px)
+//       {
+//         *left_wall_index = test_left_wall_index + 1;
+//         break;
+//       }
+//       if (test_left_wall_index == 0) { break; }
+//       test_left_wall_index -= 1;
+//     }
+//   }
+//   else if (cursor < *left_wall_index)
+//   {
+//     BreakPoint();
+//   }
+
+//   F32 height_in_px = 0.0f;
+//   {
+//     V2 dims = ui_measure_text_ex(Str8FromC(" "), edit_box_style->font, edit_box_style->font_size);
+//     height_in_px = dims.y;
+//   }
+
+//   Str8 edit_box_id = Str8FromC("Edit box id");
+
+//   ui_set_next_color({ 255, 255, 255, 255 });
+//   ui_set_next_size_x(ui_px(edit_box_style->width_in_px));
+//   ui_set_next_size_y(ui_px(height_in_px));
+//   UI_Box* edit_box = ui_box_make(Str8FromC("Edit box id"), 0/*UI_Box_flag__dont_draw_overflow*/);
+
+//   static B32 is_active = false;
+//   UI_Actions edit_box_actions = ui_actions_from_box(edit_box, rli_events);
+//   if (edit_box_actions.is_clicked && !is_active)
+//   {
+//     is_active = true; 
+//   }
+
+//   F32 clip_offset = 0.0f;
+//   if (cursor == *right_wall_index)
+//   {
+//     Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, *right_wall_index + 1);
+//     // Str8 str_between_walls   = str8_substring(text_buffer_as_str, *left_wall_index, *right_wall_index + 1);
+
+//     V2 till_right_wall_dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
+//     // V2 between_walls_dims    = ui_measure_text_ex(str_between_walls, edit_box_style->font, edit_box_style->font_size);
+
+//     clip_offset = till_right_wall_dims.x - edit_box_style->width_in_px;
+//     if (clip_offset < 0.0f) { clip_offset = 0.0f; }
+//   }
+
+//   edit_box->clip_offset.x = -1 * clip_offset;
+//   UI_Parent(edit_box)
+//   {
+//     // Text 
+//     ui_label(text_buffer_as_str);
+  
+//     // Cursor offset box
+//     F32 cursor_width = 2.0f;
+    
+//     ui_set_next_size_x(ui_px(edit_box_style->width_in_px)); ui_set_next_size_y(ui_px(height_in_px));
+//     ui_set_next_layout_axis(Axis2__x);
+//     ui_set_next_flags(UI_Box_flag__floating);
+//     UI_Box* cursor_offset_box = ui_box_make(Str8{}, 0);
+
+//     F32 cursor_box_clip_offset = clip_offset + cursor_width;
+//     if (cursor_box_clip_offset < 0.0f) { cursor_box_clip_offset = 0.0f; }
+//     cursor_offset_box->clip_offset.x = -1 * cursor_box_clip_offset;
+    
+//     UI_Parent(cursor_offset_box)
+//     {
+//       Str8 str_before_cursor = str8_substring(text_buffer_as_str, 0, cursor);
+//       F32 x_offset = ui_measure_text_ex(str_before_cursor, edit_box_style->font, edit_box_style->font_size).x;
+//       ui_spacer(ui_px(x_offset));
+
+//       ui_set_next_size_x(ui_px(cursor_width)); ui_set_next_size_y(ui_px(height_in_px));
+//       ui_set_next_color({ 0, 0, 0, 255 });
+//       UI_Box* cursor_line_box = ui_box_make(Str8{}, 0);
+//     }
+
+//     #define DRAW_DEBUG_WALLS 0
+//     #if DRAW_DEBUG_WALLS
+//     {
+//       ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
+//       ui_set_next_layout_axis(Axis2__x);
+//       ui_set_next_flags(UI_Box_flag__floating);
+//       UI_Box* left_wall_offset_box = ui_box_make(Str8{}, 0);
+//       left_wall_offset_box->clip_offset.x = -1 * (clip_offset + 1);
+      
+//       UI_Parent(left_wall_offset_box)
+//       {
+//         Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, *left_wall_index + 1);
+//         V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
+//         ui_spacer(ui_px(dims.x));
+
+//         ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
+//         ui_set_next_color({ 255, 0, 0, 255 });
+//         UI_Box* left_wall = ui_box_make(Str8{}, 0);
+//       }
+
+//     }
+//     #endif
+//     #undef DRAW_DEBUG_WALLS
+//   }
+
+  
+
+
+
+
+
+
+//   // When we go left we base it off of the left wall
+//   // Whne we go right we base it off of the right wall
+
+// }
+
 struct UI_Text_edit_box_state {
   U64 left_bound;
   U64 right_bound;
@@ -164,8 +312,26 @@ struct UI_Text_edit_box_state {
 
 // note: This is for viewing the thing only. All the data is from the outside
 //       Also might be a good idea to call this text_box_read_only
-B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64 buffer_current_size, U64 cursor_pos, U64 section_start_pos, RLI_Event_list* rli_events)
-{
+B32 ui_text_edit_box_static(
+  Str8 edit_box_id, 
+  Str8 placeholder_str, 
+  UI_Text_edit_box_state* edit_box_state, 
+  UI_Size edit_box_size_x, 
+  U8* text_buffer, 
+  U64 buffer_max_size, 
+  U64 buffer_current_size, 
+  U64 cursor_pos, 
+  U64 section_start_pos, 
+  RLI_Event_list* rli_events
+) {
+  // todo: Make sure you understand the code here
+  // todo: Change the logic for the bounds, they shoud be more like indexes, this makes more sence for the implementationimplementationimplementationimplementationimplementation
+  // todo: Fix the bugs with this implementation
+  //        - activeness bugs
+  //        - disapering cursor bugs
+  // todo: Be able to change the size of the cursor
+  // todo: Add a way to spcify the number of string to still be visible after the bound, so the bound is no longer just the visible part of the screen
+
   clamp_u64_inplace(&cursor_pos, 0, buffer_max_size);
   clamp_u64_inplace(&section_start_pos, 0, buffer_max_size);
   
@@ -175,15 +341,10 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
   
   U64 left_bound  = edit_box_state->left_bound;
   U64 right_bound = edit_box_state->right_bound;
-  
-  // todo: If screen changes and there is less space now, the buonds might be incorect.
-  //       If they are, the ui will be invalid. 
-  //       Implement adjestment logic.
-  //       Cursor gets clipped if in the end, right now i have a hard offset offset for this, not the best 
 
+  // Calculating bounds if not valid
   if (edit_box_clip_data.is_found)
   {
-    // Calculating bounds if not valid
     if (cursor_pos < left_bound) 
     {
       left_bound = cursor_pos;
@@ -258,7 +419,6 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
       F32* text_clip_x = &edit_box_clip_data.clip_offset->x;
       *text_clip_x = -(width_before_right_bound - width_inbound_str - extra_space); 
     }
-    
 
     Assert(left_bound <= cursor_pos && cursor_pos <= (right_bound + 1));
   }
@@ -282,8 +442,8 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
   edit_box_state->left_bound = left_bound;
   edit_box_state->right_bound = right_bound;
 
-  Font font       = ui_get_font();      ui_auto_pop_font_stack(); 
-  F32 font_size   = ui_get_font_size(); ui_auto_pop_font_size_stack();
+  Font font       = ui_get_font();      
+  F32 font_size   = ui_get_font_size(); 
   F32 line_height = ui_measure_text_ex(Str8FromC("a"), font, font_size).y; // todo: Use a better way to retrive line height
   
   // UI routine
@@ -293,9 +453,6 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
   ui_push_font(font);
   ui_push_font_size(font_size);
   ui_push_text_color(text_color);
-  // UI_Font(font)
-  // UI_FontSize(font_size)
-  // UI_TextColor(text_color)
   {  
     ui_set_next_size_x(edit_box_size_x);
     ui_set_next_size_y(ui_px(line_height));
@@ -304,19 +461,9 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
     UI_Box* edit_box = ui_box_make(edit_box_id, 0);
     
     UI_Actions edit_box_actions = ui_actions_from_box(edit_box, rli_events);
-    if (!ui_is_active(edit_box_id) && edit_box_actions.is_down)
+    if (!ui_is_active(edit_box_id) && edit_box_actions.is_clicked)
     {
       ui_set_active(edit_box_id);
-    }
-    if (edit_box_actions.enter_got_pressed)
-    {
-      ui_reset_active();
-      is_text_editing_done = true;
-    }
-    if (edit_box_actions.escape_got_pressed)
-    {
-      ui_reset_active();
-      // todo: this shoud just reset text but not tell the user to use it
     }
 
     UI_Parent(edit_box)
@@ -353,6 +500,7 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
           UI_Box* cursor_box = ui_box_make(Str8{}, 0);
         }
       }
+      /*
       else if (ui_is_active(edit_box_id) && cursor_pos != section_start_pos)
       {
         Str8 str_before_section = str8_substring(buffer_str, 0, Min(section_start_pos, cursor_pos));
@@ -370,7 +518,7 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
         ui_set_next_size_x(ui_p_of_p(1.0f, 1.0f)); 
         ui_set_next_size_y(ui_px(line_height));
         ui_set_next_layout_axis(Axis2__x);
-        ui_set_next_flags(UI_Box_flag__floating/*|UI_Box_flag__dont_draw_overflow*/); 
+        ui_set_next_flags(UI_Box_flag__floating); 
         UI_Box* section_clip_box = ui_box_make(Str8{}, 0);
         {
           F32* section_clip = &section_clip_box->clip_offset.x;
@@ -387,19 +535,23 @@ B32 ui_text_edit_box_static(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit
       else {
         InvalidCodePath();
       }
+      */
     }
   }
 
   return is_text_editing_done;
 }
 
-void ui_text_box_mutates(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64* buffer_current_size, U64* cursor_pos, U64* section_start_pos, RLI_Event_list* rli_events)
+/*
+B32 ui_text_box_mutates(Str8 edit_box_id, Str8 placeholder_str, UI_Text_edit_box_state* edit_box_state, UI_Size edit_box_size_x, U8* text_buffer, U64 buffer_max_size, U64* buffer_current_size, U64* cursor_pos, U64* section_start_pos, RLI_Event_list* rli_events)
 {
   Scratch scratch = get_scratch(0, 0);
   UI_Text_op_list text_op_list = ui_text_op_list_from_rli_events(scratch.arena, rli_events);
   ui_aply_text_ops(text_op_list, text_buffer, buffer_max_size, buffer_current_size, cursor_pos, section_start_pos);
-  ui_text_edit_box_static(edit_box_id, placeholder_str, edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, *buffer_current_size, *cursor_pos, *section_start_pos, rli_events);
+  B32 enter_got_pressed = ui_text_edit_box_static(edit_box_id, placeholder_str, edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, *buffer_current_size, *cursor_pos, *section_start_pos, rli_events);
   end_scratch(&scratch);
+  return enter_got_pressed;
 }
+*/
 
 #endif

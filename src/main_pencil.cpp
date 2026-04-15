@@ -368,19 +368,30 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 
         ui_spacer(ui_px(25));
 
-        ui_set_next_color({ 107, 75, 10, 255 });
-        UI_PaddedBox(ui_px(5), Axis2__x)
-        {
-          Str8 edit_box_id = Str8FromC("Edit box for red color"); 
-          static UI_Text_edit_box_state edit_box_state = {}; 
-          static UI_Size edit_box_size_x = ui_px(100); 
-          static U8 text_buffer[2] = "0"; 
-          static U64 buffer_max_size = ArrayCount(text_buffer); 
-          static U64 buffer_current_size = 1; 
-          static U64 cursor_pos = 0;
-          static U64 section_start_pos = 0;
-          ui_text_box_mutates(edit_box_id, Str8{}, &edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, &buffer_current_size, &cursor_pos, &section_start_pos, rli_events);
-        }
+        // ui_set_next_color({ 107, 75, 10, 255 });
+        // UI_PaddedBox(ui_px(5), Axis2__x)
+        // {
+        //   // Retained state for the edit box
+        //   static UI_Text_edit_box_state edit_box_state = {}; 
+        //   static U64 buffer_current_size               = 0; 
+        //   static U64 cursor_pos                        = 0;
+        //   static U64 section_start_pos                 = 0;
+
+        //   Assert(0 < G->pen_size && G->pen_size < 100);
+        //   // Scratch scratch = get_scratch(0, 0);
+        //   U8 text_buffer[3];
+        //   U64 buffer_max_size = ArrayCount(text_buffer);
+        //   snprintf((char*)text_buffer, buffer_max_size, "%lld", G->pen_size);
+
+        //   Str8 edit_box_id = Str8FromC("Red color edit box");
+        //   UI_Size edit_box_size_x = ui_px(100); 
+        //   B32 enter_go_pressed = ui_text_box_mutates(edit_box_id, Str8{}, &edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, &buffer_current_size, &cursor_pos, &section_start_pos, rli_events);
+        //   int new_red_color_value = atoi((char*)text_buffer);
+        //   if (enter_go_pressed)
+        //   {
+        //     G->pen_color.r = (F32)new_red_color_value;
+        //   }
+        // }
 
       }
 
@@ -437,17 +448,49 @@ int main()
     arena_clear(G.frame_arena);
     RLI_Event_list* rli_events = RLI_get_frame_inputs(); 
     
-    if (!G.is_mid_drawing)
+    // if ui has an active element which we are holding, then we dont start interacting with the app (drawing part)
+    
+    ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY());
+    ui_push_font(G.font_texture_for_ui);
+
+    UI_PaddedBox(ui_px(200), Axis2__x)
     {
-      update_pencil_ui(&G, rli_events);
+      static U8 buffer[100] = {};
+      static U64 current_size = 0;
+      static U64 cursor = 0;
+      static U64 section = 0;
+
+      Scratch scratch = get_scratch(0, 0);
+      UI_Text_op_list text_ops = ui_text_op_list_from_rli_events(scratch.arena, rli_events);
+      ui_aply_text_ops(text_ops, buffer, ArrayCount(buffer), &current_size, &cursor, &section);
+      end_scratch(&scratch);
+
+      UI_Text_edit_box_style edit_box_style = {};
+      edit_box_style.font        = ui_get_font();
+      edit_box_style.font_size   = ui_get_font_size();
+      edit_box_style.width_in_px = 100;
+
+      static U64 left_wall = 0;
+      static U64 right_wall = 0;
+
+      ui_push_text_color({ 255, 0, 255, 255 });
+      ui_text_edit_box(&edit_box_style, buffer, ArrayCount(buffer), current_size, cursor, section, rli_events, &left_wall, &right_wall);
     }
 
-    update_pencil(&G, ui_has_active());
+    ui_end_build();
+
+
+    // if (!G.is_mid_drawing)
+    // {
+    //   update_pencil_ui(&G, rli_events);
+    // }
+
+    // update_pencil(&G, ui_has_active());
 
     DeferLoop(BeginDrawing(), EndDrawing())
     {
       Texture draw_texture = G.draw_texture;
-      ClearBackground(BLACK);
+      ClearBackground(BLUE);
       DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
       DrawFPS(0, 0);
       ui_draw();
