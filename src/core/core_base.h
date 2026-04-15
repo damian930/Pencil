@@ -68,6 +68,7 @@ Compiler;
 #if COMPILER_MSVC
 	#include <intrin.h>
 	
+	// todo: Remove this in release, it crashed the app the same way
 	#undef BreakPoint
 	#define BreakPoint(...) do { printf("\n=== BreakPoint() macro fired ===\n\n"); __debugbreak(); } while (0) 
 
