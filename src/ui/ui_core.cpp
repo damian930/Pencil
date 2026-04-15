@@ -706,6 +706,13 @@ B32 ui_is_no_active()
   return result; 
 }
 
+B32 ui_has_active()
+{
+  Str8 id = ui_get_context()->currently_active_box_id;
+  B32 result = !str8_match(id, Str8{}, 0);
+  return result;
+}
+
 B32 ui_is_active(Str8 box_id)
 {
   UI_Context* ctx = ui_get_context();

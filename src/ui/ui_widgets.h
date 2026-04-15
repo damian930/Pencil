@@ -37,8 +37,6 @@ struct UI_Slider_style {
   V4 no_hover_color;
   V4 slided_part_color;
   V4 text_color;
-
-  // add: padding from the walls of the slider to the thumb 
 };
 F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, RLI_Event_list* rli_event_list)
 {
@@ -70,10 +68,17 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
   F32 thumb_offset = max_thumb_offset * value_ratio;
 
+  B32 moved_slider = false;
   if (slider_actions.is_down)
   {
     V2 mouse_pos = ui_get_mouse();
     thumb_offset = mouse_pos.x - slider_box_rect.x;
+    moved_slider = true;
+    ui_set_active(slider_box->id);
+  }
+  else 
+  {
+    ui_reset_active_match(slider_box->id);
   }
   clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
 
@@ -96,14 +101,12 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     }
   }
 
-  // todo: Draw text in the middle of the slider 
-
-
-  F32 new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
+  F32 new_value = current_value;
+  if (moved_slider)
+  {
+    new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
+  }
   return new_value;
-
-  // todo: Think about this, you dont really have to have last frame data for the slider if the data for 
-  //       the slider is fixed like with 1 strcitness and px size type.
 }
 
 // - Text input field 

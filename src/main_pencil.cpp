@@ -52,6 +52,7 @@ struct Node_with_points {
 StaticAssert(ArrayCount(Node_with_points::points) <= u16_max);
 
 struct Draw_record {
+  U64 pen_size;
   Node_with_points* first_node_with_points;
   Node_with_points* last_node_with_points;
   U64 nodes_count;
@@ -84,6 +85,13 @@ struct G_state {
   // Stuff for while drawing
   B32 is_mid_drawing;
   Draw_record* current_draw_record;
+
+  // Signals (These are just here like this right now)
+  B32 signal_new_pen_size;
+  U64 new_pen_size;
+
+  // Misc
+  Font font_texture_for_ui;
 };
 
 // Ring buffer or draw recconds
@@ -140,11 +148,25 @@ Draw_record* get_available_draw_record_from_pool(G_state* G)
   return draw_record;
 }
 
-void update_pencil(G_state* G)
+void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 {
   Assert(G->first_draw_record != 0);
   Assert(G->first_node_with_points != 0);
   
+  // Handling signals
+  {
+    if (G->signal_new_pen_size)
+    {
+      Assert(G->is_mid_drawing == false); // Just making sure
+      if (!G->is_mid_drawing)
+      {
+        G->pen_size = G->new_pen_size;
+        G->signal_new_pen_size = false;
+        G->new_pen_size = 0;
+      }
+    }
+  }
+
   // User is no longer holding the mouse, have to end drawing mode 
   if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
   {
@@ -155,7 +177,7 @@ void update_pencil(G_state* G)
   if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
   {
     // Starting to draw a new record
-    if (!G->is_mid_drawing) 
+    if (!G->is_mid_drawing && !is_ui_capturing_mouse) 
     { 
       G->is_mid_drawing = true;
       
@@ -163,116 +185,126 @@ void update_pencil(G_state* G)
       new_draw_record->prev = G->current_draw_record; 
 
       G->current_draw_record = new_draw_record;
-      
+      G->current_draw_record->pen_size = G->pen_size;
+
       Node_with_points* new_node = get_available_node_of_points_from_pool(G); // These nodes are just lists, so there is nothing to set up for them to work after getting the pool memory for them
       G->current_draw_record->first_node_with_points = new_node; 
       G->current_draw_record->last_node_with_points  = new_node; 
       G->current_draw_record->nodes_count = 0; 
     }
 
-    Vector2 mouse_pos = GetMousePosition();
-
-    // note: Count of a linked to node cant be zero
-    Assert(G->current_draw_record && G->current_draw_record->_is_active);
-    Assert(G->current_draw_record->first_node_with_points != 0);
-    Assert(G->current_draw_record->last_node_with_points != 0);
-    
-    Node_with_points* last_node = G->current_draw_record->last_node_with_points;
-    B32 prev_point_exists = false;
-    V2 prev_point = {};
-    
-    // Adding a new node up front if the last one is full
-    if (last_node->points_count == ArrayCount(last_node->points))
+    if (G->is_mid_drawing) 
     {
-      Node_with_points* new_node = get_available_node_of_points_from_pool(G);
-      DllPushBack_Name(G->current_draw_record, new_node, first_node_with_points, last_node_with_points, next, prev);
-      G->current_draw_record->nodes_count += 1;
-      last_node = new_node;
-    }
-    
-    // Checking if the last point exists 
-    if (last_node->points_count == 0 && last_node->prev != 0)
-    {
-      Assert(last_node->prev->points_count == ArrayCount(last_node->prev->points), "Why the fuck do you have a 0 filled node that has an unfilled prev node ???"); 
-      prev_point = last_node->prev->points[last_node->prev->points_count - 1];
-      prev_point_exists = true;
-    }
-    else 
-    {
-      prev_point = last_node->points[last_node->points_count - 1];
-      prev_point_exists = true;
-    }
-
-    // Storing the new points
-    B32 shoud_draw_point = false;
-    if (!prev_point_exists || mouse_pos.x != prev_point.x || mouse_pos.y != prev_point.y)
-    {
-      Assert(last_node->points_count != ArrayCount(last_node->points)); // Just checking
-      V2* point = last_node->points + (last_node->points_count++);
-      point->x = mouse_pos.x;
-      point->y = mouse_pos.y;
-      shoud_draw_point = true;
-    }
-
-    if (shoud_draw_point)
-    {
-      Assert(G->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
-
-      Temp_arena temp = temp_arena_begin(G->frame_arena);
-      U32* pixels_to_update = ArenaPushArr(temp.arena, U32, G->pen_size * G->pen_size);
-      for (U64 col_index = 0; col_index < G->pen_size; col_index += 1)
+      Vector2 mouse_pos = GetMousePosition();
+  
+      // note: Count of a linked to node cant be zero
+      Assert(G->pen_size != 0 && G->pen_size % 2 == 1); // Just making sure that it is an odd value
+      Assert(G->current_draw_record && G->current_draw_record->_is_active);
+      Assert(G->current_draw_record->first_node_with_points != 0);
+      Assert(G->current_draw_record->last_node_with_points != 0);
+      
+      Node_with_points* last_node = G->current_draw_record->last_node_with_points;
+      B32 prev_point_exists = false;
+      V2 prev_point = {};
+      
+      // Adding a new node up front if the last one is full
+      if (last_node->points_count == ArrayCount(last_node->points))
       {
-        for (U64 row_index = 0; row_index < G->pen_size; row_index += 1)
-        {
-          U32* px = pixels_to_update + (G->pen_size * row_index + col_index);
-          ((U8*)(px))[0] = 255; // (U8)G->pen_color.r;
-          ((U8*)(px))[1] = 50;  // (U8)G->pen_color.g;
-          ((U8*)(px))[2] = 255; // (U8)G->pen_color.b;
-          ((U8*)(px))[3] = 255; // (U8)G->pen_color.a; 
-        }
+        Node_with_points* new_node = get_available_node_of_points_from_pool(G);
+        DllPushBack_Name(G->current_draw_record, new_node, first_node_with_points, last_node_with_points, next, prev);
+        G->current_draw_record->nodes_count += 1;
+        last_node = new_node;
       }
-      U64 pixels_on_each_side_to_the_middle_pixel = (U64)(G->pen_size / 2);
-      Rectangle affected_rect = {};
-      affected_rect.x      = mouse_pos.x - pixels_on_each_side_to_the_middle_pixel;
-      affected_rect.y      = mouse_pos.y - pixels_on_each_side_to_the_middle_pixel;
-      affected_rect.width  = (F32)G->pen_size;
-      affected_rect.height = (F32)G->pen_size;
-      UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
-      temp_arena_end(&temp);
+      
+      // Checking if the last point exists 
+      if (last_node->points_count == 0 && last_node->prev != 0)
+      {
+        Assert(last_node->prev->points_count == ArrayCount(last_node->prev->points), "Why the fuck do you have a 0 filled node that has an unfilled prev node ???"); 
+        prev_point = last_node->prev->points[last_node->prev->points_count - 1];
+        prev_point_exists = true;
+      }
+      else 
+      {
+        prev_point = last_node->points[last_node->points_count - 1];
+        prev_point_exists = true;
+      }
+  
+      // Storing the new points
+      B32 shoud_draw_point = false;
+      if (!prev_point_exists || mouse_pos.x != prev_point.x || mouse_pos.y != prev_point.y)
+      {
+        Assert(last_node->points_count != ArrayCount(last_node->points)); // Just checking
+        V2* point = last_node->points + (last_node->points_count++);
+        point->x = mouse_pos.x;
+        point->y = mouse_pos.y;
+        shoud_draw_point = true;
+      }
+  
+      if (shoud_draw_point)
+      {
+        Assert(G->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
+  
+        Temp_arena temp = temp_arena_begin(G->frame_arena);
+        U32* pixels_to_update = ArenaPushArr(temp.arena, U32, G->pen_size * G->pen_size);
+        for (U64 col_index = 0; col_index < G->pen_size; col_index += 1)
+        {
+          for (U64 row_index = 0; row_index < G->pen_size; row_index += 1)
+          {
+            U32* px = pixels_to_update + (G->pen_size * row_index + col_index);
+            ((U8*)(px))[0] = 255; // (U8)G->pen_color.r;
+            ((U8*)(px))[1] = 50;  // (U8)G->pen_color.g;
+            ((U8*)(px))[2] = 255; // (U8)G->pen_color.b;
+            ((U8*)(px))[3] = 255; // (U8)G->pen_color.a; 
+          }
+        }
+        U64 pixels_on_each_side_to_the_middle_pixel = (U64)(G->pen_size / 2);
+        Rectangle affected_rect = {};
+        affected_rect.x      = mouse_pos.x - pixels_on_each_side_to_the_middle_pixel;
+        affected_rect.y      = mouse_pos.y - pixels_on_each_side_to_the_middle_pixel;
+        affected_rect.width  = (F32)G->pen_size;
+        affected_rect.height = (F32)G->pen_size;
+        UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
+        temp_arena_end(&temp);
 
-      // Temp_arena temp = temp_arena_begin(G->frame_arena);
-      // U32* px_to_update = ArenaPush(temp.arena, U32);
-      // ((U8*)(px_to_update))[0] = 255; // (U8)G->pen_color.r;
-      // ((U8*)(px_to_update))[1] = 50; // (U8)G->pen_color.g;
-      // ((U8*)(px_to_update))[2] = 255; // (U8)G->pen_color.b;
-      // ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
-      // Rectangle affected_rect = { mouse_pos.x, mouse_pos.y, 1, 1 };
-      // UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
-      // temp_arena_end(&temp);
+    }
     }
   } 
   else if (IsKeyPressed(KEY_BACKSPACE))
   {
     if (G->current_draw_record)
     {
+      Assert(G->current_draw_record->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
+
       // Removing the record from draw_texure
       for (Node_with_points* node = G->current_draw_record->first_node_with_points; node; node = node->next)
       {
         for (U64 p_index = 0; p_index < node->points_count; p_index += 1)
         {
+          U64 pen_size = G->current_draw_record->pen_size;
           Temp_arena temp = temp_arena_begin(G->frame_arena);
-          U32* px_to_update = ArenaPush(temp.arena, U32);
-          ((U8*)(px_to_update))[0] = 0;   // (U8)G->pen_color.r;
-          ((U8*)(px_to_update))[1] = 0;   // (U8)G->pen_color.g;
-          ((U8*)(px_to_update))[2] = 0;   // (U8)G->pen_color.b;
-          ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
-          V2 point = node->points[p_index];
-          Rectangle affected_rect = { point.x, point.y, 1, 1 };
-          UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
+          U32* pixels_to_update = ArenaPushArr(temp.arena, U32, pen_size * pen_size);
+          for (U64 col_index = 0; col_index < pen_size; col_index += 1)
+          {
+            for (U64 row_index = 0; row_index < pen_size; row_index += 1)
+            {
+              U32* px = pixels_to_update + (pen_size * row_index + col_index);
+              ((U8*)(px))[0] = 0; 
+              ((U8*)(px))[1] = 0;  
+              ((U8*)(px))[2] = 0; 
+              ((U8*)(px))[3] = 0; 
+            }
+          }
+          U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
+          Rectangle affected_rect = {};
+          affected_rect.x      = node->points[p_index].x - pixels_on_each_side_to_the_middle_pixel;
+          affected_rect.y      = node->points[p_index].y - pixels_on_each_side_to_the_middle_pixel;
+          affected_rect.width  = (F32)pen_size;
+          affected_rect.height = (F32)pen_size;
+          UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
           temp_arena_end(&temp);
         }
       }
-  
+
       // Puting the used point nodes by the last draw record back into the pool
       {
         G->current_draw_record->last_node_with_points->next = G->first_free_node_with_points;
@@ -300,6 +332,67 @@ void update_pencil(G_state* G)
   }
 }
 
+void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
+{
+  ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY());
+
+  ui_push_font(G->font_texture_for_ui);
+
+  UI_Wrapper(Axis2__x)
+  {
+    ui_spacer(ui_p_of_p(1, 0));
+    UI_Wrapper(Axis2__y)
+    {
+      ui_spacer(ui_p_of_p(1, 0));
+
+      ui_set_next_color({ 10, 75, 107, 255 });
+      UI_PaddedBox(ui_px(10), Axis2__y)
+      {
+        UI_Slider_style size_slider_style = {};
+        size_slider_style.height         = 50;
+        size_slider_style.width          = 100;
+        size_slider_style.hover_color    = { 75, 75, 75, 255 };
+        size_slider_style.no_hover_color = { 50, 50, 50, 255 };
+        size_slider_style.text_color     = { 255, 255, 255, 255 };
+        size_slider_style.slided_part_color = { 125, 125, 125, 255 };
+        size_slider_style.fmt_str = "%.0f";
+
+        U64 new_pen_size = (U64)ui_slider(Str8FromC("Size slider id"), &size_slider_style, (F32)G->pen_size, 1, 100, rli_events);
+        if (new_pen_size % 2 == 0 && new_pen_size != 0) { new_pen_size -= 1; }
+        clamp_u64_inplace(&new_pen_size, 1, 99);
+        if (new_pen_size != G->pen_size)
+        {
+          G->signal_new_pen_size = true;
+          G->new_pen_size = new_pen_size;
+        }
+
+        ui_spacer(ui_px(25));
+
+        ui_set_next_color({ 107, 75, 10, 255 });
+        UI_PaddedBox(ui_px(5), Axis2__x)
+        {
+          Str8 edit_box_id = Str8FromC("Edit box for red color"); 
+          static UI_Text_edit_box_state edit_box_state = {}; 
+          static UI_Size edit_box_size_x = ui_px(100); 
+          static U8 text_buffer[2] = "0"; 
+          static U64 buffer_max_size = ArrayCount(text_buffer); 
+          static U64 buffer_current_size = 1; 
+          static U64 cursor_pos = 0;
+          static U64 section_start_pos = 0;
+          ui_text_box_mutates(edit_box_id, Str8{}, &edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, &buffer_current_size, &cursor_pos, &section_start_pos, rli_events);
+        }
+
+      }
+
+      ui_spacer(ui_px(25));
+      ui_spacer(ui_p_of_p(1, 0));
+    }
+    ui_spacer(ui_px(10));
+  }
+
+  ui_end_build();
+}
+
 int main()
 {
   os_init();
@@ -310,12 +403,12 @@ int main()
 
   ui_set_text_measuring_function(ui_text_measure_func);
   InitWindow(800, 600, "Pencil");
-  Font font_roboto = LoadFont("../data/Roboto.ttf");
 
   G_state G = {};
 
   G.frame_arena = arena_alloc(Megabytes(64));
   G.pen_size = 11;
+  G.font_texture_for_ui = LoadFont("../data/Roboto.ttf");
 
   G.arena_for_draw_records = arena_alloc(Megabytes(64));
   G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
@@ -343,65 +436,13 @@ int main()
   {
     arena_clear(G.frame_arena);
     RLI_Event_list* rli_events = RLI_get_frame_inputs(); 
-
-    G.pen_size += (U64)GetMouseWheelMove();
-    clamp_u64_inplace(&G.pen_size, 1, 50);
-
-    update_pencil(&G);
-   
-    /*
-    DeferLoop(ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY()), ui_end_build())
+    
+    if (!G.is_mid_drawing)
     {
-      ui_push_font(font_roboto);
-
-      UI_Wrapper(Axis2__x)
-      {
-        ui_spacer(ui_p_of_p(1, 0));
-        UI_Wrapper(Axis2__y)
-        {
-          ui_spacer(ui_p_of_p(1, 0));
-
-          ui_set_next_color({ 10, 75, 107, 255 });
-          UI_PaddedBox(ui_px(10), Axis2__y)
-          {
-            UI_Slider_style size_slider_style = {};
-            size_slider_style.height         = 50;
-            size_slider_style.width          = 100;
-            size_slider_style.hover_color    = { 75, 75, 75, 255 };
-            size_slider_style.no_hover_color = { 50, 50, 50, 255 };
-            size_slider_style.text_color     = { 255, 255, 255, 255 };
-            size_slider_style.slided_part_color = { 125, 125, 125, 255 };
-            size_slider_style.fmt_str = "%.0f";
-            static U64 size = 1; 
-            size = (U64)ui_slider(Str8FromC("Size slider id"), &size_slider_style, (F32)size, 1, 100, rli_events);
-
-            ui_spacer(ui_px(25));
-
-            ui_set_next_color({ 107, 75, 10, 255 });
-            UI_PaddedBox(ui_px(5), Axis2__x)
-            {
-              Str8 edit_box_id = Str8FromC("Edit box for red color"); 
-              static UI_Text_edit_box_state edit_box_state = {}; 
-              static UI_Size edit_box_size_x = ui_px(100); 
-              static U8 text_buffer[2] = "0"; 
-              static U64 buffer_max_size = ArrayCount(text_buffer); 
-              static U64 buffer_current_size = 1; 
-              static U64 cursor_pos = 0;
-              static U64 section_start_pos = 0;
-              ui_text_box_mutates(edit_box_id, Str8{}, &edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, &buffer_current_size, &cursor_pos, &section_start_pos, rli_events);
-            }
-
-            // add: in place text edit field editing
-
-          }
-
-          ui_spacer(ui_px(25));
-          ui_spacer(ui_p_of_p(1, 0));
-        }
-        ui_spacer(ui_px(10));
-      }
+      update_pencil_ui(&G, rli_events);
     }
-    */
+
+    update_pencil(&G, ui_has_active());
 
     DeferLoop(BeginDrawing(), EndDrawing())
     {
@@ -409,7 +450,7 @@ int main()
       ClearBackground(BLACK);
       DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
       DrawFPS(0, 0);
-      // ui_draw();
+      ui_draw();
     }
   }
 

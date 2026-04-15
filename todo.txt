@@ -10,8 +10,14 @@ Goals:
   - eraser
 
 todo:
-- ability to change the size of the brush
-- ability to remove the last drawn and get it back
+- ui demo 
+  - text edit for red
+  - text edit for blue
+  - text edit for green
+  - types of pens
+    - regular pen
+    - eraser
+
 
 - Create a global hot key (--It does not work for some reason--)
 - Create a global hook that will switch between modes based on the state,

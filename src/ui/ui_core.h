@@ -274,6 +274,7 @@ void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset);
 void ui_draw();
 
 // - Active box stuff
+B32 ui_has_active();
 B32 ui_is_active(Str8 box_id);
 void ui_reset_active();
 void ui_set_active(Str8 box_id);

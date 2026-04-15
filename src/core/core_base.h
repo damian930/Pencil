@@ -69,15 +69,14 @@ Compiler;
 	#include <intrin.h>
 	
 	#undef BreakPoint
-	#define BreakPoint(...) __debugbreak()
+	#define BreakPoint(...) do { printf("\n=== BreakPoint() macro fired ===\n\n"); __debugbreak(); } while (0) 
 
 	#undef BreakPointCond
-	#define BreakPointCond(cond) do { if (!cond) { __debugbreak(); } } while(0)  // only works for x86, x64, ARM, ARM64
+	#define BreakPointCond(cond) do { if (!(cond)) { BreakPoint(); } } while(0)  // only works for x86, x64, ARM, ARM64
 #endif
 
 // todo: test cpp11 verson +, there it is a part of the standard
 #define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)
-
 
 #if (!DEBUG_MODE && !RELEASE_MODE)
 	StaticAssert(false, "Both Debug and Release modes are not set. Set one of them before building.")
@@ -154,15 +153,15 @@ typedef double F64;
 
 #if RELEASE_MODE
 	#define Assert(expr, ...)                do { (void)(expr); } while (0) 				         	// note: Removing the warning where the value that might only be be used for the assert, but the assert is compiled out in release build, so the warning of an unused variable appears
-	#define AssertPrint(expr, note_fmt, ...) do { (void)(expr); (void)(note_fmt); } while (0) // 
+	// #define AssertPrint(expr, note_fmt, ...) do { (void)(expr); (void)(note_fmt); } while (0) // 
 	#define HandleLater(expr, ...)           do { StaticAssert(0, __VA_ARGS__); } while (0)   // note: We want all the HandleLater calls to be gone in the release build. HandleLater is used for something like testing os, where there are bunch of thing that might take place, like file open fail. So you put HandleLater in and then use the api, but for the final version tho HandleLater calles shoud be resolved. Therefore a StaticAssert. 
 	#if DONT_ASSERT_HANDLE_LATER_MACROS
 		#undef HandleLater
 		#define HandleLater(expr, ...)         do { (void)(expr); } while (0)										// note: In case we dont want to deal with HandleLaters now, be we want to build in release to have the optimisations working, for example for testing multi threading and stuff.
 	#endif
 #else  
-	#define Assert(expr, ...)                do { if (!(expr)) { U32* p = 0; *p = 69; } } while (0)
-	#define AssertPrint(expr, note_fmt, ...) do { if (!(expr)) { printf(note_fmt, __VA_ARGS__); U32* p = 0; *p = 69; } } while (0)
+	#define Assert(expr, ...)                BreakPointCond(expr) // do { if (!(expr)) { U32* p = 0; *p = 69; } } while (0)
+	// #define AssertPrint(expr, note_fmt, ...) do { if (!(expr)) { printf(note_fmt, __VA_ARGS__); U32* p = 0; *p = 69; } } while (0)
 	#define HandleLater(expr, ...)           Assert(expr) 
 #endif
 
