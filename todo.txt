@@ -10,7 +10,6 @@ Goals:
   - eraser
 
 todo:
-- smooth drawing lines
 - ability to change the size of the brush
 - ability to remove the last drawn and get it back
 

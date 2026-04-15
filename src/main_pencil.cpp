@@ -216,15 +216,39 @@ void update_pencil(G_state* G)
 
     if (shoud_draw_point)
     {
+      Assert(G->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
+
       Temp_arena temp = temp_arena_begin(G->frame_arena);
-      U32* px_to_update = ArenaPush(temp.arena, U32);
-      ((U8*)(px_to_update))[0] = 255; // (U8)G->pen_color.r;
-      ((U8*)(px_to_update))[1] = 50; // (U8)G->pen_color.g;
-      ((U8*)(px_to_update))[2] = 255; // (U8)G->pen_color.b;
-      ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
-      Rectangle affected_rect = { mouse_pos.x, mouse_pos.y, 1, 1 };
-      UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
+      U32* pixels_to_update = ArenaPushArr(temp.arena, U32, G->pen_size * G->pen_size);
+      for (U64 col_index = 0; col_index < G->pen_size; col_index += 1)
+      {
+        for (U64 row_index = 0; row_index < G->pen_size; row_index += 1)
+        {
+          U32* px = pixels_to_update + (G->pen_size * row_index + col_index);
+          ((U8*)(px))[0] = 255; // (U8)G->pen_color.r;
+          ((U8*)(px))[1] = 50;  // (U8)G->pen_color.g;
+          ((U8*)(px))[2] = 255; // (U8)G->pen_color.b;
+          ((U8*)(px))[3] = 255; // (U8)G->pen_color.a; 
+        }
+      }
+      U64 pixels_on_each_side_to_the_middle_pixel = (U64)(G->pen_size / 2);
+      Rectangle affected_rect = {};
+      affected_rect.x      = mouse_pos.x - pixels_on_each_side_to_the_middle_pixel;
+      affected_rect.y      = mouse_pos.y - pixels_on_each_side_to_the_middle_pixel;
+      affected_rect.width  = (F32)G->pen_size;
+      affected_rect.height = (F32)G->pen_size;
+      UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
       temp_arena_end(&temp);
+
+      // Temp_arena temp = temp_arena_begin(G->frame_arena);
+      // U32* px_to_update = ArenaPush(temp.arena, U32);
+      // ((U8*)(px_to_update))[0] = 255; // (U8)G->pen_color.r;
+      // ((U8*)(px_to_update))[1] = 50; // (U8)G->pen_color.g;
+      // ((U8*)(px_to_update))[2] = 255; // (U8)G->pen_color.b;
+      // ((U8*)(px_to_update))[3] = 255; // (U8)G->pen_color.a;
+      // Rectangle affected_rect = { mouse_pos.x, mouse_pos.y, 1, 1 };
+      // UpdateTextureRec(G->draw_texture, affected_rect, px_to_update);
+      // temp_arena_end(&temp);
     }
   } 
   else if (IsKeyPressed(KEY_BACKSPACE))
@@ -291,7 +315,7 @@ int main()
   G_state G = {};
 
   G.frame_arena = arena_alloc(Megabytes(64));
-  G.pen_size = 1;
+  G.pen_size = 11;
 
   G.arena_for_draw_records = arena_alloc(Megabytes(64));
   G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
@@ -319,6 +343,9 @@ int main()
   {
     arena_clear(G.frame_arena);
     RLI_Event_list* rli_events = RLI_get_frame_inputs(); 
+
+    G.pen_size += (U64)GetMouseWheelMove();
+    clamp_u64_inplace(&G.pen_size, 1, 50);
 
     update_pencil(&G);
    
