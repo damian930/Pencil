@@ -473,8 +473,8 @@ int main()
       static U64 left_wall = 0;
       static U64 right_wall = 0;
 
-      ui_push_text_color({ 255, 0, 255, 255 });
-      // ui_push_color({ 50, 50, 50, 255 });
+      ui_push_text_color({ 255, 255, 255, 255 });
+      ui_push_color({ 50, 50, 50, 255 });
       ui_text_edit_box(&edit_box_style, buffer, ArrayCount(buffer), current_size, cursor, section, rli_events, &left_wall, &right_wall); 
     }
 
@@ -491,7 +491,7 @@ int main()
     DeferLoop(BeginDrawing(), EndDrawing())
     {
       Texture draw_texture = G.draw_texture;
-      ClearBackground(BLUE);
+      ClearBackground(BLACK);
       DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
       DrawFPS(0, 0);
       ui_draw();

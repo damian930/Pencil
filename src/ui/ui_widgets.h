@@ -179,7 +179,6 @@ void ui_text_edit_box(
   U64* right_wall_index 
 ) {
   /* fix:
-    - cursor is not visible when at 0
     - i want you to understand the code for the ui widget completely
   */
 
@@ -187,44 +186,64 @@ void ui_text_edit_box(
     - cursor size setting
   */
   
+  /* idea:
+    - you might just make 2 different boxes and the cursor box will draw ouside the box.
+      This will allow the caller if they specify a large cursor to just pad the box up and have the 
+      cursor still be on the next character and not the prev
+
+
+  */
+
   Str8 text_buffer_as_str = str8_manuall(text_buffer, text_buffer_current_size);
 
   // Check if the right wall is still valid. 
-  // Redo the right wall if it is not and keep the edit box offset
+  // Redo the right wall if it is not valid and keep the edit box offset
   // Check if walls are valid relative the the cursor pos
   // If they are then great
   // If they are not then we move them and reset the edit box offset 
   // Then just draw the ui
 
+  static B32 is_left_wall_main    = false;
+  static B32 is_right_wall_main   = false;
+  static F32 edit_box_clip_offset = 0.0f;
+
   // Checking if the right wall is still valid
   {
     Str8 walled_str = str8_substring(text_buffer_as_str, *left_wall_index, *right_wall_index);
-    V2 walled_dims = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
+    V2 walled_dims  = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
     F32 walled_str_width = walled_dims.x;
 
-    if (walled_str_width > edit_box_style->width_in_px)
+    U64 right_wall_index_copy = *right_wall_index;
+
+    // if (walled_str_width > edit_box_style->width_in_px)
+    // {
+    //   // Move the wall back till its valid
+    //   F32 space_to_remove = walled_dims.x - edit_box_style->width_in_px;
+    //   if (*right_wall_index > 0)
+    //   {
+    //     F32 total_space_removed = 0.0f;
+    //     for (U64 test_right_wall_index = *right_wall_index - 1 ;; test_right_wall_index -= 1)
+    //     {
+    //       Str8 test_char_to_remove = str8_substring(text_buffer_as_str, test_right_wall_index, test_right_wall_index + 1);
+    //       V2 test_char_dims = ui_measure_text_ex(test_char_to_remove, edit_box_style->font, edit_box_style->font_size);
+    //       total_space_removed += test_char_dims.x;
+    //       if (total_space_removed > space_to_remove)
+    //       {
+    //         *right_wall_index = test_right_wall_index + 1;
+    //         break;
+    //       }
+    //       if (test_right_wall_index == 0) { break; }
+    //     }
+    //   }
+    // }
+    if (walled_str_width < edit_box_style->width_in_px)
     {
-      // Move the wall back till its valid
-      F32 space_to_remove = walled_dims.x - edit_box_style->width_in_px;
-      if (*right_wall_index > 0)
+      // Have to accound for possible extra space on the left if left wall is not the main wall
+      if (!is_left_wall_main)
       {
-        F32 total_space_removed = 0.0f;
-        for (U64 test_right_wall_index = *right_wall_index - 1 ;; test_right_wall_index -= 1)
-        {
-          Str8 test_char_to_remove = str8_substring(text_buffer_as_str, test_right_wall_index, test_right_wall_index + 1);
-          V2 test_char_dims = ui_measure_text_ex(test_char_to_remove, edit_box_style->font, edit_box_style->font_size);
-          total_space_removed += test_char_dims.x;
-          if (total_space_removed > space_to_remove)
-          {
-            *right_wall_index = test_right_wall_index;
-            break;
-          }
-          if (test_right_wall_index == 0) { break; }
-        }
+
       }
-    }
-    else if (walled_str_width < edit_box_style->width_in_px)
-    {
+
       // Move the wall front till its valid
       F32 space_to_add = edit_box_style->width_in_px - walled_dims.x;
       if (*right_wall_index < text_buffer_as_str.count)
@@ -238,12 +257,18 @@ void ui_text_edit_box(
 
           if (total_space_added > space_to_add)
           {
-            *right_wall_index = test_right_wall_index - 1;
+            *right_wall_index = test_right_wall_index;
             break;
           }
           if (test_right_wall_index == text_buffer_as_str.count) { break; }
         }
       }
+    }
+    
+    if (right_wall_index_copy != *right_wall_index)
+    {
+      is_left_wall_main = false;
+      is_right_wall_main = false;
     }
   }
 
@@ -252,11 +277,7 @@ void ui_text_edit_box(
     V2 dims = ui_measure_text_ex(Str8FromC(" "), edit_box_style->font, edit_box_style->font_size);
     height_in_px = dims.y;
   }
-
-  static B32 is_left_wall_main = false;
-  static B32 is_right_wall_main = false;
-  static B32 edit_box_clip_offset = 0.0f;
-
+  
   // Updating walls if have to
   if (cursor > *right_wall_index) 
   {
@@ -277,6 +298,15 @@ void ui_text_edit_box(
       test_left_wall_index -= 1;
     }
 
+    // Calculating the new clip offset for the edit box
+    {
+      Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, *right_wall_index);
+      V2 till_right_wall_dims  = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
+
+      edit_box_clip_offset = till_right_wall_dims.x - edit_box_style->width_in_px;
+      edit_box_clip_offset = Max(0.0f, edit_box_clip_offset);
+    }
+
     is_right_wall_main = true;
     is_left_wall_main = false;
   }
@@ -292,16 +322,25 @@ void ui_text_edit_box(
       accumulated_text_width += dims.x;
       if (accumulated_text_width > edit_box_style->width_in_px)
       {
-        *right_wall_index = test_right_wall_index - 1;
+        *right_wall_index = test_right_wall_index;
         break;
       }
       if (test_right_wall_index == text_buffer_max_size) { break; }
       test_right_wall_index += 1;
     }
 
+    // Calculating the new clip offset for the edit box
+    {
+      Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, *left_wall_index);
+      V2 till_left_wall_dims  = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
+      edit_box_clip_offset = till_left_wall_dims.x;
+    }
+
     is_left_wall_main = true;
     is_right_wall_main = false;
   }
+
+  // todo: clip offset might be separated from the adjustment to the walls routine
 
   // Just checking stuff 
   {
@@ -317,39 +356,19 @@ void ui_text_edit_box(
   ui_set_next_color({ 255, 255, 255, 255 });
   ui_set_next_size_x(ui_px(edit_box_style->width_in_px));
   ui_set_next_size_y(ui_px(height_in_px));
-  ui_set_next_border({1, { 255, 0, 0, 255 }});
   UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__dont_draw_overflow);
 
   // Updating global ui activeness 
+  /*
   static B32 is_active = false;
   UI_Actions edit_box_actions = ui_actions_from_box(edit_box, rli_events);
   if (edit_box_actions.is_clicked && !is_active)
   {
     is_active = true; 
   }
+  */
 
-  // ==============================================
-  // note: This might be removed, since this thing might also be done only when the wall is set up,
-  //       since every other time it will be the same until the walls change 
-  //       and there is a new main wall. That might be done when the walls are set.
-  // if the right wall is main, then we have to make the offset be the offset of string inside the wall and the extras space
-  F32 clip_offset = 0.0f;
-  if (is_right_wall_main)
-  {
-    Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, *right_wall_index + 1);
-    V2 till_right_wall_dims  = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
-    
-    clip_offset = till_right_wall_dims.x - edit_box_style->width_in_px;
-    if (clip_offset < 0.0f) { clip_offset = 0.0f; }
-  }
-  else if (is_left_wall_main)
-  { 
-    Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, *left_wall_index);
-    V2 till_left_wall_dims  = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-    clip_offset = till_left_wall_dims.x;
-  }
-  // ==============================================
-
+  F32 clip_offset = edit_box_clip_offset;
 
   /*note:
     The parent box. This is the box that is for the user, call it the text edit box.
@@ -367,11 +386,11 @@ void ui_text_edit_box(
   edit_box->clip_offset.x = -1 * clip_offset;
   UI_Parent(edit_box)
   {
-    // Text 
+    // Text
     ui_label(text_buffer_as_str);
   
     // Cursor offset box
-    F32 cursor_width = 5.0f;
+    F32 cursor_width = 2.0f;
     
     ui_set_next_size_x(ui_px(edit_box_style->width_in_px)); ui_set_next_size_y(ui_px(height_in_px));
     ui_set_next_layout_axis(Axis2__x);
@@ -381,9 +400,7 @@ void ui_text_edit_box(
     F32 cursor_box_clip_offset = clip_offset; // clip_offset is for the edit box
     cursor_offset_box->clip_offset.x = -1 * cursor_box_clip_offset;
 
-    // =====================================
-    // note: This might be removed, since this is just cursor placement adjustment based on 
-    //       first and last index to make it not overflow
+    // Getting size for the spacer that will offset the cursor relative the the edit box start pos
     F32 cursor_offset_spacer = 0.0f;
     if (is_left_wall_main && cursor == *left_wall_index)
     {
@@ -403,21 +420,20 @@ void ui_text_edit_box(
       V2 till_cursor_dims  = ui_measure_text_ex(str_till_cursor, edit_box_style->font, edit_box_style->font_size);
       cursor_offset_spacer = till_cursor_dims.x;
     }
-    // =====================================
 
     UI_Parent(cursor_offset_box)
     {
       ui_spacer(ui_px(cursor_offset_spacer));
 
       ui_set_next_size_x(ui_px(cursor_width)); ui_set_next_size_y(ui_px(height_in_px));
-      ui_set_next_color({ 0, 0, 0, 255 });
+      ui_set_next_color({ 255, 0, 0, 255 });
       UI_Box* cursor_line_box = ui_box_make(Str8{}, 0);
     }
 
     #define DRAW_DEBUG_WALLS 1
     #if DRAW_DEBUG_WALLS
     {
-      ui_set_next_size_x(ui_px(3)); ui_set_next_size_y(ui_px(height_in_px));
+      ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
       ui_set_next_layout_axis(Axis2__x);
       ui_set_next_flags(UI_Box_flag__floating);
       UI_Box* left_wall_offset_box = ui_box_make(Str8{}, 0);
@@ -430,7 +446,7 @@ void ui_text_edit_box(
         F32 offset = dims.x;
         ui_spacer(ui_px(offset));
 
-        ui_set_next_size_x(ui_px(3)); ui_set_next_size_y(ui_px(height_in_px));
+        ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
         ui_set_next_color({ 0, 255, 0, 255 });
         UI_Box* left_wall = ui_box_make(Str8{}, 0);
       }
@@ -439,10 +455,10 @@ void ui_text_edit_box(
     #endif
     #undef DRAW_DEBUG_WALLS
 
-    #define DRAW_DEBUG_WALLS 1 
+    #define DRAW_DEBUG_WALLS 1
     #if DRAW_DEBUG_WALLS
     {
-      ui_set_next_size_x(ui_px(3)); ui_set_next_size_y(ui_px(height_in_px));
+      ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
       ui_set_next_layout_axis(Axis2__x);
       ui_set_next_flags(UI_Box_flag__floating);
       UI_Box* left_wall_offset_box = ui_box_make(Str8{}, 0);
@@ -452,9 +468,9 @@ void ui_text_edit_box(
       {
         Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, *right_wall_index);
         V2 dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
-        ui_spacer(ui_px(dims.x - 3));
+        ui_spacer(ui_px(dims.x - 1));
 
-        ui_set_next_size_x(ui_px(3)); ui_set_next_size_y(ui_px(height_in_px));
+        ui_set_next_size_x(ui_px(1)); ui_set_next_size_y(ui_px(height_in_px));
         ui_set_next_color({ 0, 0, 255, 255 });
         UI_Box* right_wall = ui_box_make(Str8{}, 0);
       }
