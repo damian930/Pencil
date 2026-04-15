@@ -475,7 +475,7 @@ int main()
 
       ui_push_text_color({ 255, 255, 255, 255 });
       ui_push_color({ 50, 50, 50, 255 });
-      ui_text_edit_box(&edit_box_style, buffer, ArrayCount(buffer), current_size, cursor, section, rli_events, &left_wall, &right_wall); 
+      ui_text_edit_box(&edit_box_style, buffer, ArrayCount(buffer), current_size, cursor, section, rli_events); 
     }
 
     ui_end_build();
