@@ -232,10 +232,20 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     Image_part** image_parts_arr = ArenaPushArr(G->frame_arena, Image_part*, n_parts_we_need_on_x * n_parts_we_need_on_y);
 
     // Allocating parts to cover the affected area
-    U64 count_affectd_px_on_x_mutable = count_affectd_px_on_x;
     U64 count_affectd_px_on_y_mutable = count_affectd_px_on_y;
     for (U64 part_index_y = 0; part_index_y < n_parts_we_need_on_y; part_index_y += 1)
     {
+      U64 count_affectd_px_on_x_mutable = count_affectd_px_on_x;
+      
+      U64 this_x_loop_y_px_left = 0;
+      if (count_affectd_px_on_y_mutable > IMAGE_PART_DATA_HEIGHT) {
+        this_x_loop_y_px_left = IMAGE_PART_DATA_HEIGHT;
+        count_affectd_px_on_y_mutable -= IMAGE_PART_DATA_HEIGHT;
+      } else {
+        this_x_loop_y_px_left = count_affectd_px_on_y_mutable;
+        count_affectd_px_on_y_mutable -= count_affectd_px_on_y_mutable; 
+      }
+
       for (U64 part_index_x = 0; part_index_x < n_parts_we_need_on_x; part_index_x += 1)
       {
         Image_part* new_part = get_available_image_part_from_pool(G);
@@ -261,19 +271,13 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         }
 
         // Height
-        if (count_affectd_px_on_y_mutable > IMAGE_PART_DATA_HEIGHT) {
-          new_part->height = IMAGE_PART_DATA_HEIGHT;
-          count_affectd_px_on_y_mutable -= IMAGE_PART_DATA_HEIGHT;
-        } else {
-          new_part->height = count_affectd_px_on_y_mutable;
-          count_affectd_px_on_y_mutable -= count_affectd_px_on_y_mutable; 
-        }
+        new_part->height = this_x_loop_y_px_left;
 
         // note: Data will be set in the next routine
       }
     }
-    Assert(count_affectd_px_on_x_mutable == 0);
-    Assert(count_affectd_px_on_y_mutable == 0);
+    // Assert(count_affectd_px_on_x_mutable == 0);
+    // Assert(count_affectd_px_on_y_mutable == 0);
 
     // Iterating over draw image pixels and storing them into image parts 
     for (
@@ -303,6 +307,8 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         *part_px = G->draw_texture_after_the_last_draw.pixels[px_index_inside_draw_texture];
       }
     }
+
+    // todo: Also update the cpu side stored texture data 
   }
 
   // Drawing or about to start drawing
