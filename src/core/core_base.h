@@ -651,6 +651,21 @@ struct ArrU64 {
 // #define COLOR_MACROS_PREFIX Color
 // const V4_F32 COLOR_MACROS_PREFIX##Blue v4_f32_make(0.0f, 255.0f, 0.0f, 255.0f)
 
+tu_specific U64 u64_divide_and_ceil(U64 v, U64 divisor)
+{
+	U64 _v = (U64)((v + divisor - 1) / divisor);
+	return _v;
+}
+
+// tu_specific U64 u64_divide_and_floor(U64 v, U64 divisor)
+// {
+// 	U64 result = 0;
+// 	if (v % divisor == 0) { result = v / divisor; }
+// 	else { result =  }
+// 	v / divisor;
+// 	U64 _v = (U64)((v + divisor - 1) / divisor);
+// 	return _v;
+// }
 
 #endif
 

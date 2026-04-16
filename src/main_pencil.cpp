@@ -94,7 +94,7 @@ struct G_state {
   //
   Arena* arena_for_draw_poitns;
   V2U64* first_draw_point;
-  U64 draw_pints_count;
+  U64 draw_points_count;
   //
   V2U64 last_point_where_drew;
 
@@ -141,7 +141,7 @@ Image_part* get_available_image_part_from_pool(G_state* G)
 
 U32* image_part_get_px(Image_part* part, U64 x, U64 y)
 {
-  Assert(x < IMAGE_PART_DATA_WIDTH); Assert(y < IMAGE_PART_DATA_HEIGHT); 
+  Assert(x < part->width); Assert(y < part->height); 
   U32* px = part->pixels + (y * IMAGE_PART_DATA_WIDTH + x);
   return px;
 }
@@ -218,8 +218,8 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     const U64 count_affectd_px_on_x = affected_range.max.x - affected_range.min.x;
     const U64 count_affectd_px_on_y = affected_range.max.y - affected_range.min.y;
     
-    U64 n_parts_we_need_on_x = (U64)(count_affectd_px_on_x / IMAGE_PART_DATA_WIDTH) + 1;
-    U64 n_parts_we_need_on_y = (U64)(count_affectd_px_on_y / IMAGE_PART_DATA_HEIGHT) + 1;
+    U64 n_parts_we_need_on_x = u64_divide_and_ceil(count_affectd_px_on_x, IMAGE_PART_DATA_WIDTH);
+    U64 n_parts_we_need_on_y = u64_divide_and_ceil(count_affectd_px_on_y, IMAGE_PART_DATA_HEIGHT);
 
     Image_part** image_parts_arr = ArenaPushArr(G->frame_arena, Image_part*, n_parts_we_need_on_x * n_parts_we_need_on_y);
 
@@ -271,14 +271,14 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 
     // Iterating over draw image pixels and storing them into image parts 
     for (
-      U64 draw_texture_affected_px_index_x = affected_range.min.x; 
-      draw_texture_affected_px_index_x < affected_range.max.x; 
-      draw_texture_affected_px_index_x += 1
+      U64 draw_texture_affected_px_index_y = affected_range.min.y; 
+      draw_texture_affected_px_index_y < affected_range.max.y; 
+      draw_texture_affected_px_index_y += 1
     ) {
       for (
-        U64 draw_texture_affected_px_index_y = affected_range.min.y; 
-        draw_texture_affected_px_index_y < affected_range.max.y; 
-        draw_texture_affected_px_index_y += 1
+        U64 draw_texture_affected_px_index_x = affected_range.min.x; 
+        draw_texture_affected_px_index_x < affected_range.max.x; 
+        draw_texture_affected_px_index_x += 1
       ) {
         U64 px_index_x_in_affected_range = (draw_texture_affected_px_index_x - affected_range.min.x);
         U64 px_index_y_in_affected_range = (draw_texture_affected_px_index_y - affected_range.min.y);
@@ -299,22 +299,24 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     }
 
     // Iterating over stored draw points and updating the cpu draw image based on them
-    for (U64 point_index = 0; point_index < G->draw_pints_count; point_index += 1)
+    for (U64 point_index = 0; point_index < G->draw_points_count; point_index += 1)
     {
-      V2U64 point = G->first_draw_point[point_index];
       Temp_arena temp = temp_arena_begin(G->frame_arena);
-      Draw_result_mem draw_mem = get_draw_range_memory(temp.arena, point, G->pen_size, G->pen_color);
-      Image_data* image = &G->draw_texture_after_the_last_draw;
-      RangeV2U64 updated_range = draw_mem.update_range;
-      for (U64 x_index = updated_range.min.x; x_index < updated_range.max.x; x_index += 1)
       {
+        V2U64 point = G->first_draw_point[point_index];
+        Draw_result_mem draw_mem = get_draw_range_memory(temp.arena, point, G->pen_size, G->pen_color);
+        Image_data* image = &G->draw_texture_after_the_last_draw;
+        RangeV2U64 updated_range = draw_mem.update_range;
         for (U64 y_index = updated_range.min.y; y_index < updated_range.max.y; y_index += 1)
         {
-          U32* px_value = image->pixels + (y_index * image->width + point.x);
-          ((U8*)(px_value))[0] = G->pen_color.r;
-          ((U8*)(px_value))[1] = G->pen_color.g;
-          ((U8*)(px_value))[2] = G->pen_color.b;
-          ((U8*)(px_value))[3] = G->pen_color.a;
+          for (U64 x_index = updated_range.min.x; x_index < updated_range.max.x; x_index += 1)
+          {
+            U32* px_value = image->pixels + (y_index * image->width + x_index);
+            ((U8*)(px_value))[0] = G->pen_color.r;
+            ((U8*)(px_value))[1] = G->pen_color.g;
+            ((U8*)(px_value))[2] = G->pen_color.b;
+            ((U8*)(px_value))[3] = G->pen_color.a;
+          }
         }
       }
       temp_arena_end(&temp);
@@ -330,7 +332,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     
       // todo: This shoud be reset after we dont updating the cpu side image and not here
       arena_clear(G->arena_for_draw_poitns);
-      G->draw_pints_count = 0;
+      G->draw_points_count = 0;
       G->last_point_where_drew = v2u64(u64_max, u64_max); // Just using an unreachable value
 
       Draw_record* new_draw_record = get_available_draw_record_from_pool(G);
@@ -357,6 +359,8 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       {
         G->last_point_where_drew = mouse_pos;
 
+        // todo: Stop manually upadting the min max, derive it from the single source of truth: from get_draw_range_memory down below
+        
         // Upating min/max points
         {
           U64 pen_radius_offset = (U64)(G->pen_size / 2);
@@ -402,7 +406,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 
         // Storing the new point for later update of the cpu side draw image
         V2U64* new_draw_p = ArenaPush(G->arena_for_draw_poitns, V2U64);
-        G->draw_pints_count += 1;
+        G->draw_points_count += 1;
         *new_draw_p = mouse_pos;
       }
     }
@@ -414,13 +418,31 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     {
       Assert(G->current_draw_record->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
     
-      // todo: Removing the record from the draw texture by drawing stored parts back onto the texture
-
       // Removing the record from draw_texure
       for (Image_part* part = G->current_draw_record->first_image_part; part; part = part->next)
       {
-        Rectangle rect = { (F32)part->offset.x, (F32)part->offset.y, (F32)part->width, (F32)part->height };
-        UpdateTextureRec(G->draw_texture, rect, part->pixels);
+        if (part->width == IMAGE_PART_DATA_WIDTH && part->height == IMAGE_PART_DATA_HEIGHT)
+        {
+          Rectangle rect = { (F32)part->offset.x, (F32)part->offset.y, (F32)part->width, (F32)part->height };
+          UpdateTextureRec(G->draw_texture, rect, part->pixels);
+        }
+        else // Have to redo the part pixels to have the stride be valid 
+        {
+          Temp_arena temp = temp_arena_begin(G->frame_arena);
+          U32* fixed_stride_pixel_buffer = ArenaPushArr(temp.arena, U32, part->width * part->height);
+          for (U64 y_index = 0; y_index < part->height; y_index += 1)
+          {
+            for (U64 x_index = 0; x_index < part->width; x_index += 1)
+            {
+              U32* valid_stride_px = fixed_stride_pixel_buffer + (y_index * part->width + x_index);
+              U32* part_px = image_part_get_px(part, x_index, y_index); 
+              *valid_stride_px = *part_px;
+            }
+          }
+          Rectangle rect = { (F32)part->offset.x, (F32)part->offset.y, (F32)part->width, (F32)part->height };
+          UpdateTextureRec(G->draw_texture, rect, fixed_stride_pixel_buffer);
+          temp_arena_end(&temp);
+        }
       }
 
       // Drawing back the stuff that was on the removed image parts before the last draw record
@@ -433,7 +455,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         {
           for (U64 x_index = 0; x_index < part->width; x_index += 1)
           {
-            cpu_side_first_px[x_index] = part->pixels[y_index * part->width + x_index];  
+            cpu_side_first_px[x_index] = *image_part_get_px(part, x_index, y_index);
           }
           cpu_side_first_px += cpu_side_image_w;
         }
@@ -624,18 +646,7 @@ int main()
     }
 
     update_pencil(&G, ui_has_active());
-
-    DeferLoop(BeginDrawing(), EndDrawing())
-    DeferLoop(BeginBlendMode(BLEND_ALPHA), EndBlendMode())
-    {
-      Texture draw_texture = G.draw_texture;
-      ClearBackground(BLACK);
-      DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
-      DrawFPS(0, 0);
-      ui_draw(); 
-      // DrawRectangle(0, 0, 500, 500, { 255, 255, 255, 255 });
-    }
-
+   
     #define DEBUG_CHECK_IF_TEXTURES_ARE_VALID 1
     #if DEBUG_CHECK_IF_TEXTURES_ARE_VALID
     {
@@ -651,6 +662,7 @@ int main()
           {
             U32 gpu_px = ((U32*)gpu_image.data)[i * gpu_image.width + j];
             U32 cpu_px = G.draw_texture_after_the_last_draw.pixels[i * gpu_image.width + j];
+
             if (gpu_px != cpu_px)
             {
               Image cpu_image = {};
@@ -659,7 +671,7 @@ int main()
               cpu_image.height  = (int)G.draw_texture_after_the_last_draw.height;           
               cpu_image.mipmaps = 1;          
               cpu_image.format  = PixelFormat_UNCOMPRESSED_R8G8B8A8;           
-
+  
               B32 succ = 1;
               succ &= (B32)ExportImage(gpu_image, "gpu_image.png");
               succ &= (B32)ExportImage(cpu_image, "cpu_image.png");
@@ -668,10 +680,22 @@ int main()
             }
           }
         }
+        UnloadImage(gpu_image);
       }
     }
     #endif
     #undef DEBUG_CHECK_IF_TEXTURES_ARE_VALID
+
+    DeferLoop(BeginDrawing(), EndDrawing())
+    DeferLoop(BeginBlendMode(BLEND_ALPHA), EndBlendMode())
+    {
+      Texture draw_texture = G.draw_texture;
+      ClearBackground(BLACK);
+      DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
+      DrawFPS(0, 0);
+      ui_draw(); 
+    }
+
   }
 
 
