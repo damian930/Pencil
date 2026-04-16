@@ -33,27 +33,6 @@ V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
   return result;
 }
 
-// note: This is for hooks, which i dont yet use
-// #include "dwmapi.h"
-// #pragma comment(lib, "dwmapi.lib")
-
-// todo: Add a way to have multiple draw records and go back between each one
-// todo: Since records are infinite, maku sure you dont run out of space 
-
-
-/*
-struct Node_with_points {
-  V2 points[100];
-  U16 points_count;
-  Node_with_points* next; // This is shared with the free list 
-  Node_with_points* prev; 
-
-  // Free list part
-  // B32 _is_active;
-};
-StaticAssert(ArrayCount(Node_with_points::points) <= u16_max);
-*/
-
 #define IMAGE_PART_DATA_WIDTH  200
 #define IMAGE_PART_DATA_HEIGHT 200
 struct Image_part {
@@ -67,10 +46,7 @@ struct Image_part {
 };
 
 struct Draw_record {
-  U64 pen_size;
-  // Node_with_points* first_node_with_points;
-  // Node_with_points* last_node_with_points;
-  // U64 nodes_count;
+  U64 pen_size; // todo: I am not sure we still need this
 
   RangeV2U64 affected_2d_range; // note: These is calculated mid drawing for quick access after we done drawing
 
@@ -95,24 +71,16 @@ struct G_state {
   Arena* arena;
   Arena* frame_arena;
   U64 pen_size;
-  V4 pen_color;
+  V4U8 pen_color;
 
   Texture draw_texture;
-  Image_data draw_texture_after_the_last_draw;  
+  Image_data draw_texture_after_the_last_draw; // Cpu side draw_texture  
 
   // Pool of draw_records  
   Arena* arena_for_draw_records;
   Draw_record* first_draw_record;
   U64 allocated_draw_records_count;
   Draw_record* first_free_draw_record;
-
-  /*
-  // Pool of nodes_with_points
-  Arena* arena_for_nodes_with_points;
-  Node_with_points* first_node_with_points;
-  U64 allocated_nodes_with_points_count;
-  Node_with_points* first_free_node_with_points;
-  */
 
   // Pool of Image parts
   Arena* arena_for_image_parts;
@@ -123,6 +91,12 @@ struct G_state {
   // Stuff for while drawing
   B32 is_mid_drawing;
   Draw_record* current_draw_record;
+  //
+  Arena* arena_for_draw_poitns;
+  V2U64* first_draw_point;
+  U64 draw_pints_count;
+  //
+  V2U64 last_point_where_drew;
 
   // Signals (These are just here like this right now)
   B32 signal_new_pen_size;
@@ -131,25 +105,6 @@ struct G_state {
   // Misc
   Font font_texture_for_ui;
 };
-
-/*
-Node_with_points* get_available_node_of_points_from_pool(G_state* G)
-{
-  Node_with_points* node = G->first_free_node_with_points;
-  if (node)
-  {
-    G->first_free_node_with_points = G->first_free_node_with_points->next;
-    *node = Node_with_points{};
-  }
-  else
-  {
-    node = ArenaPush(G->arena_for_nodes_with_points, Node_with_points);
-    G->allocated_nodes_with_points_count += 1;
-  }
-  // node->_is_active = true;
-  return node;
-}
-*/
 
 Draw_record* get_available_draw_record_from_pool(G_state* G)
 {
@@ -191,10 +146,47 @@ U32* image_part_get_px(Image_part* part, U64 x, U64 y)
   return px;
 }
 
+struct Draw_result_mem {
+  RangeV2U64 update_range;
+  U32* new_pixels;
+};
+
+Draw_result_mem get_draw_range_memory(Arena* arena, V2U64 pos, U64 pen_size, V4U8 color)
+{
+  Assert(pen_size != 0 && pen_size % 2 == 1); // Just making sure that it is an odd value
+  Draw_result_mem result = {};
+  U32* new_pixels = ArenaPushArr(arena, U32, pen_size * pen_size);
+  for (U64 y_index = 0; y_index < pen_size; y_index += 1)
+  {
+    for (U64 x_index = 0; x_index < pen_size; x_index += 1)
+    {
+      U32* px = new_pixels + (pen_size * y_index + x_index);
+      ((U8*)(px))[0] = color.r;
+      ((U8*)(px))[1] = color.g;
+      ((U8*)(px))[2] = color.b;
+      ((U8*)(px))[3] = color.a; 
+    }
+  }
+  U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
+  
+  // todo: I just dont want to deal with this now
+  Assert(pos.x >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
+  Assert(pos.y >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
+  
+  RangeV2U64 affected_range = {};
+  affected_range.min.x = pos.x - pixels_on_each_side_to_the_middle_pixel; 
+  affected_range.min.y = pos.y - pixels_on_each_side_to_the_middle_pixel;
+  affected_range.max.x = affected_range.min.x + pen_size;
+  affected_range.max.y = affected_range.min.y + pen_size;
+
+  result.new_pixels = new_pixels;
+  result.update_range = affected_range;
+  return result;
+}
+
 void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 {
   Assert(G->first_draw_record != 0);
-  // Assert(G->first_node_with_points != 0);
   
   // Handling signals
   {
@@ -249,7 +241,6 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       for (U64 part_index_x = 0; part_index_x < n_parts_we_need_on_x; part_index_x += 1)
       {
         Image_part* new_part = get_available_image_part_from_pool(G);
-
         image_parts_arr[part_index_y * n_parts_we_need_on_x + part_index_x] = new_part;
 
         // Next/Prev 
@@ -276,8 +267,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         // note: Data will be set in the next routine
       }
     }
-    // Assert(count_affectd_px_on_x_mutable == 0);
-    // Assert(count_affectd_px_on_y_mutable == 0);
+    Assert(count_affectd_px_on_y_mutable == 0);
 
     // Iterating over draw image pixels and storing them into image parts 
     for (
@@ -308,92 +298,69 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       }
     }
 
-    // todo: Also update the cpu side stored texture data 
+    // Iterating over stored draw points and updating the cpu draw image based on them
+    for (U64 point_index = 0; point_index < G->draw_pints_count; point_index += 1)
+    {
+      V2U64 point = G->first_draw_point[point_index];
+      Temp_arena temp = temp_arena_begin(G->frame_arena);
+      Draw_result_mem draw_mem = get_draw_range_memory(temp.arena, point, G->pen_size, G->pen_color);
+      Image_data* image = &G->draw_texture_after_the_last_draw;
+      RangeV2U64 updated_range = draw_mem.update_range;
+      for (U64 x_index = updated_range.min.x; x_index < updated_range.max.x; x_index += 1)
+      {
+        for (U64 y_index = updated_range.min.y; y_index < updated_range.max.y; y_index += 1)
+        {
+          U32* px_value = image->pixels + (y_index * image->width + point.x);
+          ((U8*)(px_value))[0] = G->pen_color.r;
+          ((U8*)(px_value))[1] = G->pen_color.g;
+          ((U8*)(px_value))[2] = G->pen_color.b;
+          ((U8*)(px_value))[3] = G->pen_color.a;
+        }
+      }
+      temp_arena_end(&temp);
+    }
   }
-
-  // Drawing or about to start drawing
-  if (IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+  else 
+  if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) // User is about to start drawing or already drawing
   {
     // Starting to draw a new record
     if (!G->is_mid_drawing && !is_ui_capturing_mouse) 
     { 
       G->is_mid_drawing = true;
-      
+    
+      // todo: This shoud be reset after we dont updating the cpu side image and not here
+      arena_clear(G->arena_for_draw_poitns);
+      G->draw_pints_count = 0;
+      G->last_point_where_drew = v2u64(u64_max, u64_max); // Just using an unreachable value
+
       Draw_record* new_draw_record = get_available_draw_record_from_pool(G);
       new_draw_record->prev = G->current_draw_record; 
 
       G->current_draw_record = new_draw_record;
-      G->current_draw_record->pen_size = G->pen_size;
-
-      /*
-      Node_with_points* new_node = get_available_node_of_points_from_pool(G); // These nodes are just lists, so there is nothing to set up for them to work after getting the pool memory for them
-      G->current_draw_record->first_node_with_points = new_node; 
-      G->current_draw_record->last_node_with_points  = new_node; 
-      G->current_draw_record->nodes_count = 0; 
-      */
+      G->current_draw_record->pen_size = G->pen_size; // todo: this might not be needed now
 
       G->current_draw_record->affected_2d_range.min = v2u64(G->draw_texture.width, G->draw_texture.height);
       G->current_draw_record->affected_2d_range.max = v2u64(0, 0);
     }
 
+    // Updating the draw state
     if (G->is_mid_drawing) 
     {
       // todo: Use a u64 vector to not have to cast each time you use this 
-      Vector2 mouse_pos = GetMousePosition();
-      clamp_f32_inplace(&mouse_pos.x, 0.0f, (F32)GetScreenWidth());
-      clamp_f32_inplace(&mouse_pos.y, 0.0f, (F32)GetScreenHeight());
-      
-      // note: Count of a linked to node cant be zero
+      V2U64 mouse_pos = v2u64((U64)GetMouseX(), (U64)GetMouseY());
+
       Assert(G->pen_size != 0 && G->pen_size % 2 == 1); // Just making sure that it is an odd value
-      // Assert(G->current_draw_record && G->current_draw_record->_is_active);
-      // Assert(G->current_draw_record->first_node_with_points != 0);
-      // Assert(G->current_draw_record->last_node_with_points != 0);
+      Assert(G->first_draw_point); // This shoud always be a valid pointer by the way, so just checking
       
-      // Node_with_points* last_node = G->current_draw_record->last_node_with_points;
-      // B32 prev_point_exists = false;
-      // V2 prev_point = {};
-      
-      // Adding a new node up front if the last one is full
-      // if (last_node->points_count == ArrayCount(last_node->points))
-      // {
-        // Node_with_points* new_node = get_available_node_of_points_from_pool(G);
-        // DllPushBack_Name(G->current_draw_record, new_node, first_node_with_points, last_node_with_points, next, prev);
-        // G->current_draw_record->nodes_count += 1;
-        // last_node = new_node;
-      // }
-      
-      // Checking if the last point exists 
-      // if (last_node->points_count == 0 && last_node->prev != 0)
-      // {
-        // Assert(last_node->prev->points_count == ArrayCount(last_node->prev->points), "Why the fuck do you have a 0 filled node that has an unfilled prev node ???"); 
-        // prev_point = last_node->prev->points[last_node->prev->points_count - 1];
-        // prev_point_exists = true;
-      // }
-      // else 
-      // {
-        // prev_point = last_node->points[last_node->points_count - 1];
-        // prev_point_exists = true;
-      // }
-  
-      // Storing the new points
-      // B32 shoud_draw_point = false;
-      // if (!prev_point_exists || mouse_pos.x != prev_point.x || mouse_pos.y != prev_point.y)
-      // {
-        // Assert(last_node->points_count != ArrayCount(last_node->points)); // Just checking
-        // V2* point = last_node->points + (last_node->points_count++);
-        // point->x = mouse_pos.x;
-        // point->y = mouse_pos.y;
-        // shoud_draw_point = true;
-      // }
-  
       // Drawing
+      if (!v2u64_match(G->last_point_where_drew, mouse_pos))
       {
-        Assert(G->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
-  
+        G->last_point_where_drew = mouse_pos;
+
         // Upating min/max points
         {
           U64 pen_radius_offset = (U64)(G->pen_size / 2);
-          
+
           // Min
           {
             V2U64* min_point = &G->current_draw_record->affected_2d_range.min;
@@ -418,31 +385,30 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         }
 
         // Updating the texture
-        Temp_arena temp = temp_arena_begin(G->frame_arena);
-        U32* pixels_to_update = ArenaPushArr(temp.arena, U32, G->pen_size * G->pen_size);
-        for (U64 col_index = 0; col_index < G->pen_size; col_index += 1)
         {
-          for (U64 row_index = 0; row_index < G->pen_size; row_index += 1)
-          {
-            U32* px = pixels_to_update + (G->pen_size * row_index + col_index);
-            ((U8*)(px))[0] = (U8)G->pen_color.r;
-            ((U8*)(px))[1] = (U8)G->pen_color.g;
-            ((U8*)(px))[2] = (U8)G->pen_color.b;
-            ((U8*)(px))[3] = (U8)G->pen_color.a; 
-          }
+          Temp_arena temp = temp_arena_begin(G->frame_arena);
+          Draw_result_mem new_draw_mem = get_draw_range_memory(temp.arena, mouse_pos, G->pen_size, G->pen_color);
+          Rectangle raylib_rect = {};
+          raylib_rect.x      = (F32)(new_draw_mem.update_range.min.x);
+          raylib_rect.y      = (F32)(new_draw_mem.update_range.min.y);
+          raylib_rect.width  = (F32)(new_draw_mem.update_range.max.x - new_draw_mem.update_range.min.x);
+          raylib_rect.height = (F32)(new_draw_mem.update_range.max.y - new_draw_mem.update_range.min.y);
+          UpdateTextureRec(G->draw_texture, raylib_rect, new_draw_mem.new_pixels);
+          temp_arena_end(&temp);
         }
-        U64 pixels_on_each_side_to_the_middle_pixel = (U64)(G->pen_size / 2);
-        Rectangle affected_rect = {};
-        affected_rect.x      = mouse_pos.x - pixels_on_each_side_to_the_middle_pixel;
-        affected_rect.y      = mouse_pos.y - pixels_on_each_side_to_the_middle_pixel;
-        affected_rect.width  = (F32)G->pen_size;
-        affected_rect.height = (F32)G->pen_size;
-        UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
-        temp_arena_end(&temp);
+
+        // note: Here is the only time when the cpu side image is not synced to the gpu one. 
+        //       But we do later sync it when we stop drawing.
+
+        // Storing the new point for later update of the cpu side draw image
+        V2U64* new_draw_p = ArenaPush(G->arena_for_draw_poitns, V2U64);
+        G->draw_pints_count += 1;
+        *new_draw_p = mouse_pos;
       }
     }
   } 
-  else if (IsKeyPressed(KEY_BACKSPACE))
+  else 
+  if (IsKeyPressed(KEY_BACKSPACE)) // User want to remove the last line they drew
   {
     if (G->current_draw_record)
     {
@@ -456,49 +422,23 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         Rectangle rect = { (F32)part->offset.x, (F32)part->offset.y, (F32)part->width, (F32)part->height };
         UpdateTextureRec(G->draw_texture, rect, part->pixels);
       }
-      // for (Node_with_points* node = G->current_draw_record->first_node_with_points; node; node = node->next)
-      // {
-      //   for (U64 p_index = 0; p_index < node->points_count; p_index += 1)
-      //   {
-      //     U64 pen_size = G->current_draw_record->pen_size;
-      //     Temp_arena temp = temp_arena_begin(G->frame_arena);
-      //     U32* pixels_to_update = ArenaPushArr(temp.arena, U32, pen_size * pen_size);
-      //     for (U64 col_index = 0; col_index < pen_size; col_index += 1)
-      //     {
-      //       for (U64 row_index = 0; row_index < pen_size; row_index += 1)
-      //       {
-      //         U32* px = pixels_to_update + (pen_size * row_index + col_index);
-      //         ((U8*)(px))[0] = 0; 
-      //         ((U8*)(px))[1] = 0;  
-      //         ((U8*)(px))[2] = 0; 
-      //         ((U8*)(px))[3] = 0; 
-      //       }
-      //     }
-      //     U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
-      //     Rectangle affected_rect = {};
-      //     affected_rect.x      = node->points[p_index].x - pixels_on_each_side_to_the_middle_pixel;
-      //     affected_rect.y      = node->points[p_index].y - pixels_on_each_side_to_the_middle_pixel;
-      //     affected_rect.width  = (F32)pen_size;
-      //     affected_rect.height = (F32)pen_size;
-      //     UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
-      //     temp_arena_end(&temp);
-      //   }
-      // }
 
-      /*
-      // Puting the used point nodes by the last draw record back into the pool
+      // Drawing back the stuff that was on the removed image parts before the last draw record
+      for (Image_part* part = G->current_draw_record->first_image_part; part; part = part->next)
       {
-        // todo: Take a look at this again
-        G->current_draw_record->last_node_with_points->next = G->first_free_node_with_points;
-        Node_with_points* node_stack_head_p = G->current_draw_record->first_node_with_points;
-        Node_with_points* next_p = node_stack_head_p->next;
-        *node_stack_head_p = Node_with_points{};
-        node_stack_head_p->next = next_p;
-        // node_stack_head_p->_is_active = false;
-        G->first_free_node_with_points = node_stack_head_p;
+        U64 cpu_side_image_w = G->draw_texture_after_the_last_draw.width;
+        U32* cpu_side_image = G->draw_texture_after_the_last_draw.pixels;
+        U32* cpu_side_first_px = cpu_side_image + (part->offset.y * cpu_side_image_w + part->offset.x);
+        for (U64 y_index = 0; y_index < part->height; y_index += 1)
+        {
+          for (U64 x_index = 0; x_index < part->width; x_index += 1)
+          {
+            cpu_side_first_px[x_index] = part->pixels[y_index * part->width + x_index];  
+          }
+          cpu_side_first_px += cpu_side_image_w;
+        }
       }
-      */
-      
+
       // Puting the used image parts back into the pool
       {
         G->current_draw_record->last_image_part->next = G->first_free_image_part;
@@ -564,7 +504,7 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
         red_color_slider.slided_part_color = { 125, 125, 125, 255 };
         red_color_slider.fmt_str = "%.0f";
 
-        F32 new_pen_red = ui_slider(Str8FromC("Red color slider"), &size_slider_style, G->pen_color.r, 0, 255, rli_events);
+        U8 new_pen_red = (U8)ui_slider(Str8FromC("Red color slider"), &size_slider_style, G->pen_color.r, 0, 255, rli_events);
         G->pen_color.r = new_pen_red;
 
         ui_spacer(ui_px(25));
@@ -578,7 +518,7 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
         green_color_slider.slided_part_color = { 125, 125, 125, 255 };
         green_color_slider.fmt_str = "%.0f";
 
-        F32 new_pen_green = ui_slider(Str8FromC("Green color slider"), &size_slider_style, G->pen_color.g, 0, 255, rli_events);
+        U8 new_pen_green = (U8)ui_slider(Str8FromC("Green color slider"), &size_slider_style, G->pen_color.g, 0, 255, rli_events);
         G->pen_color.g = new_pen_green;
 
         ui_spacer(ui_px(25));
@@ -592,7 +532,7 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
         blue_color_slider.slided_part_color = { 125, 125, 125, 255 };
         blue_color_slider.fmt_str = "%.0f";
 
-        F32 new_pen_blue = ui_slider(Str8FromC("Blue color slider"), &size_slider_style, G->pen_color.b, 0, 255, rli_events);
+        U8 new_pen_blue = (U8)ui_slider(Str8FromC("Blue color slider"), &size_slider_style, G->pen_color.b, 0, 255, rli_events);
         G->pen_color.b = new_pen_blue;
 
         ui_spacer(ui_px(25));
@@ -606,7 +546,7 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
         alpha_color_slider.slided_part_color = { 125, 125, 125, 255 };
         alpha_color_slider.fmt_str = "%.0f";
 
-        F32 new_pen_alpha = ui_slider(Str8FromC("Aplha color slider"), &size_slider_style, G->pen_color.a, 0, 255, rli_events);
+        U8 new_pen_alpha = (U8)ui_slider(Str8FromC("Aplha color slider"), &size_slider_style, G->pen_color.a, 0, 255, rli_events);
         G->pen_color.a = new_pen_alpha;
       }
 
@@ -640,11 +580,6 @@ int main()
   G.arena_for_draw_records = arena_alloc(Megabytes(64));
   G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
 
-  /*
-  G.arena_for_nodes_with_points = arena_alloc(Megabytes(64));
-  G.first_node_with_points = ArenaCurrentPos(G.arena_for_nodes_with_points, Node_with_points);
-  */
-  
   G.arena_for_image_parts = arena_alloc(Megabytes(64));
   G.first_image_part = ArenaCurrentPos(G.arena_for_image_parts, Image_part);
 
@@ -670,6 +605,9 @@ int main()
     G.draw_texture_after_the_last_draw.width = G.draw_texture.width;
     G.draw_texture_after_the_last_draw.height = G.draw_texture.height;
   }
+
+  G.arena_for_draw_poitns = arena_alloc(Megabytes(64));
+  G.first_draw_point = ArenaCurrentPos(G.arena_for_draw_poitns, V2U64);
 
   // ==============================
 
@@ -697,6 +635,43 @@ int main()
       ui_draw(); 
       // DrawRectangle(0, 0, 500, 500, { 255, 255, 255, 255 });
     }
+
+    #define DEBUG_CHECK_IF_TEXTURES_ARE_VALID 1
+    #if DEBUG_CHECK_IF_TEXTURES_ARE_VALID
+    {
+      if (!G.is_mid_drawing) // The textures are legaly un synched when drawing
+      {
+        Image gpu_image = LoadImageFromTexture(G.draw_texture);
+        Assert(gpu_image.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+        Assert(gpu_image.width == G.draw_texture_after_the_last_draw.width);
+        Assert(gpu_image.height == G.draw_texture_after_the_last_draw.height);
+        for (U64 i = 0; i < gpu_image.height; i += 1)
+        {
+          for (U64 j = 0; j < gpu_image.width; j += 1)
+          {
+            U32 gpu_px = ((U32*)gpu_image.data)[i * gpu_image.width + j];
+            U32 cpu_px = G.draw_texture_after_the_last_draw.pixels[i * gpu_image.width + j];
+            if (gpu_px != cpu_px)
+            {
+              Image cpu_image = {};
+              cpu_image.data    = G.draw_texture_after_the_last_draw.pixels;             
+              cpu_image.width   = (int)G.draw_texture_after_the_last_draw.width;            
+              cpu_image.height  = (int)G.draw_texture_after_the_last_draw.height;           
+              cpu_image.mipmaps = 1;          
+              cpu_image.format  = PixelFormat_UNCOMPRESSED_R8G8B8A8;           
+
+              B32 succ = 1;
+              succ &= (B32)ExportImage(gpu_image, "gpu_image.png");
+              succ &= (B32)ExportImage(cpu_image, "cpu_image.png");
+              Assert(succ);
+              BreakPoint();
+            }
+          }
+        }
+      }
+    }
+    #endif
+    #undef DEBUG_CHECK_IF_TEXTURES_ARE_VALID
   }
 
 

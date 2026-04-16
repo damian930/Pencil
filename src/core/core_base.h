@@ -548,6 +548,7 @@ struct V2U64 {
 	U64 v[2];
 };
 tu_specific V2U64 v2u64(U64 x, U64 y) { V2U64 v = { x, y }; return v; }
+tu_specific B32 v2u64_match(V2U64 v1, V2U64 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
 
 struct RangeV2U64 {
 	V2U64 min;
@@ -607,6 +608,18 @@ tu_specific B32 __mem_compare(U8* m1, U64 size1, U8* m2, U64 size2)
 }
 
 // #define MemComapare(var1, size1, var2, size2) __mem_compare((U8*)&var1, sizeof(var1), (U8*)&var2, sizeof(var2))
+
+union V4U64 {
+	struct { U64 x; U64 y; U64 z; U64 w; };
+	struct { U64 r; U64 g; U64 b; U64 a; };
+};
+tu_specific V4U64 v4u64(U64 x, U64 y, U64 z, U64 w) { V4U64 v = { x, y, z, w }; return v; }
+
+union V4U8 {
+	struct { U8 x; U8 y; U8 z; U8 w; };
+	struct { U8 r; U8 g; U8 b; U8 a; };
+};
+tu_specific V4U8 v4ui(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
 
 union Vec4_F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
