@@ -40,6 +40,18 @@ V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
 // todo: Add a way to have multiple draw records and go back between each one
 // todo: Since records are infinite, maku sure you dont run out of space 
 
+#define IMAGE_PART_DATA_WIDTH  200
+#define IMAGE_PART_DATA_HEIGHT 200
+struct Image_part {
+  V2U64 offset;
+  U32 width;
+  U32 height;
+  U32 pixels[IMAGE_PART_DATA_WIDTH * IMAGE_PART_DATA_HEIGHT];
+
+  Image_part* next; 
+  Image_part* prev;
+};
+
 struct Node_with_points {
   V2 points[100];
   U16 points_count;
@@ -56,7 +68,17 @@ struct Draw_record {
   Node_with_points* first_node_with_points;
   Node_with_points* last_node_with_points;
   U64 nodes_count;
-  
+
+  // note: These is calculated mid drawing for quick access after we done drawing
+  // RangeV2U64
+  RangeV2U64 affected_2d_range;
+  // V2U64 affected_rect_min_point; 
+  // V2U64 affected_rect_max_point; 
+
+  Image_part* first_image_part;
+  Image_part* last_image_part;
+  U64 image_parts_count;
+
   Draw_record* prev;
   
   // Free list part
@@ -64,11 +86,20 @@ struct Draw_record {
   B32 _is_active;
 };
 
+struct Image_data {
+  U32* pixels; // R8_G8_B8_A8 
+  U64 width;
+  U64 height;
+};  
+
 struct G_state {
+  Arena* arena;
   Arena* frame_arena;
-  Texture draw_texture;
   U64 pen_size;
   V4 pen_color;
+
+  Texture draw_texture;
+  Image_data draw_texture_after_the_last_draw;  
 
   // Pool of draw_records  
   Arena* arena_for_draw_records;
@@ -81,6 +112,12 @@ struct G_state {
   Node_with_points* first_node_with_points;
   U64 allocated_nodes_with_points_count;
   Node_with_points* first_free_node_with_points;
+
+  // Pool of Image parts
+  Arena* arena_for_image_parts;
+  Image_part* first_image_part;
+  U64 allocated_image_parts_count;
+  Image_part* first_free_image_part;
 
   // Stuff for while drawing
   B32 is_mid_drawing;
@@ -148,6 +185,29 @@ Draw_record* get_available_draw_record_from_pool(G_state* G)
   return draw_record;
 }
 
+Image_part* get_available_image_part_from_pool(G_state* G)
+{
+  Image_part* part = G->first_free_image_part;
+  if (part)
+  {
+    G->first_free_image_part = G->first_free_image_part->next;
+  }
+  else
+  {
+    part = ArenaPush(G->arena_for_image_parts, Image_part);
+    G->allocated_image_parts_count += 1;
+  }
+  *part = Image_part{};
+  return part;
+}
+
+U32* image_part_get_px(Image_part* part, U64 x, U64 y)
+{
+  Assert(x < IMAGE_PART_DATA_WIDTH); Assert(y < IMAGE_PART_DATA_HEIGHT); 
+  U32* px = part->pixels + (y * IMAGE_PART_DATA_WIDTH + x);
+  return px;
+}
+
 void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 {
   Assert(G->first_draw_record != 0);
@@ -170,7 +230,95 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
   // User is no longer holding the mouse, have to end drawing mode 
   if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
   {
+    // Now that we are done drawing, we have to get the affected rect 
+    // in the current draw texture and store it in the current record.
+    // This will allow for later removing of the record, since we will know what to put instead of it. 
+    Assert(G->current_draw_record != 0);
+    Assert(G->current_draw_record->affected_rect_min_point.x < G->current_draw_record->affected_rect_max_point.x); 
+    Assert(G->current_draw_record->affected_rect_min_point.y < G->current_draw_record->affected_rect_max_point.y); 
+
     G->is_mid_drawing = false;
+
+    V2U64 affected_min_p = G->current_draw_record->affected_rect_min_point;
+    V2U64 affected_max_p = G->current_draw_record->affected_rect_max_point;
+    
+    const U64 count_affectd_px_on_x = affected_max_p.x - affected_min_p.x;
+    const U64 count_affectd_px_on_y = affected_max_p.x - affected_min_p.x;
+    
+    U64 n_parts_we_need_on_x = (count_affectd_px_on_x % IMAGE_PART_DATA_WIDTH) + 1;
+    U64 n_parts_we_need_on_y = (count_affectd_px_on_y % IMAGE_PART_DATA_HEIGHT) + 1;
+
+    // Allocating parts to cover the affected area
+    U64 count_affectd_px_on_x_mutable = count_affectd_px_on_x;
+    U64 count_affectd_px_on_y_mutable = count_affectd_px_on_y;
+    Image_part* image_parts = 0;
+    for (U64 part_index_x = 0; part_index_x < n_parts_we_need_on_x; part_index_x += 1)
+    {
+      for (U64 part_index_y = 0; part_index_y < n_parts_we_need_on_y; part_index_y += 1)
+      {
+        Image_part* new_part = get_available_image_part_from_pool(G);
+        if (part_index_x == 0 && part_index_y == 0) { image_parts = new_part; }
+
+        // Next/Prev 
+        DllPushBack_Name(G->current_draw_record, new_part, first_image_part, last_image_part, next, prev);
+        G->current_draw_record->image_parts_count += 1;
+
+        // Offset 
+        new_part->offset = {};
+        new_part->offset.x = affected_min_p.x + (part_index_x * IMAGE_PART_DATA_WIDTH);
+        new_part->offset.y = affected_min_p.y + (part_index_y * IMAGE_PART_DATA_HEIGHT);
+        
+        // Width
+        if (count_affectd_px_on_x_mutable > IMAGE_PART_DATA_WIDTH) {
+          new_part->width = IMAGE_PART_DATA_WIDTH;
+          count_affectd_px_on_x_mutable -= IMAGE_PART_DATA_WIDTH;
+        } else {
+          new_part->width = count_affectd_px_on_x_mutable;
+          count_affectd_px_on_x_mutable -= count_affectd_px_on_x_mutable; 
+        }
+
+        // Height
+        if (count_affectd_px_on_y_mutable > IMAGE_PART_DATA_HEIGHT) {
+          new_part->height = IMAGE_PART_DATA_HEIGHT;
+          count_affectd_px_on_y_mutable -= IMAGE_PART_DATA_HEIGHT;
+        } else {
+          new_part->height = count_affectd_px_on_y_mutable;
+          count_affectd_px_on_y_mutable -= count_affectd_px_on_y_mutable; 
+        }
+
+        // note: Data will be set in the next routine
+      }
+    }
+    Assert(count_affectd_px_on_x_mutable == 0);
+    Assert(count_affectd_px_on_y_mutable == 0);
+
+    // todo: I would rather the max point here to not be inclusive --> to keep the invariant of the codebase
+    for (
+      U64 draw_texture_affected_px_index_x = affected_min_p.x; 
+      draw_texture_affected_px_index_x <= affected_max_p.x; 
+      draw_texture_affected_px_index_x += 1
+    ) {
+      for (
+        U64 draw_texture_affected_px_index_y = affected_min_p.y; 
+        draw_texture_affected_px_index_y <= affected_max_p.y; 
+        draw_texture_affected_px_index_y += 1
+      ) {
+        U64 px_relative_to_min_affected_x = (draw_texture_affected_px_index_x - affected_min_p.x);
+        U64 px_relative_to_min_affected_y = (draw_texture_affected_px_index_y - affected_min_p.y);
+
+        U64 part_index_x = px_relative_to_min_affected_x % IMAGE_PART_DATA_WIDTH;
+        U64 part_index_y = px_relative_to_min_affected_x % IMAGE_PART_DATA_HEIGHT;
+
+        Image_part* part = image_parts + (part_index_y * n_parts_we_need_on_x + part_index_x);
+
+        U64 px_index_x_relative_to_part = px_relative_to_min_affected_x - (part_index_x * IMAGE_PART_DATA_WIDTH);
+        U64 px_index_y_relative_to_part = px_relative_to_min_affected_y - (part_index_y * IMAGE_PART_DATA_HEIGHT);
+        U32* part_px = image_part_get_px(part, px_index_x_relative_to_part, px_index_y_relative_to_part);
+
+        U64 index_for_draw_texture = (G->draw_texture.width * draw_texture_affected_px_index_y + draw_texture_affected_px_index_x);
+        *part_px = G->draw_texture_after_the_last_draw.pixels[index_for_draw_texture];
+      }
+    }
   }
 
   // Drawing or about to start drawing
@@ -191,6 +339,10 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       G->current_draw_record->first_node_with_points = new_node; 
       G->current_draw_record->last_node_with_points  = new_node; 
       G->current_draw_record->nodes_count = 0; 
+
+      // todo: Fix this
+      G->current_draw_record->affected_rect_min_point = V2{(F32)(G->draw_texture.width - 1), (F32)(G->draw_texture.height - 1)};
+      G->current_draw_record->affected_rect_max_point = V2{0.0f, 0.0f};
     }
 
     if (G->is_mid_drawing) 
@@ -244,6 +396,32 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       {
         Assert(G->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
   
+        // Upating min/max points
+        {
+          U64 pen_radius_offset = (U64)(G->pen_size / 2);
+          
+          // Min
+          {
+            V2U64* min_point = &G->current_draw_record->affected_rect_min_point;
+            V2U64 test_min_point = {};
+            if (mouse_pos.x > pen_radius_offset) { test_min_point.x = mouse_pos.x - pen_radius_offset; } // Making sure we dont overflow the U64 and loop around
+            if (mouse_pos.y > pen_radius_offset) { test_min_point.y = mouse_pos.x - pen_radius_offset; } // Making sure we dont overflow the U64 and loop around
+            min_point->x = Min(min_point->x, test_min_point.x);
+            min_point->y = Min(min_point->y, test_min_point.y);
+          }
+
+          // Max
+          { 
+            V2U64* max_point = &G->current_draw_record->affected_rect_max_point;
+            V2U64 test_max_point = v2u64(mouse_pos.x + pen_radius_offset, mouse_pos.y + pen_radius_offset);
+            Assert(test_max_point.x <= G->draw_texture.width);            
+            Assert(test_max_point.y <= G->draw_texture.height);            
+            max_point->x = Max(max_point->x , test_max_point.x);
+            max_point->y = Max(max_point->y , test_max_point.y);
+          }
+        }
+
+        // Updating the texture
         Temp_arena temp = temp_arena_begin(G->frame_arena);
         U32* pixels_to_update = ArenaPushArr(temp.arena, U32, G->pen_size * G->pen_size);
         for (U64 col_index = 0; col_index < G->pen_size; col_index += 1)
@@ -251,10 +429,10 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
           for (U64 row_index = 0; row_index < G->pen_size; row_index += 1)
           {
             U32* px = pixels_to_update + (G->pen_size * row_index + col_index);
-            ((U8*)(px))[0] = 255; // (U8)G->pen_color.r;
-            ((U8*)(px))[1] = 50;  // (U8)G->pen_color.g;
-            ((U8*)(px))[2] = 255; // (U8)G->pen_color.b;
-            ((U8*)(px))[3] = 255; // (U8)G->pen_color.a; 
+            ((U8*)(px))[0] = (U8)G->pen_color.r;
+            ((U8*)(px))[1] = (U8)G->pen_color.g;
+            ((U8*)(px))[2] = (U8)G->pen_color.b;
+            ((U8*)(px))[3] = (U8)G->pen_color.a; 
           }
         }
         U64 pixels_on_each_side_to_the_middle_pixel = (U64)(G->pen_size / 2);
@@ -265,8 +443,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         affected_rect.height = (F32)G->pen_size;
         UpdateTextureRec(G->draw_texture, affected_rect, pixels_to_update);
         temp_arena_end(&temp);
-
-    }
+      }
     }
   } 
   else if (IsKeyPressed(KEY_BACKSPACE))
@@ -368,31 +545,59 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 
         ui_spacer(ui_px(25));
 
-        // ui_set_next_color({ 107, 75, 10, 255 });
-        // UI_PaddedBox(ui_px(5), Axis2__x)
-        // {
-        //   // Retained state for the edit box
-        //   static UI_Text_edit_box_state edit_box_state = {}; 
-        //   static U64 buffer_current_size               = 0; 
-        //   static U64 cursor_pos                        = 0;
-        //   static U64 section_start_pos                 = 0;
+        UI_Slider_style red_color_slider = {};
+        red_color_slider.height         = 50;
+        red_color_slider.width          = 100;
+        red_color_slider.hover_color    = { 75, 75, 75, 255 };
+        red_color_slider.no_hover_color = { 50, 50, 50, 255 };
+        red_color_slider.text_color     = { 255, 255, 255, 255 };
+        red_color_slider.slided_part_color = { 125, 125, 125, 255 };
+        red_color_slider.fmt_str = "%.0f";
 
-        //   Assert(0 < G->pen_size && G->pen_size < 100);
-        //   // Scratch scratch = get_scratch(0, 0);
-        //   U8 text_buffer[3];
-        //   U64 buffer_max_size = ArrayCount(text_buffer);
-        //   snprintf((char*)text_buffer, buffer_max_size, "%lld", G->pen_size);
+        F32 new_pen_red = ui_slider(Str8FromC("Red color slider"), &size_slider_style, G->pen_color.r, 0, 255, rli_events);
+        G->pen_color.r = new_pen_red;
 
-        //   Str8 edit_box_id = Str8FromC("Red color edit box");
-        //   UI_Size edit_box_size_x = ui_px(100); 
-        //   B32 enter_go_pressed = ui_text_box_mutates(edit_box_id, Str8{}, &edit_box_state, edit_box_size_x, text_buffer, buffer_max_size, &buffer_current_size, &cursor_pos, &section_start_pos, rli_events);
-        //   int new_red_color_value = atoi((char*)text_buffer);
-        //   if (enter_go_pressed)
-        //   {
-        //     G->pen_color.r = (F32)new_red_color_value;
-        //   }
-        // }
+        ui_spacer(ui_px(25));
 
+        UI_Slider_style green_color_slider = {};
+        green_color_slider.height         = 50;
+        green_color_slider.width          = 100;
+        green_color_slider.hover_color    = { 75, 75, 75, 255 };
+        green_color_slider.no_hover_color = { 50, 50, 50, 255 };
+        green_color_slider.text_color     = { 255, 255, 255, 255 };
+        green_color_slider.slided_part_color = { 125, 125, 125, 255 };
+        green_color_slider.fmt_str = "%.0f";
+
+        F32 new_pen_green = ui_slider(Str8FromC("Green color slider"), &size_slider_style, G->pen_color.g, 0, 255, rli_events);
+        G->pen_color.g = new_pen_green;
+
+        ui_spacer(ui_px(25));
+
+        UI_Slider_style blue_color_slider = {};
+        blue_color_slider.height         = 50;
+        blue_color_slider.width          = 100;
+        blue_color_slider.hover_color    = { 75, 75, 75, 255 };
+        blue_color_slider.no_hover_color = { 50, 50, 50, 255 };
+        blue_color_slider.text_color     = { 255, 255, 255, 255 };
+        blue_color_slider.slided_part_color = { 125, 125, 125, 255 };
+        blue_color_slider.fmt_str = "%.0f";
+
+        F32 new_pen_blue = ui_slider(Str8FromC("Blue color slider"), &size_slider_style, G->pen_color.b, 0, 255, rli_events);
+        G->pen_color.b = new_pen_blue;
+
+        ui_spacer(ui_px(25));
+
+        UI_Slider_style alpha_color_slider = {};
+        alpha_color_slider.height         = 50;
+        alpha_color_slider.width          = 100;
+        alpha_color_slider.hover_color    = { 75, 75, 75, 255 };
+        alpha_color_slider.no_hover_color = { 50, 50, 50, 255 };
+        alpha_color_slider.text_color     = { 255, 255, 255, 255 };
+        alpha_color_slider.slided_part_color = { 125, 125, 125, 255 };
+        alpha_color_slider.fmt_str = "%.0f";
+
+        F32 new_pen_alpha = ui_slider(Str8FromC("Aplha color slider"), &size_slider_style, G->pen_color.a, 0, 255, rli_events);
+        G->pen_color.a = new_pen_alpha;
       }
 
       ui_spacer(ui_px(25));
@@ -417,6 +622,7 @@ int main()
 
   G_state G = {};
 
+  G.arena = arena_alloc(Megabytes(64));
   G.frame_arena = arena_alloc(Megabytes(64));
   G.pen_size = 11;
   G.font_texture_for_ui = LoadFont("../data/Roboto.ttf");
@@ -424,8 +630,11 @@ int main()
   G.arena_for_draw_records = arena_alloc(Megabytes(64));
   G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
   
-  G.arena_for_nodes_with_points = arena_alloc(Megabytes(64));;
+  G.arena_for_nodes_with_points = arena_alloc(Megabytes(64));
   G.first_node_with_points = ArenaCurrentPos(G.arena_for_nodes_with_points, Node_with_points);
+  
+  G.arena_for_image_parts = arena_alloc(Megabytes(64));
+  G.first_image_part = ArenaCurrentPos(G.arena_for_image_parts, Image_part);
 
   G.draw_texture = {};
   {
@@ -442,6 +651,15 @@ int main()
     G.draw_texture = LoadTexture("draw_image.png");
     temp_arena_end(&temp);
   }
+  // note: These have to be the same, but 1 is on the gpu for quick drawing and another one is the the cpu for state managment
+  G.draw_texture_after_the_last_draw = {};
+  {
+    G.draw_texture_after_the_last_draw.pixels = ArenaPushArr(G.arena, U32, G.draw_texture.width * G.draw_texture.height);
+    G.draw_texture_after_the_last_draw.width = G.draw_texture.width;
+    G.draw_texture_after_the_last_draw.height = G.draw_texture.height;
+  }
+
+  // ==============================
 
   for (;!WindowShouldClose();)
   {
@@ -450,51 +668,22 @@ int main()
     
     // if ui has an active element which we are holding, then we dont start interacting with the app (drawing part)
     
-    ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY());
-    ui_push_font(G.font_texture_for_ui);
-
-    UI_PaddedBox(ui_px(200), Axis2__x)
+    if (!G.is_mid_drawing)
     {
-      static U8 buffer[100] = {};
-      static U64 current_size = 0;
-      static U64 cursor = 0;
-      static U64 section = 0;
-
-      Scratch scratch = get_scratch(0, 0);
-      UI_Text_op_list text_ops = ui_text_op_list_from_rli_events(scratch.arena, rli_events);
-      ui_aply_text_ops(text_ops, buffer, ArrayCount(buffer), &current_size, &cursor, &section);
-      end_scratch(&scratch);
-
-      UI_Text_edit_box_style edit_box_style = {};
-      edit_box_style.font        = ui_get_font();
-      edit_box_style.font_size   = ui_get_font_size();
-      edit_box_style.width_in_px = 100;
-
-      static U64 left_wall = 0;
-      static U64 right_wall = 0;
-
-      ui_push_text_color({ 255, 255, 255, 255 });
-      ui_push_color({ 50, 50, 50, 255 });
-      ui_text_edit_box(&edit_box_style, buffer, ArrayCount(buffer), current_size, cursor, section, rli_events); 
+      update_pencil_ui(&G, rli_events);
     }
 
-    ui_end_build();
-
-
-    // if (!G.is_mid_drawing)
-    // {
-    //   update_pencil_ui(&G, rli_events);
-    // }
-
-    // update_pencil(&G, ui_has_active());
+    update_pencil(&G, ui_has_active());
 
     DeferLoop(BeginDrawing(), EndDrawing())
+    DeferLoop(BeginBlendMode(BLEND_ALPHA), EndBlendMode())
     {
       Texture draw_texture = G.draw_texture;
       ClearBackground(BLACK);
       DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
       DrawFPS(0, 0);
-      ui_draw();
+      ui_draw(); 
+      // DrawRectangle(0, 0, 500, 500, { 255, 255, 255, 255 });
     }
   }
 

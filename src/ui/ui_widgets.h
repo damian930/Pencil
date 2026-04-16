@@ -167,7 +167,19 @@ struct UI_Text_edit_box_style {
   // V4 text_color;
   // add: value that specifies how many simbols are minimum on a side to start changing clip offset
 };
+struct UI_Text_edit_box_state {
+  // F32 non_used_space_right;
+
+  // F32 walled_part_space;
+
+  // F32 visible_extra_space_left;
+  // F32 visible_extra_space_right;
+
+  // U64 wall_index_left;  // These indexes are kind of like cursor, so the range is [left, right) to get he walled string
+  // U64 wall_index_right;
+};
 void ui_text_edit_box(
+  UI_Text_edit_box_state* state,
   const UI_Text_edit_box_style* edit_box_style, 
   U8* text_buffer, 
   U64 text_buffer_max_size, // todo: I feel like for displaying this is not really needed 
@@ -201,8 +213,11 @@ void ui_text_edit_box(
 
   Str8 text_buffer_as_str = str8_manuall(text_buffer, text_buffer_current_size);
 
-  // static F32 non_visible_space_left = 0.0f;
-  // static F32 non_visible_space_right = 0.0f;
+  // ---- Testing this 
+  static F32 non_used_space_right = 0.0f;
+
+  // ---- Testing this 
+  static F32 cursor_offset_from_left_wall = 0.0f;
 
   // State
   static F32 walled_part_space = 0.0f;
@@ -212,32 +227,25 @@ void ui_text_edit_box(
   // 
   static U64 wall_index_left = 0;  // These indexes are kind of like cursor, so the range is [left, right) to get he walled string
   static U64 wall_index_right = 0;
-  // 
-  static B32 is_main_wall_left = false;
-  static B32 is_main_wall_right = false;
 
-  F32 new_walled_part_space = 0.0f;
-  {
-    
-  }
-
-  // cases to cover:
-  // - something got added to the walled part
-  // - something got removed from the walled part
-  // - cursor is past the wall index right
-  // - cursor is before the wall index left 
-
-  // if i remove on the left wall or add on the right wall i go out of the walled part,
-  // if i do it in the middle, i have to recalculat the walls
-
+  // Updating state
   if (cursor > wall_index_right)
   {
+    // When we move over the right wall, we make the new position be the right wall.
+    // The right extra space shoud also become 0, since now start rendering px perfect char end and the 
+    // cursor on it. On the left side there might be additional part of char that cant fit into the walled 
+    // part but is still visible. That is represented by the additional space left. Additional space right
+    // has to be 0. 
+    // 
+    // todo: What about when we have text that is smaller than the box, what about that space ???
+
     wall_index_right = cursor;
-    is_main_wall_right = true;
-    is_main_wall_left = false;
     visible_extra_space_right = 0.0f;  
     
-    Assert(wall_index_right > 0); // This shoud be true, since thats the only way that it is smaller than cursor, to which we then set it
+    // This shoud be true, since thats the only way that it is smaller than cursor, to which we then set it
+    Assert(wall_index_right > 0); 
+
+    // Finding the index for the new left wall
     F32 accumulated_text_width = 0.0f;
     for (U64 test_left_wall_index = wall_index_right - 1;;)
     {
@@ -247,7 +255,7 @@ void ui_text_edit_box(
       accumulated_text_width += dims.x;
       if (accumulated_text_width > edit_box_style->width_in_px)
       {
-        wall_index_left = test_left_wall_index + 1;
+        wall_index_left = test_left_wall_index + 1; // We over reached, so + 1
         accumulated_text_width -= dims.x;
         break;
       }
@@ -255,14 +263,34 @@ void ui_text_edit_box(
       test_left_wall_index -= 1;
     }
 
-    visible_extra_space_left = edit_box_style->width_in_px - accumulated_text_width;
-    visible_extra_space_left = Max(0.0f, visible_extra_space_left);
+    Assert(visible_extra_space_right == 0.0f); // Just for context
+    // if (visible_extra_space_left == 0.0f && accumulated_text_width < edit_box_style->width_in_px)
+    if (wall_index_left == 0 && accumulated_text_width < edit_box_style->width_in_px)
+    {
+      // Walled strings often are not the same lengh than edit_box_style->width_in_px.
+      // They also cant be longer, that would be invalid state.
+      // But if the left wall index is 0 and the walled part is less than the space available in the 
+      // edit box, that means that out string is not long enough to be longer than the edit box space.
+      // If it was we would eihter have accumulated_text_width be the same as the edit box size,
+      // or would have some space on the left. But we dont have it, since the left wall is 0;
+      Assert(visible_extra_space_left == 0.0f);
+      // note: I dont use visible_extra_space_left in the condition, since when state is first passed,
+      // all the values there are 0. Wall index left at 0 is valid. If i used visible_extra_space_left 
+      // in the condition, if would always then trigger this code path and never set visible_extra_space_left
+      // to a different value in the else block below.
+
+      non_used_space_right = edit_box_style->width_in_px - accumulated_text_width;
+    }
+    else
+    {
+      visible_extra_space_left = edit_box_style->width_in_px - accumulated_text_width;
+      non_used_space_right = 0.0f;
+      Assert(visible_extra_space_left >= 0.0f);
+    }
   }
   else if (cursor < wall_index_left)
   {
     wall_index_left = cursor;
-    is_main_wall_right = false;
-    is_main_wall_left = true;
     visible_extra_space_left = 0.0f;  
 
     F32 accumulated_text_width = 0.0f;
@@ -275,7 +303,7 @@ void ui_text_edit_box(
       if (accumulated_text_width > edit_box_style->width_in_px)
       {
         accumulated_text_width -= dims.x;
-        wall_index_right = test_right_wall_index;
+        wall_index_right = test_right_wall_index; // Since wall indexes work the same as cursor, they are at the next index kind of, we dont do -1 or +1 here
         break;
       }
       if (test_right_wall_index == text_buffer_max_size) { break; }
@@ -283,7 +311,17 @@ void ui_text_edit_box(
     }
 
     visible_extra_space_right = edit_box_style->width_in_px - accumulated_text_width;
-    Assert(visible_extra_space_right > 0.0f); // Just in case
+    
+    // We shoud not have any non used space on the right of the text edit box, 
+    // since if we have moved to the left of the cursor, that means that 
+    // the text at some point was longer than the edit box size, which means 
+    // that its not possible to have non used space when we move left
+    non_used_space_right = edit_box_style->width_in_px - (visible_extra_space_left + accumulated_text_width + visible_extra_space_right);
+    Assert(non_used_space_right == 0.0f);
+  }
+  else if (wall_index_left == 0 && wall_index_right == 0) { 
+    // Nothing, waiting for the user to do something to the cursor 
+    // to trigger the routine above
   }
   else 
   {
@@ -292,6 +330,7 @@ void ui_text_edit_box(
     
     if (walled_dims.x > walled_part_space) // Something got inserted (this did not happend at the right wall, since if it did, we would have handled it in the case where cursor > right_wall_index)
     {
+      BreakPoint();
       Assert(wall_index_right > 0);
 
       // Since something got added, we know that the char that got added is not the same size as the one 
@@ -300,10 +339,6 @@ void ui_text_edit_box(
       // wall boundary, the one on the boundary would get pushed outside the boundary and the new one would be
       // added in the middle of the walled part. Either way to us it makes no difference in how to display it,
       // since nothing changed in terms of the positioning and spacing.
-
-      // We lost the main wall if we had one 
-      is_main_wall_left = false; 
-      is_main_wall_left = false;
 
       if (visible_extra_space_left + walled_dims.x + visible_extra_space_right > edit_box_style->width_in_px)
       {
@@ -314,6 +349,7 @@ void ui_text_edit_box(
         space_to_remove -= visible_extra_space_right;
         if (space_to_remove < 0.0f) // Only some extra space shoud be removed 
         {
+          BreakPoint();
           visible_extra_space_right = abs_f32(space_to_remove);
         }
         if (space_to_remove > 0.0f) // Now we also have to adjust the right wall
@@ -337,18 +373,65 @@ void ui_text_edit_box(
         }
       }
     }
-  }
+    else 
+    if (walled_dims.x < walled_part_space) // Something got deleted (this did not happend at the left wall, since if it did, we would have had the routine (cursor < left_wall_index) above handle it)
+    {
+      Assert(wall_index_right > 0);
+      BreakPoint();
+      
+      // goal: 
+      // We want to keep the cursor at the same offset to the user if possible.
+      // So when we are removing chars, we want the cursor to be in the same spot as it was before.
+      // We need to know what cursor offset to the left wall was. We know the left extra space that the user sees,
+      // now we just need to know how much till the cursor they also seen      
+      
+      
+      // === Old code
+      /*
+      F32 space_to_add = walled_part_space - walled_dims.x + visible_extra_space_right;
+      F32 total_space_added = 0.0f;
+      U64 test_right_index = wall_index_right;
+      for (;;)
+      {
+        if (test_right_index >= text_buffer_as_str.count) { break; } // This is in case if we were at the end and the last char got removed
+        Str8 test_char_str = str8_substring(text_buffer_as_str, test_right_index, test_right_index + 1);
+        V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
+        total_space_added += dims.x;
+        if (total_space_added > space_to_add)
+        {
+          total_space_added -= dims.x;
+          break;
+        }
+        test_right_index += 1;
+      }
 
+      // todo: I dont understand this
+      visible_extra_space_right = space_to_add - total_space_added;  
+      wall_index_right = test_right_index;
+      */
+    }
+  }
 
   // Updating wrapped part size 
   {
     Str8 walled_str = str8_substring(text_buffer_as_str, wall_index_left, wall_index_right);
-    V2 walled_dims = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
-    walled_part_space = walled_dims.x;
+    V2 dims = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
+    walled_part_space = dims.x;
+  }
+  
+  // Updating cursor_offset_from_left_wall
+  {
+    Str8 walled_cursor_str = str8_substring(text_buffer_as_str, wall_index_left, cursor);
+    V2 dims = ui_measure_text_ex(walled_cursor_str, edit_box_style->font, edit_box_style->font_size);
+    cursor_offset_from_left_wall = dims.x;
   }
 
-  if (visible_extra_space_left + walled_part_space + visible_extra_space_right > edit_box_style->width_in_px)
-  {
+  // Just checking if the invariant has not been broken
+  if (
+    wall_index_right != 0 // This means that the state is not zeroed out and not yet set by the routine
+      && 
+    (visible_extra_space_left + walled_part_space + visible_extra_space_right + non_used_space_right != edit_box_style->width_in_px)
+  ) {
     BreakPoint();
   }
 
@@ -359,31 +442,35 @@ void ui_text_edit_box(
   }
 
   Str8 edit_box_id = Str8FromC("Edit box id");
-  ui_set_next_color({ 255, 255, 255, 255 });
   ui_set_next_size_x(ui_px(edit_box_style->width_in_px));
   ui_set_next_size_y(ui_px(height_in_px));
   UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__dont_draw_overflow);
   
   F32 edit_box_clip_offset = 0.0f;
   {
-    if (is_main_wall_right)
+    if (visible_extra_space_left != 0.0f && visible_extra_space_right == 0.0f)
     {
-      Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, wall_index_right);
-      V2 dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
-      edit_box_clip_offset = dims.x - edit_box_style->width_in_px;
-      edit_box_clip_offset = Max(0.0f, edit_box_clip_offset);
+      Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
+      V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
+      edit_box_clip_offset = dims.x - visible_extra_space_left;
     }
-    else if (is_main_wall_left)
+    else if (visible_extra_space_left == 0.0f && visible_extra_space_right != 0.0f)
     {
       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
       edit_box_clip_offset = dims.x;
     }
-    else if (!is_main_wall_left && !is_main_wall_left)
+    else if (visible_extra_space_left != 0.0f && visible_extra_space_right != 0.0f)
     {
       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
       edit_box_clip_offset = dims.x - visible_extra_space_left;
+    }
+    else if (visible_extra_space_left == 0.0f && visible_extra_space_right == 0.0f)
+    {
+      Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
+      V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
+      edit_box_clip_offset = dims.x;
     }
     else { InvalidCodePath(); }
   }
@@ -418,7 +505,7 @@ void ui_text_edit_box(
 
     // Getting size for the spacer that will offset the cursor relative the the edit box start pos
     F32 cursor_offset_spacer = 0.0f;
-    if (is_main_wall_right && cursor == wall_index_right)
+    if (visible_extra_space_right == 0 && cursor == wall_index_right)
     {
       Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, wall_index_right);
       V2 dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
@@ -436,7 +523,7 @@ void ui_text_edit_box(
       ui_spacer(ui_px(cursor_offset_spacer));
 
       ui_set_next_size_x(ui_px(cursor_width)); ui_set_next_size_y(ui_px(height_in_px));
-      ui_set_next_color({ 255, 0, 0, 255 });
+      ui_set_next_color({ 255, 255, 255, 255 });
       UI_Box* cursor_line_box = ui_box_make(Str8{}, 0);
     }
 

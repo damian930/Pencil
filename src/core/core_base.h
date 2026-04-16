@@ -539,6 +539,20 @@ typedef Vec2_F32 V2;
 tu_specific Vec2_F32 vec2_f32_make(F32 x, F32 y) { Vec2_F32 v = { x, y }; return v; }
 tu_specific B32 vec2_f32_match(Vec2_F32 v1, Vec2_F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
 
+struct V2U64 {
+	struct {
+		U64 x;
+		U64 y;
+	};
+	U64 v[2];
+};
+tu_specific V2U64 v2u64(U64 x, U64 y) { V2U64 v = { x, y }; return v; }
+
+struct RangeV2U64 {
+	V2U64 min;
+	V2U64 max;
+};
+
 struct Rect {
 	F32 x;
 	F32 y;
