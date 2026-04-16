@@ -457,6 +457,7 @@ struct RangeU64 {
 tu_specific RangeU64 range_u64_make(U64 min, U64 max);
 tu_specific U64 range_u64_count(RangeU64 range);
 tu_specific B32 range_u64_within(RangeU64 range, U64 v);
+tu_specific B32 range_u64_is_valid(RangeU64 range);
 
 #define Address(var) (U64)(&(var))
 
@@ -552,6 +553,14 @@ struct RangeV2U64 {
 	V2U64 min;
 	V2U64 max;
 };
+
+tu_specific B32 range_v2u64_is_valid(RangeV2U64 range) 
+{
+	B32 is_valid = true;
+	if      (range.min.x > range.max.x) { is_valid = false; }
+	else if (range.min.y > range.max.y) { is_valid = false; }
+	return is_valid;
+}
 
 struct Rect {
 	F32 x;

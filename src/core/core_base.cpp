@@ -136,6 +136,12 @@ B32 range_u64_within(RangeU64 range, U64 v)
 	return result;
 }
 
+B32 range_u64_is_valid(RangeU64 range)
+{
+	B32 result = (range.min <= range.max);
+	return result;
+}
+
 Vec2_F32 rect_dims(Rect rect)
 {
 	Vec2_F32 dims = {};
