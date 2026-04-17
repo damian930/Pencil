@@ -63,7 +63,7 @@ struct Draw_record {
   Draw_record* prev;
 
   RangeV2U64 affected_2d_range; // note: These is calculated mid drawing for quick access after we done drawing
-  RenderTexture draw_texture_state_before;
+  RenderTexture draw_texture_chunk_before_affected;
 
   // Free list part
   Draw_record* _next_free;
@@ -278,24 +278,28 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
   {
     G->is_mid_drawing = false;
 
-    U64 width = G->draw_texture_always_fresh.texture.width;
-    U64 height = G->draw_texture_always_fresh.texture.height;
+    U64 draw_t_width = G->draw_texture_always_fresh.texture.width;
+    U64 draw_t_height = G->draw_texture_always_fresh.texture.height;
 
-    RenderTexture2D old_copy_texture = LoadRenderTexture((int)width, (int)height);
-    HandleLater(old_copy_texture.texture.id != 0);
+    RangeV2U64 affected_range = G->current_draw_record->affected_2d_range;
+    RenderTexture* affected_t_chunk = &G->current_draw_record->draw_texture_chunk_before_affected;
 
+    U64 affected_width = affected_range.max.x - affected_range.min.x;
+    U64 affected_height = affected_range.max.y - affected_range.min.y;
+    *affected_t_chunk = LoadRenderTexture((int)affected_width, (int)affected_height);
+
+    // Storing what was on the affected chunk before we affected it
     copy_from_texture_to_texture(
-      old_copy_texture.texture, v2u64(0, 0), 
-      G->draw_texture_not_that_fresh.texture, v2u64(0, 0),
-      width, height
+      affected_t_chunk->texture, v2u64(0, 0),
+      G->draw_texture_not_that_fresh.texture, affected_range.min,
+      affected_width, affected_height
     );
-    G->current_draw_record->draw_texture_state_before = old_copy_texture;
 
-    // Updating the old texture to be the same as the fresh texture
+    // Copying the affected chunk into the old texture from the fresh texture
     copy_from_texture_to_texture(
-      G->draw_texture_not_that_fresh.texture, v2u64(0, 0), 
-      G->draw_texture_always_fresh.texture, v2u64(0, 0),
-      width, height
+      G->draw_texture_not_that_fresh.texture, affected_range.min,
+      G->draw_texture_always_fresh.texture, affected_range.min,
+      affected_width, affected_height
     );
 
     // Debug
@@ -306,7 +310,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       Image gpu_image_other = LoadImageFromTexture(G->draw_texture_not_that_fresh.texture);
       Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
 
-      Image copy = LoadImageFromTexture(old_copy_texture.texture);
+      Image copy = LoadImageFromTexture(affected_t_chunk->texture);
       Assert(copy.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
 
       ExportImage(gpu_image_fresh, "fresh.png");
@@ -360,22 +364,34 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     //       But we do later sync it when we stop drawing.
   }
   else 
-  if (IsKeyPressed(KEY_BACKSPACE)) // User want to remove the last line they drew
+  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) // User want to remove the last line they drew
+  // if (IsKeyPressed(KEY_BACKSPACE))
   {
     if (G->current_draw_record)
     {
-      Assert(G->current_draw_record->pen_size % 2 == 1); // Hard to draw pen_size, which is the diameter when we press on the middle px, but there is not middle pixel, since the diameter is an even value
-    
-      U64 w = G->draw_texture_always_fresh.texture.width;
-      U64 h = G->draw_texture_always_fresh.texture.height;
-      // Removing the record from draw_texure
-      copy_from_texture_to_texture(G->draw_texture_always_fresh.texture, v2u64(0, 0), G->current_draw_record->draw_texture_state_before.texture, v2u64(0, 0), w, h);
-      // Drawing back the stuff that was on the removed image parts before the last draw record
-      copy_from_texture_to_texture(G->draw_texture_not_that_fresh.texture, v2u64(0, 0), G->current_draw_record->draw_texture_state_before.texture, v2u64(0, 0), w, h);
+      RangeV2U64 affected_range = G->current_draw_record->affected_2d_range;
+      RenderTexture old_chunk_texture = G->current_draw_record->draw_texture_chunk_before_affected;
+      
+      U64 affected_width = affected_range.max.x - affected_range.min.x;
+      U64 affected_height = affected_range.max.y - affected_range.min.y;
+      
+      // Change the affected part from the fresh texture to the stored old version
+      copy_from_texture_to_texture(
+        G->draw_texture_always_fresh.texture, affected_range.min, 
+        old_chunk_texture.texture, v2u64(0, 0), 
+        affected_width, affected_height
+      );
+
+      // Change the affected part from the not so fresh texture to the stored old version
+      copy_from_texture_to_texture(
+        G->draw_texture_not_that_fresh.texture, affected_range.min, 
+        old_chunk_texture.texture, v2u64(0, 0), 
+        affected_width, affected_height
+      );
 
       Draw_record* record_to_remove = G->current_draw_record;
       G->current_draw_record = G->current_draw_record->prev;
-      UnloadRenderTexture(record_to_remove->draw_texture_state_before); 
+      UnloadRenderTexture(record_to_remove->draw_texture_chunk_before_affected); 
 
       // Puting the used draw_record back into the pool
       {
@@ -538,6 +554,7 @@ int main()
     EndDrawing();
   }
   */
+  
 
   G_state G = {};
   
