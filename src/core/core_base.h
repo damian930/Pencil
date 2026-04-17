@@ -619,7 +619,7 @@ union V4U8 {
 	struct { U8 x; U8 y; U8 z; U8 w; };
 	struct { U8 r; U8 g; U8 b; U8 a; };
 };
-tu_specific V4U8 v4ui(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
+tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
 
 union Vec4_F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
