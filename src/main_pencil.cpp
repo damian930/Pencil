@@ -104,6 +104,7 @@ struct G_state {
 
   // Misc
   Font font_texture_for_ui;
+  // V2U64 last_screen_dims;
 };
 
 Draw_record* get_available_draw_record_from_pool(G_state* G)
@@ -172,7 +173,9 @@ Draw_result_mem get_draw_range_memory(Arena* arena, V2U64 pos, U64 pen_size, V4U
   // todo: I just dont want to deal with this now
   Assert(pos.x >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
   Assert(pos.y >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
-  
+  // U64 min_px_x = (pos.x >= pixels_on_each_side_to_the_middle_pixel ? pos.x - pixels_on_each_side_to_the_middle_pixel : 0);
+  // U64 min_px_y = (pos.y >= pixels_on_each_side_to_the_middle_pixel ? pos.y - pixels_on_each_side_to_the_middle_pixel : 0);
+
   RangeV2U64 affected_range = {};
   affected_range.min.x = pos.x - pixels_on_each_side_to_the_middle_pixel; 
   affected_range.min.y = pos.y - pixels_on_each_side_to_the_middle_pixel;
@@ -581,6 +584,7 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
   ui_end_build();
 }
 
+
 int main()
 {
   os_init();
@@ -591,6 +595,10 @@ int main()
 
   ui_set_text_measuring_function(ui_text_measure_func);
   InitWindow(800, 600, "Pencil");
+  // SetWindowState(FLAG_WINDOW_TOPMOST);
+  // SetWindowState(FLAG_WINDOW_UNDECORATED);
+  // SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+  // SetWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
 
   G_state G = {};
 
@@ -638,8 +646,6 @@ int main()
     arena_clear(G.frame_arena);
     RLI_Event_list* rli_events = RLI_get_frame_inputs(); 
     
-    // if ui has an active element which we are holding, then we dont start interacting with the app (drawing part)
-    
     if (!G.is_mid_drawing)
     {
       update_pencil_ui(&G, rli_events);
@@ -647,7 +653,7 @@ int main()
 
     update_pencil(&G, ui_has_active());
    
-    #define DEBUG_CHECK_IF_TEXTURES_ARE_VALID 1
+    #define DEBUG_CHECK_IF_TEXTURES_ARE_VALID 0
     #if DEBUG_CHECK_IF_TEXTURES_ARE_VALID
     {
       if (!G.is_mid_drawing) // The textures are legaly un synched when drawing
@@ -686,16 +692,30 @@ int main()
     #endif
     #undef DEBUG_CHECK_IF_TEXTURES_ARE_VALID
 
+    Texture screen_texture = {};
+    {
+      Image image = {};
+      OS_Image os_image = os_take_screenshot(G.frame_arena);
+      image.data    = os_image.data;
+      image.width   = (int)os_image.width;
+      image.height  = (int)os_image.height;
+      image.mipmaps = 1;
+      image.format  = PixelFormat_UNCOMPRESSED_R8G8B8A8;
+      screen_texture = LoadTextureFromImage(image);
+    }
+    
     DeferLoop(BeginDrawing(), EndDrawing())
     DeferLoop(BeginBlendMode(BLEND_ALPHA), EndBlendMode())
     {
       Texture draw_texture = G.draw_texture;
       ClearBackground(BLACK);
+      DrawTexturePro(screen_texture, Rectangle{0, 0, (F32)screen_texture.width, (F32)screen_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);
       DrawTexturePro(draw_texture, Rectangle{0, 0, (F32)draw_texture.width, (F32)draw_texture.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);   
       DrawFPS(0, 0);
       ui_draw(); 
     }
 
+    UnloadTexture(screen_texture);
   }
 
 
