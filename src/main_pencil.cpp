@@ -59,14 +59,13 @@ V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
 // };
 
 struct Draw_record {
-  U64 pen_size; // todo: I am not sure we still need this
+  RangeV2U64 affected_2d_range;           // This is calculated while drawing
+  RenderTexture chunk_before_we_affected; // This is allocated when done drawing
+  RenderTexture chunk_after_we_affected;  // This is allocated when done drawing
+
+  // These are alos used for draw record free list
+  Draw_record* next;
   Draw_record* prev;
-
-  RangeV2U64 affected_2d_range; // note: These is calculated mid drawing for quick access after we done drawing
-  RenderTexture draw_texture_chunk_before_affected;
-
-  // Free list part
-  Draw_record* _next_free;
 };
 
 struct G_state {
@@ -78,15 +77,19 @@ struct G_state {
   RenderTexture draw_texture_always_fresh; 
   RenderTexture draw_texture_not_that_fresh;
 
-  // Pool of draw_records  
-  Arena* arena_for_draw_records;
-  Draw_record* first_draw_record;
-  U64 allocated_draw_records_count;
+  // Pool of draw records
+  #define DRAW_RECORDS_MAX_COUNT 100
+  Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
+  U64 count_of_pool_draw_records_in_use; // This inludes if they are in the free list
   Draw_record* first_free_draw_record;
+  Draw_record* last_free_draw_record;
+  
+  Draw_record* first_record;
+  Draw_record* last_record;
+  Draw_record* current_record;
 
   // Stuff for while drawing
   B32 is_mid_drawing;
-  Draw_record* current_draw_record;
 
   // Signals (These are just here like this right now)
   B32 signal_new_pen_size;
@@ -97,87 +100,23 @@ struct G_state {
   V2U64 last_screen_dims;
 };
 
-Draw_record* get_available_draw_record_from_pool(G_state* G)
+Draw_record* get_new_draw_record_from_pool__nullable(G_state* G)
 {
-  Draw_record* draw_record = G->first_free_draw_record;
-  if (draw_record)
+  Draw_record* result = 0;
+  if (G->first_free_draw_record)
   {
-    G->first_free_draw_record = G->first_free_draw_record->_next_free;
-    *draw_record = Draw_record{};
+    result = G->first_free_draw_record;
+    DllPopFront_Name(G, first_record, last_record, next, prev);
+    *result = Draw_record{};
   }
-  else 
+  else if (G->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
   {
-    draw_record = ArenaPush(G->arena_for_draw_records, Draw_record);
-    G->allocated_draw_records_count += 1;
+    result = G->pool_of_draw_records + G->count_of_pool_draw_records_in_use;
+    G->count_of_pool_draw_records_in_use += 1;
+    *result = Draw_record{};
   }
-  // draw_record->_is_active = true;
-  return draw_record;
+  return result;
 }
-
-// Image_part* get_available_image_part_from_pool(G_state* G)
-// {
-//   Image_part* part = G->first_free_image_part;
-//   if (part)
-//   {
-//     G->first_free_image_part = G->first_free_image_part->next;
-//   }
-//   else
-//   {
-//     part = ArenaPush(G->arena_for_image_parts, Image_part);
-//     G->allocated_image_parts_count += 1;
-//   }
-//   *part = Image_part{};
-//   return part;
-// }
-
-// U32* image_part_get_px(Image_part* part, U64 x, U64 y)
-// {
-//   Assert(x < part->width); Assert(y < part->height); 
-//   U32* px = part->pixels + (y * IMAGE_PART_DATA_WIDTH + x);
-//   return px;
-// }
-
-// /*
-// struct Draw_result_mem {
-//   RangeV2U64 update_range;
-//   U32* new_pixels;
-// };
-
-// Draw_result_mem get_draw_range_memory(Arena* arena, V2U64 pos, U64 pen_size, V4U8 color)
-// {
-//   Assert(pen_size != 0 && pen_size % 2 == 1); // Just making sure that it is an odd value
-//   Draw_result_mem result = {};
-//   U32* new_pixels = ArenaPushArr(arena, U32, pen_size * pen_size);
-//   for (U64 y_index = 0; y_index < pen_size; y_index += 1)
-//   {
-//     for (U64 x_index = 0; x_index < pen_size; x_index += 1)
-//     {
-//       U32* px = new_pixels + (pen_size * y_index + x_index);
-//       ((U8*)(px))[0] = color.r;
-//       ((U8*)(px))[1] = color.g;
-//       ((U8*)(px))[2] = color.b;
-//       ((U8*)(px))[3] = color.a; 
-//     }
-//   }
-//   U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
-  
-//   // todo: I just dont want to deal with this now
-//   Assert(pos.x >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
-//   Assert(pos.y >= pixels_on_each_side_to_the_middle_pixel); // These 2 are for same minus operations down below
-//   // U64 min_px_x = (pos.x >= pixels_on_each_side_to_the_middle_pixel ? pos.x - pixels_on_each_side_to_the_middle_pixel : 0);
-//   // U64 min_px_y = (pos.y >= pixels_on_each_side_to_the_middle_pixel ? pos.y - pixels_on_each_side_to_the_middle_pixel : 0);
-
-//   RangeV2U64 affected_range = {};
-//   affected_range.min.x = pos.x - pixels_on_each_side_to_the_middle_pixel; 
-//   affected_range.min.y = pos.y - pixels_on_each_side_to_the_middle_pixel;
-//   affected_range.max.x = affected_range.min.x + pen_size;
-//   affected_range.max.y = affected_range.min.y + pen_size;
-
-//   result.new_pixels = new_pixels;
-//   result.update_range = affected_range;
-//   return result;
-// }
-// */
 
 RangeV2U64 get_affected_points_for_draw_call(V2U64 pos, U64 pen_size, V2U64 upper_bound)
 {
@@ -255,10 +194,42 @@ U64 get_draw_texture_height(const G_state* G)
   return get_draw_texture_dims(G).y;
 }
 
+void _debug_load_gpu_textures_onto_cpu(const G_state* G)
+{
+  Image gpu_image_fresh = LoadImageFromTexture(G->draw_texture_always_fresh.texture);
+  Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+  
+  Image gpu_image_other = LoadImageFromTexture(G->draw_texture_not_that_fresh.texture);
+  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+
+  Assert(gpu_image_other.width == gpu_image_fresh.width);
+  Assert(gpu_image_other.height == gpu_image_fresh.height);
+  
+  Texture chunk_before_we_affected = {};
+  Texture chunk_after_we_affected = {};
+
+  if (G->current_record != 0)
+  {
+    chunk_before_we_affected = G->current_record->chunk_before_we_affected.texture;
+    chunk_after_we_affected = G->current_record->chunk_after_we_affected.texture;
+  }
+
+  Image image_before_we_affected = LoadImageFromTexture(chunk_before_we_affected);
+  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+  
+  Image image_after_we_affected = LoadImageFromTexture(chunk_after_we_affected);
+  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+
+  ExportImage(gpu_image_fresh, "fresh.png");
+  ExportImage(gpu_image_other, "other.png");
+  ExportImage(image_before_we_affected, "before_we_affected.png");
+  ExportImage(image_after_we_affected, "after_we_affected.png");
+
+  BreakPoint();
+}
+
 void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 {
-  Assert(G->first_draw_record != 0);
-  
   // Handling signals
   {
     if (G->signal_new_pen_size)
@@ -276,22 +247,33 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
   // User is no longer holding the mouse, have to end drawing mode 
   if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
   {
+    Assert(G->current_record != 0);
     G->is_mid_drawing = false;
 
     U64 draw_t_width = G->draw_texture_always_fresh.texture.width;
     U64 draw_t_height = G->draw_texture_always_fresh.texture.height;
 
-    RangeV2U64 affected_range = G->current_draw_record->affected_2d_range;
-    RenderTexture* affected_t_chunk = &G->current_draw_record->draw_texture_chunk_before_affected;
-
-    U64 affected_width = affected_range.max.x - affected_range.min.x;
+    Draw_record* record                     = G->current_record;
+    RangeV2U64 affected_range               = record->affected_2d_range;
+    RenderTexture* chunk_before_we_affected = &record->chunk_before_we_affected;
+    RenderTexture* chunk_after_we_affected  = &record->chunk_after_we_affected;
+    
+    U64 affected_width  = affected_range.max.x - affected_range.min.x;
     U64 affected_height = affected_range.max.y - affected_range.min.y;
-    *affected_t_chunk = LoadRenderTexture((int)affected_width, (int)affected_height);
-
+    
     // Storing what was on the affected chunk before we affected it
+    *chunk_before_we_affected = LoadRenderTexture((int)affected_width, (int)affected_height);
     copy_from_texture_to_texture(
-      affected_t_chunk->texture, v2u64(0, 0),
+      chunk_before_we_affected->texture, v2u64(0, 0),
       G->draw_texture_not_that_fresh.texture, affected_range.min,
+      affected_width, affected_height
+    );
+
+    // Storing the new texture state as for the state that this drawing achieved
+    *chunk_after_we_affected = LoadRenderTexture((int)affected_width, (int)affected_height);
+    copy_from_texture_to_texture(
+      chunk_after_we_affected->texture, v2u64(0, 0),
+      G->draw_texture_always_fresh.texture, affected_range.min,
       affected_width, affected_height
     );
 
@@ -301,22 +283,6 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       G->draw_texture_always_fresh.texture, affected_range.min,
       affected_width, affected_height
     );
-
-    // Debug
-    {
-      Image gpu_image_fresh = LoadImageFromTexture(G->draw_texture_always_fresh.texture);
-      Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-      
-      Image gpu_image_other = LoadImageFromTexture(G->draw_texture_not_that_fresh.texture);
-      Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-
-      Image copy = LoadImageFromTexture(affected_t_chunk->texture);
-      Assert(copy.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-
-      ExportImage(gpu_image_fresh, "fresh.png");
-      ExportImage(gpu_image_other, "other.png");
-      ExportImage(copy, "copy.png");
-    }
   }
   else 
   if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) // User is about to start drawing or already drawing
@@ -325,15 +291,31 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     if (!G->is_mid_drawing && !is_ui_capturing_mouse) 
     { 
       G->is_mid_drawing = true;
-    
-      Draw_record* new_draw_record = get_available_draw_record_from_pool(G);
-      new_draw_record->prev = G->current_draw_record; 
 
-      G->current_draw_record = new_draw_record;
-      G->current_draw_record->pen_size = G->pen_size; // todo: this might not be needed now
+      // Freeing all the records that are in front of the current one
+      if (G->current_record != 0)
+      {
+        for (Draw_record* record = G->current_record->next; record; record = record->next)
+        {
+          DllPop_Name(G, record, first_record, last_record, next, prev); 
+          DllPushBack_Name(G, record, first_free_draw_record, last_free_draw_record, next, prev);
+        }
+      }
 
-      G->current_draw_record->affected_2d_range.min = v2u64(get_draw_texture_width(G), get_draw_texture_height(G));
-      G->current_draw_record->affected_2d_range.max = v2u64(0, 0);
+      Draw_record* new_draw_record = get_new_draw_record_from_pool__nullable(G);
+      if (new_draw_record != 0)
+      {
+        new_draw_record->affected_2d_range.min = v2u64(get_draw_texture_width(G), get_draw_texture_height(G));
+        new_draw_record->affected_2d_range.max = v2u64(0, 0);
+        G->current_record = new_draw_record;
+        DllPushBack_Name(G, new_draw_record, first_record, last_record, next, prev);
+        Assert(G->last_record == new_draw_record); 
+      }
+      else
+      {
+        HandleLater(0, "Not yet handling that");
+        // Maybe just dont start drawing at all at this point
+      }
     }
 
     // Updating the draw state
@@ -347,15 +329,17 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       RangeV2U64 affected_range = get_affected_points_for_draw_call(mouse_pos, G->pen_size, G->last_screen_dims);
       draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color);
 
+      Draw_record* record = G->current_record;
+
       // Updating affected range min value
       V2U64 af_min = affected_range.min;
-      V2U64* state_min_point = &G->current_draw_record->affected_2d_range.min;
+      V2U64* state_min_point = &record->affected_2d_range.min;
       state_min_point->x = Min(state_min_point->x, affected_range.min.x);
       state_min_point->y = Min(state_min_point->y, affected_range.min.y);
 
       // Updating affected range max value
       V2U64 af_max = affected_range.max;
-      V2U64* state_max_point = &G->current_draw_record->affected_2d_range.max;
+      V2U64* state_max_point = &record->affected_2d_range.max;
       state_max_point->x = Max(state_max_point->x, affected_range.max.x);
       state_max_point->y = Max(state_max_point->y, affected_range.max.y);
     }
@@ -364,42 +348,73 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     //       But we do later sync it when we stop drawing.
   }
   else 
-  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) // User want to remove the last line they drew
-  // if (IsKeyPressed(KEY_BACKSPACE))
+  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) // User want to go back to the drawing they have last removed
   {
-    if (G->current_draw_record)
+    if (!G->is_mid_drawing)
     {
-      RangeV2U64 affected_range = G->current_draw_record->affected_2d_range;
-      RenderTexture old_chunk_texture = G->current_draw_record->draw_texture_chunk_before_affected;
+      // This is here to be able to deal with current_record beeing 0
+      Draw_record* next_record = 0;
+      if (G->current_record == 0) {
+        next_record = G->first_record;
+      } 
+      else if (G->current_record->next != 0) {
+        next_record = G->current_record->next;
+      }
+
+      if (next_record)
+      {
+        Assert(next_record->chunk_after_we_affected.texture.id != 0); // Has to not be 0 or else we shoud not have the next record
+        RangeV2U64 affected_range    = next_record->affected_2d_range;
+        RenderTexture future_texture = next_record->chunk_after_we_affected;
+        
+        U64 affected_width = affected_range.max.x - affected_range.min.x;
+        U64 affected_height = affected_range.max.y - affected_range.min.y;
+        
+        // Change the affected part from the fresh texture to the stored old version
+        copy_from_texture_to_texture(
+          G->draw_texture_always_fresh.texture, affected_range.min, 
+          future_texture.texture, v2u64(0, 0), 
+          affected_width, affected_height
+        );
+  
+        // Change the affected part from the not so fresh texture to the stored old version
+        copy_from_texture_to_texture(
+          G->draw_texture_not_that_fresh.texture, affected_range.min, 
+          future_texture.texture, v2u64(0, 0), 
+          affected_width, affected_height
+        );
+  
+        G->current_record = next_record;
+      }
+    }
+  }
+  else 
+  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) // User want to remove the last line they drew
+  {
+    if (!G->is_mid_drawing && G->current_record != 0)
+    {
+      Draw_record* record                    = G->current_record;
+      RangeV2U64 affected_range              = record->affected_2d_range;
+      RenderTexture chunk_before_we_affected = record->chunk_before_we_affected;
       
-      U64 affected_width = affected_range.max.x - affected_range.min.x;
+      U64 affected_width  = affected_range.max.x - affected_range.min.x;
       U64 affected_height = affected_range.max.y - affected_range.min.y;
       
       // Change the affected part from the fresh texture to the stored old version
       copy_from_texture_to_texture(
         G->draw_texture_always_fresh.texture, affected_range.min, 
-        old_chunk_texture.texture, v2u64(0, 0), 
+        chunk_before_we_affected.texture, v2u64(0, 0), 
         affected_width, affected_height
       );
 
       // Change the affected part from the not so fresh texture to the stored old version
       copy_from_texture_to_texture(
         G->draw_texture_not_that_fresh.texture, affected_range.min, 
-        old_chunk_texture.texture, v2u64(0, 0), 
+        chunk_before_we_affected.texture, v2u64(0, 0), 
         affected_width, affected_height
       );
-
-      Draw_record* record_to_remove = G->current_draw_record;
-      G->current_draw_record = G->current_draw_record->prev;
-      UnloadRenderTexture(record_to_remove->draw_texture_chunk_before_affected); 
-
-      // Puting the used draw_record back into the pool
-      {
-        *record_to_remove = Draw_record{};
-        // record_to_remove->_is_active = false;
-        record_to_remove->_next_free = G->first_free_draw_record;
-        G->first_free_draw_record = record_to_remove;
-      }
+      
+      G->current_record = G->current_record->prev;
     }
   }
 }
@@ -554,7 +569,6 @@ int main()
     EndDrawing();
   }
   */
-  
 
   G_state G = {};
   
@@ -571,9 +585,6 @@ int main()
   Assert(G.draw_texture_not_that_fresh.id != 0);
   BeginTextureMode(G.draw_texture_not_that_fresh); { ClearBackground(BLANK); } EndTextureMode(); 
 
-  G.arena_for_draw_records = arena_alloc(Megabytes(64));
-  G.first_draw_record = ArenaCurrentPos(G.arena_for_draw_records, Draw_record);
-
   G.font_texture_for_ui = LoadFont("../data/Roboto.ttf");
   G.last_screen_dims = {};
   {
@@ -586,6 +597,11 @@ int main()
 
   for (;!WindowShouldClose();)
   {
+    if (IsKeyPressed(KEY_P))
+    {
+      _debug_load_gpu_textures_onto_cpu(&G);
+    }
+
     // Checking if the app invariant is still valid
     {
       V2U64 test_dims = v2u64((U64)GetScreenWidth(), (U64)GetScreenHeight());

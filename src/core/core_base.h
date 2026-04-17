@@ -222,21 +222,21 @@ typedef double F64;
 						}
 
 #define DllPushBack_Name(dll_p, new_node_p, name_for_first_in_dll, name_for_last_in_dll, name_for_next_in_node, name_for_prev_in_node) \
-						if (   dll_p->name_for_first_in_dll == Null                             \
-								&& dll_p->name_for_last_in_dll == Null                              \
+						if (   (dll_p)->name_for_first_in_dll == Null                             \
+								&& (dll_p)->name_for_last_in_dll == Null                              \
 						) { 									 												                          \
-							dll_p->name_for_first_in_dll = new_node_p;                            \
-							dll_p->name_for_last_in_dll = new_node_p; 													  \
+							(dll_p)->name_for_first_in_dll = new_node_p;                            \
+							(dll_p)->name_for_last_in_dll = new_node_p; 													  \
 						} 																							 											  \
-						else if (dll_p->name_for_first_in_dll == dll_p->name_for_last_in_dll) { \
-							dll_p->name_for_first_in_dll->name_for_next_in_node = new_node_p;     \
-							new_node_p->name_for_prev_in_node = dll_p->name_for_first_in_dll;     \
-							dll_p->name_for_last_in_dll = new_node_p; 												 		\
+						else if ((dll_p)->name_for_first_in_dll == (dll_p)->name_for_last_in_dll) { \
+							(dll_p)->name_for_first_in_dll->name_for_next_in_node = new_node_p;     \
+							(new_node_p)->name_for_prev_in_node = (dll_p)->name_for_first_in_dll;     \
+							(dll_p)->name_for_last_in_dll = new_node_p; 												 		\
 						} 											 												 												\
 						else { 									 												 												\
-							dll_p->name_for_last_in_dll->name_for_next_in_node = new_node_p; 			\
-							new_node_p->name_for_prev_in_node = dll_p->name_for_last_in_dll; 		  \
- 							dll_p->name_for_last_in_dll = new_node_p;  											 			\
+							(dll_p)->name_for_last_in_dll->name_for_next_in_node = new_node_p; 			\
+							(new_node_p)->name_for_prev_in_node = (dll_p)->name_for_last_in_dll; 		  \
+ 							(dll_p)->name_for_last_in_dll = new_node_p;  											 			\
 						} 
 #define DllPushFront_Name(dll_p, new_node_p, name_for_first_in_dll, name_for_last_in_dll, name_for_next_in_node, name_for_prev_in_node) \
 						if (   dll_p->name_for_first_in_dll == Null                             \
