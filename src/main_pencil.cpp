@@ -63,7 +63,7 @@ struct Draw_record {
   RenderTexture chunk_before_we_affected; // This is allocated when done drawing
   RenderTexture chunk_after_we_affected;  // This is allocated when done drawing
 
-  // These are alos used for draw record free list
+  // These are also used for draw record free list
   Draw_record* next;
   Draw_record* prev;
 };
@@ -106,7 +106,7 @@ Draw_record* get_new_draw_record_from_pool__nullable(G_state* G)
   if (G->first_free_draw_record)
   {
     result = G->first_free_draw_record;
-    DllPopFront_Name(G, first_record, last_record, next, prev);
+    DllPopFront_Name(G, first_free_draw_record, last_free_draw_record, next, prev);
     *result = Draw_record{};
   }
   else if (G->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
@@ -295,10 +295,19 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       // Freeing all the records that are in front of the current one
       if (G->current_record != 0)
       {
-        for (Draw_record* record = G->current_record->next; record; record = record->next)
+        for (Draw_record* record = G->last_record; record != 0;) 
         {
-          DllPop_Name(G, record, first_record, last_record, next, prev); 
+          if (record == G->current_record) { break; }
+          UnloadRenderTexture(record->chunk_after_we_affected);
+          UnloadRenderTexture(record->chunk_before_we_affected);
+          
+          DllPopBack_Name(G, first_record, last_record, next, prev);
+          Draw_record* prev_record = record->prev;
+          
+          *record = Draw_record{};
           DllPushBack_Name(G, record, first_free_draw_record, last_free_draw_record, next, prev);
+          
+          record = prev_record;
         }
       }
 
@@ -530,10 +539,10 @@ int main()
   ui_set_text_measuring_function(ui_text_measure_func);
   
   // todo: This is not great
-  // SetConfigFlags(FLAG_WINDOW_TRANSPARENT | FLAG_BORDERLESS_WINDOWED_MODE);
-  // InitWindow(1920, 1080, "Pencil");
+  SetConfigFlags(FLAG_WINDOW_TRANSPARENT | FLAG_BORDERLESS_WINDOWED_MODE);
+  InitWindow(1920, 1080, "Pencil");
   
-  InitWindow(800, 600, "Pencil");
+  // InitWindow(800, 600, "Pencil");
 
   glCopyImageSubData = (glCopyImageSubData_fp)wglGetProcAddress("glCopyImageSubData");
   HandleLater(glCopyImageSubData != (void*)0 && glCopyImageSubData != (void*)1 && glCopyImageSubData != (void*)2 && glCopyImageSubData != (void*)3 && glCopyImageSubData != (void*)-1);
