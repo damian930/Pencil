@@ -100,6 +100,7 @@ struct G_state {
   // Misc
   Font font_texture_for_ui;
   V2U64 last_screen_dims;
+  B32 is_erasing;
 };
 
 Draw_record* get_new_draw_record_from_pool__nullable(G_state* G)
@@ -153,14 +154,16 @@ RangeV2U64 get_affected_points_for_draw_call(V2U64 pos, U64 pen_size, V2U64 uppe
   return affected_range;
 }
 
-void draw_onto_texture(RenderTexture texture, V2U64 pos, U64 pen_size, V4U8 color)
+void draw_onto_texture(RenderTexture texture, V2U64 pos, U64 pen_size, V4U8 color, B32 is_erasing)
 {
   Assert(pen_size % 2 == 1); // Just to catch an error 
   U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
 
+  if (is_erasing) { glDisable(GL_BLEND); }
   BeginTextureMode(texture);
   DrawCircle((int)pos.x, texture.texture.height - (int)pos.y, (F32)pixels_on_each_side_to_the_middle_pixel, { color.r, color.g, color.b, color.a });
   EndTextureMode();
+  if (is_erasing) { glEnable(GL_BLEND); }
 }
 
 void copy_from_texture_to_texture(
@@ -334,26 +337,56 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
     {
       Assert(G->pen_size != 0 && G->pen_size % 2 == 1); // Just making sure that it is an odd value
 
-      V2U64 mouse_pos = v2u64((U64)GetMouseX(), (U64)GetMouseY());
-      
       // Updating the texture
+      Vector2 rl_mouse_pos = GetMousePosition();
+      V2U64 mouse_pos = v2u64((U64)rl_mouse_pos.x, (U64)rl_mouse_pos.y);
+      draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color, G->is_erasing);
+      
+      // RangeV2U64 affected_range = get_affected_points_for_draw_call(old_mouse_pos, G->pen_size, G->last_screen_dims);
       RangeV2U64 affected_range = get_affected_points_for_draw_call(mouse_pos, G->pen_size, G->last_screen_dims);
-      draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color);
-
-      Draw_record* record = G->current_record;
 
       // Updating affected range min value
       V2U64 af_min = affected_range.min;
-      V2U64* state_min_point = &record->affected_2d_range.min;
+      V2U64* state_min_point = &G->current_record->affected_2d_range.min;
       state_min_point->x = Min(state_min_point->x, affected_range.min.x);
       state_min_point->y = Min(state_min_point->y, affected_range.min.y);
 
       // Updating affected range max value
       V2U64 af_max = affected_range.max;
-      V2U64* state_max_point = &record->affected_2d_range.max;
+      V2U64* state_max_point = &G->current_record->affected_2d_range.max;
       state_max_point->x = Max(state_max_point->x, affected_range.max.x);
       state_max_point->y = Max(state_max_point->y, affected_range.max.y);
     }
+
+      // V2U64 min_mouse_pos = v2u64(Min(old_mouse_pos.x, mouse_pos.x), Min(old_mouse_pos.y, mouse_pos.y));
+      // V2U64 max_mouse_pos = v2u64(Max(old_mouse_pos.x, mouse_pos.x), Max(old_mouse_pos.y, mouse_pos.y));
+      // for (U64 mouse_y = min_mouse_pos.y; mouse_y <= max_mouse_pos.y; mouse_y += 1)
+      // {
+      //   for (U64 mouse_x = min_mouse_pos.x; mouse_x <= max_mouse_pos.x; mouse_x += 1)
+      //   {
+      //     V2U64 point = v2u64(mouse_x, mouse_y);
+
+      //     // Updating the texture
+      //     RangeV2U64 affected_range = get_affected_points_for_draw_call(point, G->pen_size, G->last_screen_dims);
+      //     draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color, G->is_erasing);
+    
+      //     Draw_record* record = G->current_record;
+    
+      //     // Updating affected range min value
+      //     V2U64 af_min = affected_range.min;
+      //     V2U64* state_min_point = &record->affected_2d_range.min;
+      //     state_min_point->x = Min(state_min_point->x, affected_range.min.x);
+      //     state_min_point->y = Min(state_min_point->y, affected_range.min.y);
+    
+      //     // Updating affected range max value
+      //     V2U64 af_max = affected_range.max;
+      //     V2U64* state_max_point = &record->affected_2d_range.max;
+      //     state_max_point->x = Max(state_max_point->x, affected_range.max.x);
+      //     state_max_point->y = Max(state_max_point->y, affected_range.max.y);
+      //   }
+      // }
+
+    // }
     // todo: Update this comment here (We no longer use cpu side image)
     // note: Here is the only time when the cpu side image is not synced to the gpu one. 
     //       But we do later sync it when we stop drawing.
@@ -428,6 +461,10 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       G->current_record = G->current_record->prev;
     }
   }
+  else if (IsKeyPressed(KEY_C))
+  { 
+    ToggleBool(G->is_erasing);
+  }
 }
 
 void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
@@ -438,7 +475,50 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 
   ui_push_font(G->font_texture_for_ui);
 
-  UI_Wrapper(Axis2__x)
+  ui_set_next_border({ 2, { 255, 0, 0, 255 } });
+  ui_set_next_size_x(ui_p_of_p(1, 1));
+  ui_set_next_size_y(ui_p_of_p(1, 1));
+  ui_set_next_layout_axis(Axis2__x);
+  UI_Box* top_wrapper = ui_box_make(Str8{}, 0);
+
+  UI_Box* content_inner = 0;
+  UI_Parent(top_wrapper)
+  {
+    ui_set_next_size_x(ui_px(10));
+    ui_set_next_size_y(ui_p_of_p(1, 1));
+    ui_set_next_color({ 255, 0, 0, 255 });
+    UI_Box* left_border = ui_box_make(Str8{}, 0);
+    
+    ui_set_next_size_x(ui_p_of_p(1, 0));
+    ui_set_next_size_y(ui_p_of_p(1, 0));
+    ui_set_next_layout_axis(Axis2__y);
+    UI_Box* content_outer = ui_box_make(Str8{}, 0);
+
+    UI_Parent(content_outer)
+    {
+      ui_set_next_size_x(ui_p_of_p(1, 1));
+      ui_set_next_size_y(ui_px(10));
+      ui_set_next_color({ 255, 0, 0, 255 });
+      UI_Box* top_border = ui_box_make(Str8{}, 0);
+
+      ui_set_next_size_x(ui_p_of_p(1, 0));
+      ui_set_next_size_y(ui_p_of_p(1, 0));
+      ui_set_next_layout_axis(Axis2__y);
+      content_inner = ui_box_make(Str8{}, 0);
+
+      ui_set_next_size_x(ui_p_of_p(1, 1));
+      ui_set_next_size_y(ui_px(10));
+      ui_set_next_color({ 255, 0, 0, 255 });
+      UI_Box* bottom_border = ui_box_make(Str8{}, 0);
+    }
+
+    ui_set_next_size_x(ui_px(10));
+    ui_set_next_size_y(ui_p_of_p(1, 1));
+    ui_set_next_color({ 255, 0, 0, 255 });
+    UI_Box* right_border = ui_box_make(Str8{}, 0);
+  }
+
+  UI_Parent(content_inner)
   {
     ui_spacer(ui_p_of_p(1, 0));
     UI_Wrapper(Axis2__y)
@@ -614,9 +694,12 @@ int main()
   
   for (;!WindowShouldClose();)
   {
-    if (IsKeyPressed(KEY_ESCAPE))
+    B32 are_we_interactive = !IsWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+
+    if (are_we_interactive && IsKeyPressed(KEY_ESCAPE))
     {
       SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+      are_we_interactive = false;
     }
 
     if (hot_key_activated)
@@ -630,7 +713,15 @@ int main()
         } else {
           SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
         }
+        ToggleBool(are_we_interactive);
       }
+    }
+
+    // Chaning the cursor
+    if (are_we_interactive) {
+      SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);  
+    } else {
+      SetMouseCursor(MOUSE_CURSOR_DEFAULT);  
     }
 
     // note: These were the attemps to fix the task bar movement issue for window sizing, didnt work
@@ -647,7 +738,7 @@ int main()
     // HWND window_handle = (HWND)GetWindowHandle();
     // BOOL succ = GetClientRect(window_handle, &rect);
 
-    if (IsKeyPressed(KEY_P))
+    if (are_we_interactive && IsKeyPressed(KEY_P))
     {
       _debug_load_gpu_textures_onto_cpu(&G);
     }
@@ -677,7 +768,7 @@ int main()
       
       DrawTexture(G.draw_texture_always_fresh.texture, 0, 0, WHITE);
       
-      ui_draw(); 
+      if (are_we_interactive) { ui_draw(); }
       
       DrawFPS(0, 0);
     }

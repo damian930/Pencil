@@ -8,7 +8,18 @@ Goals:
   - marker 
   - blurere
   - eraser
+- there are some blending issues, i dont know much about it. So for now just leaving it here.
 
 Features to add:
 - delay on line removing when control z is held down
-- have a shortucut to start passing the inputs thought the window 
+- shortcut to clear the screen
+- eraser pen
+- better line drawing when moving mouse fast
+- 
+
+
+Ideas:
+- If we decide to remove Texture parts and just store full screen textures, then i can just have 
+  a zero (first) draw record which just stored a zero texture or a texture with no pixels in it.
+  This way i will be able to just set to it when i clear.
+

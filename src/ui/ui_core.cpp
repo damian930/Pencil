@@ -550,6 +550,9 @@ void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset)
   // todo/note: DrawRectangleRoundedLinesEx draws the line on the outside of the rect and not within
   if (root->flags & UI_Box_flag__draw_borders)
   {
+    // note: Might just draw a rect behind the rect which has borders
+    // DrawRectangleV();
+    // DrawRing();
     DrawRectangleRoundedLinesEx(raylib_rect, root->shape_style.corner_radius, 0, root->shape_style.border.width, RAYLIB_COLOR_FROM_VEC(root->shape_style.border.color));
   }
 
