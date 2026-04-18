@@ -19,7 +19,9 @@
 #define CloseWindow Win32CloseWindow
 #define ShowCursor Win32ShowCursor
 #define Rectangle Win32Rectangle
+// #define DrawText Win32DrawText
 #include "windows.h"
+// #undef DrawText
 #undef CloseWindow
 #undef ShowCursor
 #undef Rectangle
@@ -430,6 +432,8 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 
 void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 {
+  int w = GetScreenWidth();
+  int h = GetScreenHeight();
   ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY());
 
   ui_push_font(G->font_texture_for_ui);
@@ -528,6 +532,30 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
   ui_end_build();
 }
 
+
+WNDPROC raylib_winproc = 0;
+
+B32 hot_key_activated = false;
+
+LRESULT custom_win_proc(
+  HWND window_handle,
+  UINT message,
+  WPARAM w_param,
+  LPARAM l_param
+) {
+  Assert(raylib_winproc != 0);
+
+  LRESULT result = {};
+  if (message == WM_HOTKEY) {
+    hot_key_activated = true;
+    result = TRUE;
+  } 
+  else {
+    result = CallWindowProc(raylib_winproc, window_handle, message, w_param, l_param);
+  }
+  return result;
+}
+
 int main()
 {
   os_init();
@@ -538,49 +566,31 @@ int main()
 
   ui_set_text_measuring_function(ui_text_measure_func);
   
-  // todo: This is not great
-  SetConfigFlags(FLAG_WINDOW_TRANSPARENT | FLAG_BORDERLESS_WINDOWED_MODE);
-  InitWindow(1920, 1080, "Pencil");
+  // FLAG_WINDOW_TOPMOST
+  SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_TRANSPARENT);
+  InitWindow(800, 600, "Pencil");
+
+  HWND win32_window_handle = (HWND)GetWindowHandle();
+  raylib_winproc = (WNDPROC)GetWindowLongPtrA(win32_window_handle, GWLP_WNDPROC);
+  Assert(raylib_winproc != 0);
+  LONG_PTR set_succ = SetWindowLongPtrA(win32_window_handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
+  Assert(set_succ != 0);
   
-  // InitWindow(800, 600, "Pencil");
+  BOOL hot_key_register_succ = RegisterHotKey((HWND)GetWindowHandle(), 69, MOD_CONTROL|MOD_SHIFT, 'S');
+  HandleLater(hot_key_register_succ);
+
+  SetExitKey(KEY_NULL);
+
+  SetWindowState(FLAG_WINDOW_TOPMOST);
+  SetWindowState(FLAG_WINDOW_UNDECORATED);
+  SetWindowState(FLAG_WINDOW_RESIZABLE);
+  SetWindowState(FLAG_WINDOW_MAXIMIZED);
 
   glCopyImageSubData = (glCopyImageSubData_fp)wglGetProcAddress("glCopyImageSubData");
   HandleLater(glCopyImageSubData != (void*)0 && glCopyImageSubData != (void*)1 && glCopyImageSubData != (void*)2 && glCopyImageSubData != (void*)3 && glCopyImageSubData != (void*)-1);
 
-  // Gpu test
-  /*
-  InitWindow(800, 600, "Pencil");
-
-  glCopyImageSubData = (glCopyImageSubData_fp)wglGetProcAddress("glCopyImageSubData");
-  HandleLater(glCopyImageSubData != (void*)1 && glCopyImageSubData != (void*)2 && glCopyImageSubData != (void*)3 && glCopyImageSubData != (void*)-1);
-
-  Texture t1 = LoadTexture("F:/red.png");
-  Texture t2 = LoadTexture("F:/blue.png");
-  for (;!WindowShouldClose();)
-  {
-    static Image_part part = {};
-    part.height = 100;
-    part.width = 100;
-    part.offset = v2u64(50, 50);
-
-    static B32 done = false;
-    if (!done)
-    {
-      done = true;
-      copy_from_texture_to_texture(t1, part.offset, t2, part.offset, part.width, part.height);
-    }
-
-    BeginDrawing();
-    {
-      DrawTexturePro(t1, Rectangle{0, 0, (F32)t1.width, (F32)t1.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);
-      DrawTexturePro(t2, Rectangle{0, 0, (F32)t2.width, (F32)t2.height}, Rectangle{0, 0, (F32)GetScreenWidth(), (F32)GetScreenHeight()}, {}, {}, WHITE);
-    }
-    EndDrawing();
-  }
-  */
-
   G_state G = {};
-  
+
   G.arena = arena_alloc(Megabytes(64));
   G.frame_arena = arena_alloc(Megabytes(64));
   G.pen_size = 11;
@@ -601,11 +611,42 @@ int main()
     int h = GetScreenHeight(); Assert(h >= 0);
     G.last_screen_dims = v2u64((U64)w, (U64)h);
   }
-
-  // ==============================
-
+  
   for (;!WindowShouldClose();)
   {
+    if (IsKeyPressed(KEY_ESCAPE))
+    {
+      SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+    }
+
+    if (hot_key_activated)
+    {
+      hot_key_activated = false;
+
+      if (!G.is_mid_drawing)
+      {
+        if (IsWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH)) {
+          ClearWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+        } else {
+          SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+        }
+      }
+    }
+
+    // note: These were the attemps to fix the task bar movement issue for window sizing, didnt work
+    // RECT rect = {};
+    // BOOL succ = SystemParametersInfoA(SPI_GETWORKAREA, 0, &rect, 0);
+    // Assert(succ);
+    // int x = 0;
+    // SetWindowSize(rect.right - rect.left, rect.bottom - rect.top);
+    // Assert(GetScreenWidth() == rect.right - rect.left);
+    // Assert(GetScreenHeight() == rect.bottom- rect.top);
+    // getclientrect
+    // MaximizeWindow();
+    // RECT rect = {};
+    // HWND window_handle = (HWND)GetWindowHandle();
+    // BOOL succ = GetClientRect(window_handle, &rect);
+
     if (IsKeyPressed(KEY_P))
     {
       _debug_load_gpu_textures_onto_cpu(&G);
@@ -630,47 +671,6 @@ int main()
 
     update_pencil(&G, ui_has_active());
 
-    #define DEBUG_CHECK_IF_TEXTURES_ARE_VALID 0
-    #if DEBUG_CHECK_IF_TEXTURES_ARE_VALID
-    {
-      if (!G.is_mid_drawing) // The textures are legaly un synched when drawing
-      {
-        Image gpu_image_fresh = LoadImageFromTexture(G.draw_texture_always_fresh.texture);
-        Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-        
-        Image gpu_image_other = LoadImageFromTexture(G.draw_texture_not_that_fresh.texture);
-        Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-        
-        Assert(gpu_image_other.width == gpu_image_fresh.width);
-        Assert(gpu_image_other.height == gpu_image_fresh.height);
-        
-        B32 is_the_same = true;
-        for (U64 y_index = 0; y_index < gpu_image_fresh.height; y_index += 1)
-        {
-          for (U64 x_index = 0; x_index < gpu_image_fresh.width; x_index += 1)
-          {
-            U32 px1 = ((U32*)(gpu_image_fresh.data))[y_index * gpu_image_fresh.width + x_index];
-            U32 px2 = ((U32*)(gpu_image_other.data))[y_index * gpu_image_fresh.width + x_index];
-            if (px1 != px2)
-            {
-              is_the_same = false;
-              break;
-            }
-          }
-        }
-
-        if (!is_the_same)
-        {
-          B32 succ = true;
-          succ &= (B32)ExportImage(gpu_image_fresh, "fresh.png");
-          succ &= (B32)ExportImage(gpu_image_other, "other.png");
-          BreakPoint();
-        }
-      }
-    }
-    #endif
-    #undef DEBUG_CHECK_IF_TEXTURES_ARE_VALID
-
     DeferLoop(BeginDrawing(), EndDrawing())
     {
       ClearBackground(BLANK);
@@ -687,3 +687,192 @@ int main()
   return 0;
 }
 
+
+// int main(void)
+// {
+//     // Initialization
+//     //---------------------------------------------------------
+//     const int screenWidth = 800;
+//     const int screenHeight = 450;
+
+//     // Possible window flags
+//     /*
+//     FLAG_VSYNC_HINT
+//     FLAG_FULLSCREEN_MODE    -> not working properly -> wrong scaling!
+//     FLAG_WINDOW_RESIZABLE
+//     FLAG_WINDOW_UNDECORATED
+//     FLAG_WINDOW_TRANSPARENT
+//     FLAG_WINDOW_HIDDEN
+//     FLAG_WINDOW_MINIMIZED   -> Not supported on window creation
+//     FLAG_WINDOW_MAXIMIZED   -> Not supported on window creation
+//     FLAG_WINDOW_UNFOCUSED
+//     FLAG_WINDOW_TOPMOST
+//     FLAG_WINDOW_HIGHDPI     -> errors after minimize-resize, fb size is recalculated
+//     FLAG_WINDOW_ALWAYS_RUN
+//     FLAG_MSAA_4X_HINT
+//     */
+
+//     // Set configuration flags for window creation
+//     SetConfigFlags(FLAG_WINDOW_TRANSPARENT);
+//     // SetConfigFlags(FLAG_VSYNC_HINT | FLAG_MSAA_4X_HINT | FLAG_WINDOW_HIGHDPI);// | FLAG_WINDOW_TRANSPARENT);
+//     InitWindow(screenWidth, screenHeight, "raylib [core] example - window flags");
+
+//     Vector2 ballPosition = { GetScreenWidth()/2.0f, GetScreenHeight()/2.0f };
+//     Vector2 ballSpeed = { 5.0f, 4.0f };
+//     float ballRadius = 20;
+
+//     int framesCounter = 0;
+
+//     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
+//     //----------------------------------------------------------
+
+//     // Main game loop
+//     while (!WindowShouldClose())    // Detect window close button or ESC key
+//     {
+//         // Update
+//         //-----------------------------------------------------
+//         if (IsKeyPressed(KEY_F)) ToggleFullscreen();  // modifies window size when scaling!
+
+//         if (IsKeyPressed(KEY_R))
+//         {
+//             if (IsWindowState(FLAG_WINDOW_RESIZABLE)) ClearWindowState(FLAG_WINDOW_RESIZABLE);
+//             else SetWindowState(FLAG_WINDOW_RESIZABLE);
+//         }
+
+//         if (IsKeyPressed(KEY_D))
+//         {
+//             if (IsWindowState(FLAG_WINDOW_UNDECORATED)) ClearWindowState(FLAG_WINDOW_UNDECORATED);
+//             else SetWindowState(FLAG_WINDOW_UNDECORATED);
+//         }
+
+//         if (IsKeyPressed(KEY_H))
+//         {
+//             if (!IsWindowState(FLAG_WINDOW_HIDDEN)) SetWindowState(FLAG_WINDOW_HIDDEN);
+
+//             framesCounter = 0;
+//         }
+
+//         if (IsWindowState(FLAG_WINDOW_HIDDEN))
+//         {
+//             framesCounter++;
+//             if (framesCounter >= 240) ClearWindowState(FLAG_WINDOW_HIDDEN); // Show window after 3 seconds
+//         }
+
+//         if (IsKeyPressed(KEY_N))
+//         {
+//             if (!IsWindowState(FLAG_WINDOW_MINIMIZED)) MinimizeWindow();
+
+//             framesCounter = 0;
+//         }
+
+//         if (IsWindowState(FLAG_WINDOW_MINIMIZED))
+//         {
+//             framesCounter++;
+//             if (framesCounter >= 240)
+//             {
+//                 RestoreWindow(); // Restore window after 3 seconds
+//                 framesCounter = 0;
+//             }
+//         }
+
+//         if (IsKeyPressed(KEY_M))
+//         {
+//             // NOTE: Requires FLAG_WINDOW_RESIZABLE enabled!
+//             if (IsWindowState(FLAG_WINDOW_MAXIMIZED)) RestoreWindow();
+//             else MaximizeWindow();
+//         }
+
+//         if (IsKeyPressed(KEY_U))
+//         {
+//             if (IsWindowState(FLAG_WINDOW_UNFOCUSED)) ClearWindowState(FLAG_WINDOW_UNFOCUSED);
+//             else SetWindowState(FLAG_WINDOW_UNFOCUSED);
+//         }
+
+//         if (IsKeyPressed(KEY_T))
+//         {
+//             if (IsWindowState(FLAG_WINDOW_TOPMOST)) ClearWindowState(FLAG_WINDOW_TOPMOST);
+//             else SetWindowState(FLAG_WINDOW_TOPMOST);
+//         }
+
+//         if (IsKeyPressed(KEY_A))
+//         {
+//             if (IsWindowState(FLAG_WINDOW_ALWAYS_RUN)) ClearWindowState(FLAG_WINDOW_ALWAYS_RUN);
+//             else SetWindowState(FLAG_WINDOW_ALWAYS_RUN);
+//         }
+
+//         if (IsKeyPressed(KEY_V))
+//         {
+//             if (IsWindowState(FLAG_VSYNC_HINT)) ClearWindowState(FLAG_VSYNC_HINT);
+//             else SetWindowState(FLAG_VSYNC_HINT);
+//         }
+
+//         if (IsKeyPressed(KEY_B)) ToggleBorderlessWindowed();
+
+
+//         // Bouncing ball logic
+//         ballPosition.x += ballSpeed.x;
+//         ballPosition.y += ballSpeed.y;
+//         if ((ballPosition.x >= (GetScreenWidth() - ballRadius)) || (ballPosition.x <= ballRadius)) ballSpeed.x *= -1.0f;
+//         if ((ballPosition.y >= (GetScreenHeight() - ballRadius)) || (ballPosition.y <= ballRadius)) ballSpeed.y *= -1.0f;
+//         //-----------------------------------------------------
+
+//         // Draw
+//         //-----------------------------------------------------
+//         BeginDrawing();
+
+//         if (IsWindowState(FLAG_WINDOW_TRANSPARENT)) ClearBackground(BLANK);
+//         else ClearBackground(RAYWHITE);
+
+//         DrawCircleV(ballPosition, ballRadius, MAROON);
+//         DrawRectangleLinesEx({ 0, 0, (float)GetScreenWidth(), (float)GetScreenHeight() }, 4, RAYWHITE);
+
+//         DrawCircleV(GetMousePosition(), 10, DARKBLUE);
+
+//         DrawFPS(10, 10);
+
+//         DrawText(TextFormat("Screen Size: [%i, %i]", GetScreenWidth(), GetScreenHeight()), 10, 40, 10, GREEN);
+
+//         // Draw window state info
+//         DrawText("Following flags can be set after window creation:", 10, 60, 10, GRAY);
+//         if (IsWindowState(FLAG_FULLSCREEN_MODE)) DrawText("[F] FLAG_FULLSCREEN_MODE: on", 10, 80, 10, LIME);
+//         else DrawText("[F] FLAG_FULLSCREEN_MODE: off", 10, 80, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_RESIZABLE)) DrawText("[R] FLAG_WINDOW_RESIZABLE: on", 10, 100, 10, LIME);
+//         else DrawText("[R] FLAG_WINDOW_RESIZABLE: off", 10, 100, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_UNDECORATED)) DrawText("[D] FLAG_WINDOW_UNDECORATED: on", 10, 120, 10, LIME);
+//         else DrawText("[D] FLAG_WINDOW_UNDECORATED: off", 10, 120, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_HIDDEN)) DrawText("[H] FLAG_WINDOW_HIDDEN: on", 10, 140, 10, LIME);
+//         else DrawText("[H] FLAG_WINDOW_HIDDEN: off (hides for 3 seconds)", 10, 140, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_MINIMIZED)) DrawText("[N] FLAG_WINDOW_MINIMIZED: on", 10, 160, 10, LIME);
+//         else DrawText("[N] FLAG_WINDOW_MINIMIZED: off (restores after 3 seconds)", 10, 160, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_MAXIMIZED)) DrawText("[M] FLAG_WINDOW_MAXIMIZED: on", 10, 180, 10, LIME);
+//         else DrawText("[M] FLAG_WINDOW_MAXIMIZED: off", 10, 180, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_UNFOCUSED)) DrawText("[G] FLAG_WINDOW_UNFOCUSED: on", 10, 200, 10, LIME);
+//         else DrawText("[U] FLAG_WINDOW_UNFOCUSED: off", 10, 200, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_TOPMOST)) DrawText("[T] FLAG_WINDOW_TOPMOST: on", 10, 220, 10, LIME);
+//         else DrawText("[T] FLAG_WINDOW_TOPMOST: off", 10, 220, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_ALWAYS_RUN)) DrawText("[A] FLAG_WINDOW_ALWAYS_RUN: on", 10, 240, 10, LIME);
+//         else DrawText("[A] FLAG_WINDOW_ALWAYS_RUN: off", 10, 240, 10, MAROON);
+//         if (IsWindowState(FLAG_VSYNC_HINT)) DrawText("[V] FLAG_VSYNC_HINT: on", 10, 260, 10, LIME);
+//         else DrawText("[V] FLAG_VSYNC_HINT: off", 10, 260, 10, MAROON);
+//         if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) DrawText("[B] FLAG_BORDERLESS_WINDOWED_MODE: on", 10, 280, 10, LIME);
+//         else DrawText("[B] FLAG_BORDERLESS_WINDOWED_MODE: off", 10, 280, 10, MAROON);
+
+//         DrawText("Following flags can only be set before window creation:", 10, 320, 10, GRAY);
+//         if (IsWindowState(FLAG_WINDOW_HIGHDPI)) DrawText("FLAG_WINDOW_HIGHDPI: on", 10, 340, 10, LIME);
+//         else DrawText("FLAG_WINDOW_HIGHDPI: off", 10, 340, 10, MAROON);
+//         if (IsWindowState(FLAG_WINDOW_TRANSPARENT)) DrawText("FLAG_WINDOW_TRANSPARENT: on", 10, 360, 10, LIME);
+//         else DrawText("FLAG_WINDOW_TRANSPARENT: off", 10, 360, 10, MAROON);
+//         if (IsWindowState(FLAG_MSAA_4X_HINT)) DrawText("FLAG_MSAA_4X_HINT: on", 10, 380, 10, LIME);
+//         else DrawText("FLAG_MSAA_4X_HINT: off", 10, 380, 10, MAROON);
+
+//         EndDrawing();
+//         //-----------------------------------------------------
+//     }
+
+//     // De-Initialization
+//     //---------------------------------------------------------
+//     CloseWindow();        // Close window and OpenGL context
+//     //----------------------------------------------------------
+
+//     return 0;
+// }
