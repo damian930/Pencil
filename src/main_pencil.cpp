@@ -70,8 +70,11 @@ struct Draw_record {
 struct G_state {
   Arena* arena;
   Arena* frame_arena;
+  
   U64 pen_size;
   V4U8 pen_color;
+
+  U64 eraser_size;
 
   U64 draw_texures_width;
   U64 draw_texures_height;
@@ -92,6 +95,7 @@ struct G_state {
 
   // Stuff for while drawing
   B32 is_mid_drawing;
+  B32 is_erasing_mode;
 
   // Signals (These are just here like this right now)
   B32 signal_new_pen_size;
@@ -100,7 +104,6 @@ struct G_state {
   // Misc
   Font font_texture_for_ui;
   V2U64 last_screen_dims;
-  B32 is_erasing;
 };
 
 Draw_record* get_new_draw_record_from_pool__nullable(G_state* G)
@@ -260,7 +263,7 @@ struct Draw_record_registration_result {
 //       be handled by the caller ????
 Draw_record_registration_result register_new_draw_record(G_state* G, B32 is_ui_capturing_mouse)
 {
-  if (G->is_mid_drawing || is_ui_capturing_mouse) { Draw_record_registration_result{}; }
+  if (G->is_mid_drawing || is_ui_capturing_mouse) { return Draw_record_registration_result{}; }
 
   // Freeing all the records that are in front of the current one
   if (G->current_record != 0)
@@ -434,11 +437,23 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       G->draw_texures_width, G->draw_texures_height
     );
   }
+  else // Use wants to start using the eraser pen 
+  if (!G->is_mid_drawing && IsKeyPressed(KEY_C))
+  {
+    dont_start_drawing_this_frame = true;
+    G->is_erasing_mode = true;
+  }
+  else 
+  if (!G->is_mid_drawing && IsKeyPressed(KEY_B))
+  {
+    dont_start_drawing_this_frame = true;
+    G->is_erasing_mode = false;
+  } 
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
 
-  // Use is about to start drawing
-  if (!G->is_mid_drawing && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) 
+  // User is about to start drawing
+  if (!G->is_mid_drawing && !is_ui_capturing_mouse && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) 
   {
     Draw_record_registration_result record_registation = register_new_draw_record(G, is_ui_capturing_mouse);
     if (!record_registation.succ) { HandleLater(0, "Dont yet handle this case"); }
@@ -449,7 +464,13 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
   {
     Vector2 new_pos = GetMousePosition();
     Vector2 prev_pos = Vector2Subtract(new_pos, GetMouseDelta());
-    draw_onto_texture(G->draw_texture_always_fresh, new_pos, prev_pos, G->pen_size, G->pen_color, G->is_erasing);
+    
+    // todo: This is not the best way to have this here like this, but for now thats how it is
+    V4U8 color = { 0, 0, 0 ,0 };
+    if (!G->is_erasing_mode) { color = G->pen_color; }
+    U64 pen_size = G->eraser_size;
+    if (!G->is_erasing_mode) { pen_size = G->pen_size; }
+    draw_onto_texture(G->draw_texture_always_fresh, new_pos, prev_pos, pen_size, color, G->is_erasing_mode);
 
     // todo: Update this comment here (We no longer use cpu side image)
     // note: Here is the only time when the cpu side image is not synced to the gpu one. 
@@ -497,37 +518,6 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 
   __active_draw_update_routine_end__: {};
 
-  /*
-  else 
-  
-  else if (IsKeyPressed(KEY_C) && !G->is_mid_drawing)
-  { 
-    ToggleBool(G->is_erasing);
-  }
-  else if (IsKeyPressed(KEY_V) && !G->is_mid_drawing)
-  {
-    // Clear mode when we just set the blend to 0 and dont allow to change the color
-    // To blit the screen we make this operation have be a seprate kind of op and just do it in the update
-
-
-    // Register new record
-    // Draw into the global state
-    // Update the record 
-    
-    // fill_texture_with_color(G->draw_texture_always_fresh, { 0, 0, 0, 0 }, true);
-
-    // running the store routine
-    // G->is_mid_drawing = true;
-
-    
-    
-    // update the gput texture 
-    // then store the record as a new record
-
-    // todo: Clear the whole screen
-    // Set to erase and just blit the screen, but store the curent texture
-  }
-  */
 }
 
 void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
@@ -744,8 +734,11 @@ int main()
 
   G.arena = arena_alloc(Megabytes(64));
   G.frame_arena = arena_alloc(Megabytes(64));
+  
   G.pen_size = 11;
   G.pen_color = v4u8(255, 255, 255, 255);
+
+  G.eraser_size = G.pen_size * 2;
 
   G.draw_texures_width = (U64)GetScreenWidth();
   G.draw_texures_height = (U64)GetScreenHeight();
@@ -798,8 +791,13 @@ int main()
     }
 
     // Chaning the cursor
+    // todo: Not sure how much i like to have these here like that, but for now its here
     if (are_we_interactive) {
-      SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);  
+      if (G.is_erasing_mode) {
+        SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+      } else {
+        SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);  
+      }
     } else {
       SetMouseCursor(MOUSE_CURSOR_DEFAULT);  
     }
@@ -836,6 +834,8 @@ int main()
     arena_clear(G.frame_arena);
     RLI_Event_list* rli_events = RLI_get_frame_inputs(); 
     
+    // todo: If ui start to have some animations, we will have to not just not update it, but rather 
+    //       just not take inputs but still update all the rest of the things
     if (!G.is_mid_drawing) {
       update_pencil_ui(&G, rli_events);
     }
