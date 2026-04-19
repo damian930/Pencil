@@ -19,9 +19,9 @@
 #define CloseWindow Win32CloseWindow
 #define ShowCursor Win32ShowCursor
 #define Rectangle Win32Rectangle
-// #define DrawText Win32DrawText
+#define LoadImage Win32LoadImage
 #include "windows.h"
-// #undef DrawText
+#undef LoadImage
 #undef CloseWindow
 #undef ShowCursor
 #undef Rectangle
@@ -52,18 +52,15 @@ V2 ui_text_measure_func(Str8 text, Font font, F32 font_size)
 // - Pencil stuff
 //
 
-#define IMAGE_PART_DATA_WIDTH  200
-#define IMAGE_PART_DATA_HEIGHT 200
-// struct Image_part {
-//   V2U64 offset;
-//   U64 width;
-//   U64 height;
-// };
+enum Operation_kind {
+  Operation_kind__Line,   
+  Operation_kind__Eraser,
+  Operation_kind__Clear_the_screen,
+};
 
 struct Draw_record {
-  RangeV2U64 affected_2d_range;           // This is calculated while drawing
-  RenderTexture chunk_before_we_affected; // This is allocated when done drawing
-  RenderTexture chunk_after_we_affected;  // This is allocated when done drawing
+  RenderTexture texture_before_we_affected; // This is allocated when done drawing
+  RenderTexture texture_after_we_affected;  // This is allocated when done drawing
 
   // These are also used for draw record free list
   Draw_record* next;
@@ -76,6 +73,8 @@ struct G_state {
   U64 pen_size;
   V4U8 pen_color;
 
+  U64 draw_texures_width;
+  U64 draw_texures_height;
   RenderTexture draw_texture_always_fresh; 
   RenderTexture draw_texture_not_that_fresh;
 
@@ -89,6 +88,7 @@ struct G_state {
   Draw_record* first_record;
   Draw_record* last_record;
   Draw_record* current_record;
+  // Operation_kind
 
   // Stuff for while drawing
   B32 is_mid_drawing;
@@ -154,14 +154,34 @@ RangeV2U64 get_affected_points_for_draw_call(V2U64 pos, U64 pen_size, V2U64 uppe
   return affected_range;
 }
 
-void draw_onto_texture(RenderTexture texture, V2U64 pos, U64 pen_size, V4U8 color, B32 is_erasing)
+void fill_texture_with_color(RenderTexture texture, V4U8 color, B32 is_erasing)
 {
-  Assert(pen_size % 2 == 1); // Just to catch an error 
-  U64 pixels_on_each_side_to_the_middle_pixel = (U64)(pen_size / 2);
-
   if (is_erasing) { glDisable(GL_BLEND); }
   BeginTextureMode(texture);
-  DrawCircle((int)pos.x, texture.texture.height - (int)pos.y, (F32)pixels_on_each_side_to_the_middle_pixel, { color.r, color.g, color.b, color.a });
+
+  ClearBackground({ color.r, color.g, color.b, color.a });
+
+  EndTextureMode();
+  if (is_erasing) { glEnable(GL_BLEND); }
+}
+
+void draw_onto_texture(RenderTexture texture, Vector2 new_pos, Vector2 prev_pos, U64 pen_size, V4U8 color, B32 is_erasing)
+{
+  if (is_erasing) { glDisable(GL_BLEND); }
+  BeginTextureMode(texture);
+  
+  F32 dx = new_pos.x - prev_pos.x;
+  F32 dy = new_pos.y - prev_pos.y;
+  F32 length = sqrtf(dx * dx + dy * dy);
+  U64 steps = (U64)length;
+  for (U64 i = 0; i <= steps; i++) 
+  {
+    F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
+    F32 x = prev_pos.x + dx * t;
+    F32 y = prev_pos.y + dy * t;
+    DrawCircleV({ x, texture.texture.height - y }, (F32)pen_size, { color.r, color.g, color.b, color.a });
+  }
+
   EndTextureMode();
   if (is_erasing) { glEnable(GL_BLEND); }
 }
@@ -210,27 +230,82 @@ void _debug_load_gpu_textures_onto_cpu(const G_state* G)
   Assert(gpu_image_other.width == gpu_image_fresh.width);
   Assert(gpu_image_other.height == gpu_image_fresh.height);
   
-  Texture chunk_before_we_affected = {};
-  Texture chunk_after_we_affected = {};
+  Texture texture_before_we_affected = {};
+  Texture texture_after_we_affected = {};
 
   if (G->current_record != 0)
   {
-    chunk_before_we_affected = G->current_record->chunk_before_we_affected.texture;
-    chunk_after_we_affected = G->current_record->chunk_after_we_affected.texture;
+    texture_before_we_affected = G->current_record->texture_before_we_affected.texture;
+    texture_after_we_affected = G->current_record->texture_after_we_affected.texture;
   }
 
-  Image image_before_we_affected = LoadImageFromTexture(chunk_before_we_affected);
+  Image image_before_we_affected = LoadImageFromTexture(texture_before_we_affected);
   Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
   
-  Image image_after_we_affected = LoadImageFromTexture(chunk_after_we_affected);
+  Image image_after_we_affected = LoadImageFromTexture(texture_after_we_affected);
   Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
 
   ExportImage(gpu_image_fresh, "fresh.png");
   ExportImage(gpu_image_other, "other.png");
   ExportImage(image_before_we_affected, "before_we_affected.png");
   ExportImage(image_after_we_affected, "after_we_affected.png");
+}
 
-  BreakPoint();
+struct Draw_record_registration_result {
+  B32 succ;
+  Draw_record* record;  
+};
+
+// todo: Does this really need to care about is_ui_capturing_mouse, or shoud this
+//       be handled by the caller ????
+Draw_record_registration_result register_new_draw_record(G_state* G, B32 is_ui_capturing_mouse)
+{
+  if (G->is_mid_drawing || is_ui_capturing_mouse) { Draw_record_registration_result{}; }
+
+  // Freeing all the records that are in front of the current one
+  if (G->current_record != 0)
+  {
+    for (Draw_record* record = G->last_record; record != 0;) 
+    {
+      if (record == G->current_record) { break; }
+      UnloadRenderTexture(record->texture_before_we_affected);
+      UnloadRenderTexture(record->texture_after_we_affected);
+      
+      DllPopBack_Name(G, first_record, last_record, next, prev);
+      Draw_record* prev_record = record->prev;
+      
+      *record = Draw_record{};
+      DllPushBack_Name(G, record, first_free_draw_record, last_free_draw_record, next, prev);
+      
+      record = prev_record;
+    }
+  }
+
+  Draw_record* new_draw_record = get_new_draw_record_from_pool__nullable(G);
+  if (new_draw_record != 0)
+  {
+    // Adding the new draw record to the draw record queue
+    DllPushBack_Name(G, new_draw_record, first_record, last_record, next, prev);  Assert(G->last_record == new_draw_record);
+
+    new_draw_record->texture_before_we_affected = LoadRenderTexture((int)G->draw_texures_width, (int)G->draw_texures_height);
+    HandleLater(new_draw_record->texture_before_we_affected.texture.id != 0);
+
+    new_draw_record->texture_after_we_affected = LoadRenderTexture((int)G->draw_texures_width, (int)G->draw_texures_height);
+    HandleLater(new_draw_record->texture_after_we_affected.texture.id != 0);
+
+    G->current_record = new_draw_record;
+  }
+  else
+  {
+    HandleLater(0, "Not yet handling that");
+    // Maybe just dont start drawing at all at this point
+  }
+
+  Draw_record_registration_result result = {};
+  result.succ = true;
+  result.record = new_draw_record;
+
+  return result;
 }
 
 void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
@@ -248,223 +323,211 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       }
     }
   }
-
-  // User is no longer holding the mouse, have to end drawing mode 
-  if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
-  {
-    Assert(G->current_record != 0);
-    G->is_mid_drawing = false;
-
-    U64 draw_t_width = G->draw_texture_always_fresh.texture.width;
-    U64 draw_t_height = G->draw_texture_always_fresh.texture.height;
-
-    Draw_record* record                     = G->current_record;
-    RangeV2U64 affected_range               = record->affected_2d_range;
-    RenderTexture* chunk_before_we_affected = &record->chunk_before_we_affected;
-    RenderTexture* chunk_after_we_affected  = &record->chunk_after_we_affected;
-    
-    U64 affected_width  = affected_range.max.x - affected_range.min.x;
-    U64 affected_height = affected_range.max.y - affected_range.min.y;
-    
-    // Storing what was on the affected chunk before we affected it
-    *chunk_before_we_affected = LoadRenderTexture((int)affected_width, (int)affected_height);
-    copy_from_texture_to_texture(
-      chunk_before_we_affected->texture, v2u64(0, 0),
-      G->draw_texture_not_that_fresh.texture, affected_range.min,
-      affected_width, affected_height
-    );
-
-    // Storing the new texture state as for the state that this drawing achieved
-    *chunk_after_we_affected = LoadRenderTexture((int)affected_width, (int)affected_height);
-    copy_from_texture_to_texture(
-      chunk_after_we_affected->texture, v2u64(0, 0),
-      G->draw_texture_always_fresh.texture, affected_range.min,
-      affected_width, affected_height
-    );
-
-    // Copying the affected chunk into the old texture from the fresh texture
-    copy_from_texture_to_texture(
-      G->draw_texture_not_that_fresh.texture, affected_range.min,
-      G->draw_texture_always_fresh.texture, affected_range.min,
-      affected_width, affected_height
-    );
-  }
-  else 
-  if (IsMouseButtonDown(MOUSE_BUTTON_LEFT)) // User is about to start drawing or already drawing
-  {
-    // Starting to draw a new record
-    if (!G->is_mid_drawing && !is_ui_capturing_mouse) 
-    { 
-      G->is_mid_drawing = true;
-
-      // Freeing all the records that are in front of the current one
-      if (G->current_record != 0)
-      {
-        for (Draw_record* record = G->last_record; record != 0;) 
-        {
-          if (record == G->current_record) { break; }
-          UnloadRenderTexture(record->chunk_after_we_affected);
-          UnloadRenderTexture(record->chunk_before_we_affected);
-          
-          DllPopBack_Name(G, first_record, last_record, next, prev);
-          Draw_record* prev_record = record->prev;
-          
-          *record = Draw_record{};
-          DllPushBack_Name(G, record, first_free_draw_record, last_free_draw_record, next, prev);
-          
-          record = prev_record;
-        }
-      }
-
-      Draw_record* new_draw_record = get_new_draw_record_from_pool__nullable(G);
-      if (new_draw_record != 0)
-      {
-        new_draw_record->affected_2d_range.min = v2u64(get_draw_texture_width(G), get_draw_texture_height(G));
-        new_draw_record->affected_2d_range.max = v2u64(0, 0);
-        G->current_record = new_draw_record;
-        DllPushBack_Name(G, new_draw_record, first_record, last_record, next, prev);
-        Assert(G->last_record == new_draw_record); 
-      }
-      else
-      {
-        HandleLater(0, "Not yet handling that");
-        // Maybe just dont start drawing at all at this point
-      }
-    }
-
-    // Updating the draw state
-    if (G->is_mid_drawing) 
-    {
-      Assert(G->pen_size != 0 && G->pen_size % 2 == 1); // Just making sure that it is an odd value
-
-      // Updating the texture
-      Vector2 rl_mouse_pos = GetMousePosition();
-      V2U64 mouse_pos = v2u64((U64)rl_mouse_pos.x, (U64)rl_mouse_pos.y);
-      draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color, G->is_erasing);
-      
-      // RangeV2U64 affected_range = get_affected_points_for_draw_call(old_mouse_pos, G->pen_size, G->last_screen_dims);
-      RangeV2U64 affected_range = get_affected_points_for_draw_call(mouse_pos, G->pen_size, G->last_screen_dims);
-
-      // Updating affected range min value
-      V2U64 af_min = affected_range.min;
-      V2U64* state_min_point = &G->current_record->affected_2d_range.min;
-      state_min_point->x = Min(state_min_point->x, affected_range.min.x);
-      state_min_point->y = Min(state_min_point->y, affected_range.min.y);
-
-      // Updating affected range max value
-      V2U64 af_max = affected_range.max;
-      V2U64* state_max_point = &G->current_record->affected_2d_range.max;
-      state_max_point->x = Max(state_max_point->x, affected_range.max.x);
-      state_max_point->y = Max(state_max_point->y, affected_range.max.y);
-    }
-
-      // V2U64 min_mouse_pos = v2u64(Min(old_mouse_pos.x, mouse_pos.x), Min(old_mouse_pos.y, mouse_pos.y));
-      // V2U64 max_mouse_pos = v2u64(Max(old_mouse_pos.x, mouse_pos.x), Max(old_mouse_pos.y, mouse_pos.y));
-      // for (U64 mouse_y = min_mouse_pos.y; mouse_y <= max_mouse_pos.y; mouse_y += 1)
-      // {
-      //   for (U64 mouse_x = min_mouse_pos.x; mouse_x <= max_mouse_pos.x; mouse_x += 1)
-      //   {
-      //     V2U64 point = v2u64(mouse_x, mouse_y);
-
-      //     // Updating the texture
-      //     RangeV2U64 affected_range = get_affected_points_for_draw_call(point, G->pen_size, G->last_screen_dims);
-      //     draw_onto_texture(G->draw_texture_always_fresh, mouse_pos, G->pen_size, G->pen_color, G->is_erasing);
-    
-      //     Draw_record* record = G->current_record;
-    
-      //     // Updating affected range min value
-      //     V2U64 af_min = affected_range.min;
-      //     V2U64* state_min_point = &record->affected_2d_range.min;
-      //     state_min_point->x = Min(state_min_point->x, affected_range.min.x);
-      //     state_min_point->y = Min(state_min_point->y, affected_range.min.y);
-    
-      //     // Updating affected range max value
-      //     V2U64 af_max = affected_range.max;
-      //     V2U64* state_max_point = &record->affected_2d_range.max;
-      //     state_max_point->x = Max(state_max_point->x, affected_range.max.x);
-      //     state_max_point->y = Max(state_max_point->y, affected_range.max.y);
-      //   }
-      // }
-
-    // }
-    // todo: Update this comment here (We no longer use cpu side image)
-    // note: Here is the only time when the cpu side image is not synced to the gpu one. 
-    //       But we do later sync it when we stop drawing.
-  }
-  else 
-  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) // User want to go back to the drawing they have last removed
-  {
-    if (!G->is_mid_drawing)
-    {
-      // This is here to be able to deal with current_record beeing 0
-      Draw_record* next_record = 0;
-      if (G->current_record == 0) {
-        next_record = G->first_record;
-      } 
-      else if (G->current_record->next != 0) {
-        next_record = G->current_record->next;
-      }
-
-      if (next_record)
-      {
-        Assert(next_record->chunk_after_we_affected.texture.id != 0); // Has to not be 0 or else we shoud not have the next record
-        RangeV2U64 affected_range    = next_record->affected_2d_range;
-        RenderTexture future_texture = next_record->chunk_after_we_affected;
-        
-        U64 affected_width = affected_range.max.x - affected_range.min.x;
-        U64 affected_height = affected_range.max.y - affected_range.min.y;
-        
-        // Change the affected part from the fresh texture to the stored old version
-        copy_from_texture_to_texture(
-          G->draw_texture_always_fresh.texture, affected_range.min, 
-          future_texture.texture, v2u64(0, 0), 
-          affected_width, affected_height
-        );
   
-        // Change the affected part from the not so fresh texture to the stored old version
-        copy_from_texture_to_texture(
-          G->draw_texture_not_that_fresh.texture, affected_range.min, 
-          future_texture.texture, v2u64(0, 0), 
-          affected_width, affected_height
-        );
+  // idea: Based on some shortcutes, figure out the next op kind
+
+  // Some single frame draw ops
+  // 
+  // User want to go back to the drawing they have last removed
   
-        G->current_record = next_record;
-      }
-    }
-  }
-  else 
-  if (IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) // User want to remove the last line they drew
+  B32 dont_start_drawing_this_frame = false;
+  if (!G->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) 
   {
-    if (!G->is_mid_drawing && G->current_record != 0)
+    dont_start_drawing_this_frame = true; 
+
+    // This is here to be able to deal with current_record beeing 0
+    Draw_record* next_record = 0;
+    if (G->current_record == 0) {
+      next_record = G->first_record;
+    } 
+    else if (G->current_record->next != 0) {
+      next_record = G->current_record->next;
+    }
+
+    if (next_record)
     {
-      Draw_record* record                    = G->current_record;
-      RangeV2U64 affected_range              = record->affected_2d_range;
-      RenderTexture chunk_before_we_affected = record->chunk_before_we_affected;
-      
-      U64 affected_width  = affected_range.max.x - affected_range.min.x;
-      U64 affected_height = affected_range.max.y - affected_range.min.y;
+      RenderTexture future_texture = next_record->texture_after_we_affected;
       
       // Change the affected part from the fresh texture to the stored old version
       copy_from_texture_to_texture(
-        G->draw_texture_always_fresh.texture, affected_range.min, 
-        chunk_before_we_affected.texture, v2u64(0, 0), 
-        affected_width, affected_height
+        G->draw_texture_always_fresh.texture, v2u64(0, 0), 
+        future_texture.texture, v2u64(0, 0), 
+        (U64)future_texture.texture.width, (U64)future_texture.texture.height
       );
 
       // Change the affected part from the not so fresh texture to the stored old version
       copy_from_texture_to_texture(
-        G->draw_texture_not_that_fresh.texture, affected_range.min, 
-        chunk_before_we_affected.texture, v2u64(0, 0), 
-        affected_width, affected_height
+        G->draw_texture_not_that_fresh.texture, v2u64(0, 0), 
+        future_texture.texture, v2u64(0, 0), 
+        (U64)future_texture.texture.width, (U64)future_texture.texture.height
+      );
+
+      G->current_record = next_record;
+    }
+  }
+  else // User wants to remove the last line they drew
+  if (!G->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) 
+  {
+    dont_start_drawing_this_frame = true;
+
+    if (G->current_record != 0)
+    {
+      Draw_record* record                    = G->current_record;
+      RenderTexture texture_before_we_affected = record->texture_before_we_affected;
+      
+      // Change the affected part from the fresh texture to the stored old version
+      copy_from_texture_to_texture(
+        G->draw_texture_always_fresh.texture, v2u64(0, 0), 
+        texture_before_we_affected.texture, v2u64(0, 0), 
+        (U64)texture_before_we_affected.texture.width, (U64)texture_before_we_affected.texture.height
+      );
+
+      // Change the affected part from the not so fresh texture to the stored old version
+      copy_from_texture_to_texture(
+        G->draw_texture_not_that_fresh.texture, v2u64(0, 0), 
+        texture_before_we_affected.texture, v2u64(0, 0), 
+        (U64)texture_before_we_affected.texture.width, (U64)texture_before_we_affected.texture.height
       );
       
       G->current_record = G->current_record->prev;
     }
   }
-  else if (IsKeyPressed(KEY_C))
+  else // User want to clear the screen
+  if (!G->is_mid_drawing && IsKeyPressed(KEY_DELETE))
+  {
+    dont_start_drawing_this_frame = true;
+
+    // Creating a new current record
+    {
+      Draw_record_registration_result record_reg = register_new_draw_record(G, is_ui_capturing_mouse);
+      HandleLater(record_reg.succ);
+      Draw_record* record = record_reg.record;
+      G->current_record = record;
+    }
+
+    U64 w = G->draw_texture_always_fresh.texture.width;
+    U64 h = G->draw_texture_always_fresh.texture.height;
+    
+    // todo: These storing of 4 textures might be seprated into their own call
+
+    // Clearing the texture
+    fill_texture_with_color(G->draw_texture_always_fresh, { 0, 0, 0, 0 }, true);
+
+    // Storing the prev texture state
+    copy_from_texture_to_texture(
+      G->current_record->texture_before_we_affected.texture, v2u64(0, 0),
+      G->draw_texture_not_that_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+
+    // Storing the new texture state
+    copy_from_texture_to_texture(
+      G->current_record->texture_after_we_affected.texture, v2u64(0, 0),
+      G->draw_texture_always_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+
+    // Matching the prev texture state to the new one
+    copy_from_texture_to_texture(
+      G->draw_texture_not_that_fresh.texture, v2u64(0, 0),
+      G->draw_texture_always_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+  }
+
+  if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
+
+  // Use is about to start drawing
+  if (!G->is_mid_drawing && IsMouseButtonDown(MOUSE_BUTTON_LEFT)) 
+  {
+    Draw_record_registration_result record_registation = register_new_draw_record(G, is_ui_capturing_mouse);
+    if (!record_registation.succ) { HandleLater(0, "Dont yet handle this case"); }
+    G->is_mid_drawing = true;
+  }
+  else // Updating active drawing 
+  if (G->is_mid_drawing && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+  {
+    Vector2 new_pos = GetMousePosition();
+    Vector2 prev_pos = Vector2Subtract(new_pos, GetMouseDelta());
+    draw_onto_texture(G->draw_texture_always_fresh, new_pos, prev_pos, G->pen_size, G->pen_color, G->is_erasing);
+
+    // todo: Update this comment here (We no longer use cpu side image)
+    // note: Here is the only time when the cpu side image is not synced to the gpu one. 
+    //       But we do later sync it when we stop drawing.
+  }
+  else // Here we finalise the draw recordd that the user have been drawing
+  if (G->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+  {
+    Assert(G->current_record != 0);
+    Assert(G->current_record->texture_after_we_affected.texture.id != 0);  // These are expected to already be allocated by this point
+    Assert(G->current_record->texture_before_we_affected.texture.id != 0); // These are expected to already be allocated by this point
+    
+    G->is_mid_drawing = false;
+
+    U64 draw_t_width = G->draw_texture_always_fresh.texture.width;
+    U64 draw_t_height = G->draw_texture_always_fresh.texture.height;
+
+    Draw_record* record = G->current_record;
+    RenderTexture* texture_before_we_affected = &record->texture_before_we_affected;
+    RenderTexture* texture_after_we_affected  = &record->texture_after_we_affected;
+    
+    // note: By this point, the fresh draw texture is the new final version of what the user has draw
+
+    // Storing the prev version of the draw texture 
+    copy_from_texture_to_texture(
+      texture_before_we_affected->texture, v2u64(0, 0),
+      G->draw_texture_not_that_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+
+    // Storing the new version of the draw texture
+    copy_from_texture_to_texture(
+      texture_after_we_affected->texture, v2u64(0, 0),
+      G->draw_texture_always_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+
+    // Updating the prev version of the draw texture to match the new version
+    copy_from_texture_to_texture(
+      G->draw_texture_not_that_fresh.texture, v2u64(0, 0),
+      G->draw_texture_always_fresh.texture, v2u64(0, 0),
+      G->draw_texures_width, G->draw_texures_height
+    );
+  }
+
+  __active_draw_update_routine_end__: {};
+
+  /*
+  else 
+  
+  else if (IsKeyPressed(KEY_C) && !G->is_mid_drawing)
   { 
     ToggleBool(G->is_erasing);
   }
+  else if (IsKeyPressed(KEY_V) && !G->is_mid_drawing)
+  {
+    // Clear mode when we just set the blend to 0 and dont allow to change the color
+    // To blit the screen we make this operation have be a seprate kind of op and just do it in the update
+
+
+    // Register new record
+    // Draw into the global state
+    // Update the record 
+    
+    // fill_texture_with_color(G->draw_texture_always_fresh, { 0, 0, 0, 0 }, true);
+
+    // running the store routine
+    // G->is_mid_drawing = true;
+
+    
+    
+    // update the gput texture 
+    // then store the record as a new record
+
+    // todo: Clear the whole screen
+    // Set to erase and just blit the screen, but store the curent texture
+  }
+  */
 }
 
 void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
@@ -650,11 +713,19 @@ int main()
   SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_TRANSPARENT);
   InitWindow(800, 600, "Pencil");
 
+  Image logo = LoadImage("../data/logo.png");
+  HandleLater(logo.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+  SetWindowIcon(logo);
+  // Setting the custom win32 winproc to handle registered system shortcuts
   HWND win32_window_handle = (HWND)GetWindowHandle();
   raylib_winproc = (WNDPROC)GetWindowLongPtrA(win32_window_handle, GWLP_WNDPROC);
   Assert(raylib_winproc != 0);
-  LONG_PTR set_succ = SetWindowLongPtrA(win32_window_handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
-  Assert(set_succ != 0);
+  LONG_PTR set_succ_proc = SetWindowLongPtrA(win32_window_handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
+  Assert(set_succ_proc != 0);
+
+  // todo:
+  LONG_PTR set_succ_style = SetWindowLongPtrA(win32_window_handle, GWL_EXSTYLE, WS_EX_TOOLWINDOW);
+  Assert(set_succ_style != 0);
   
   BOOL hot_key_register_succ = RegisterHotKey((HWND)GetWindowHandle(), 69, MOD_CONTROL|MOD_SHIFT, 'S');
   HandleLater(hot_key_register_succ);
@@ -676,11 +747,14 @@ int main()
   G.pen_size = 11;
   G.pen_color = v4u8(255, 255, 255, 255);
 
-  G.draw_texture_always_fresh = LoadRenderTexture(GetScreenWidth(), GetScreenHeight()); 
+  G.draw_texures_width = (U64)GetScreenWidth();
+  G.draw_texures_height = (U64)GetScreenHeight();
+
+  G.draw_texture_always_fresh = LoadRenderTexture((int)G.draw_texures_width, (int)G.draw_texures_height); 
   Assert(G.draw_texture_always_fresh.id != 0);
   BeginTextureMode(G.draw_texture_always_fresh); { ClearBackground(BLANK); } EndTextureMode(); 
 
-  G.draw_texture_not_that_fresh = LoadRenderTexture(GetScreenWidth(), GetScreenHeight()); 
+  G.draw_texture_not_that_fresh = LoadRenderTexture((int)G.draw_texures_width, (int)G.draw_texures_height); 
   Assert(G.draw_texture_not_that_fresh.id != 0);
   BeginTextureMode(G.draw_texture_not_that_fresh); { ClearBackground(BLANK); } EndTextureMode(); 
 
@@ -694,13 +768,19 @@ int main()
   
   for (;!WindowShouldClose();)
   {
+    // todo: 
+    // There shoud be a good way to just stop doing what the user is doing 
+    // in the update loop to not have to deal with braking bugs.
+    // This way the logic might be wrong an the thing wont work as intended,
+    // but it wont be staight up broken, but rather just have a default
+    // behaviour.      
     B32 are_we_interactive = !IsWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
 
-    if (are_we_interactive && IsKeyPressed(KEY_ESCAPE))
-    {
-      SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
-      are_we_interactive = false;
-    }
+    // if (are_we_interactive && IsKeyPressed(KEY_ESCAPE))
+    // {
+    //   SetWindowState(FLAG_WINDOW_MOUSE_PASSTHROUGH);
+    //   are_we_interactive = false;
+    // }
 
     if (hot_key_activated)
     {

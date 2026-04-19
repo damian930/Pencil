@@ -1,25 +1,15 @@
-Goals:
-- simple drawing
-- change pen size
-- change pen color 
-- pen styles:
-  - regular line
-  - arrow 
-  - marker 
-  - blurere
-  - eraser
-- there are some blending issues, i dont know much about it. So for now just leaving it here.
+Features to add for jam:
+- Clear 
+- A little better ui
+- ReadME with all the future things to add
 
 Features to add:
-- delay on line removing when control z is held down
+- way to use the screen in the draw mode
+  This shoud be done by a settable key combination which will just turn off the draw mode.
+  I guess i need hookd for this.
+- delay on line removing when control z is held down (-- use rli events for that, there is a delay there)
 - shortcut to clear the screen
-- eraser pen
-- better line drawing when moving mouse fast
-- 
-
-
-Ideas:
-- If we decide to remove Texture parts and just store full screen textures, then i can just have 
-  a zero (first) draw record which just stored a zero texture or a texture with no pixels in it.
-  This way i will be able to just set to it when i clear.
-
+- something that represents the size of the pen when in the drawing mode. Like in milton on paint
+- README
+- shortucut settings
+- way to take a screen shot of the drawn thing
