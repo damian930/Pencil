@@ -5,12 +5,14 @@ Features to add for jam:
     - [x] Have a differnt pen size for the eraser
 - [ ] Better cursor that shows the size of the pen or eraser
 - [-] Screen shot of the drawing on top of the screen, basically
-- [ ] A little better ui
+- [x] A little better ui
   - 2 different menus like in milton and paint for color and for brushes
-    - [ ] Brush menu
-    - [ ] Color menu 
-      - [ ] Regular pen
-      - [ ] Eraser 
+    - [x] Wheel scrol for sliders
+    - [ ] Another color for hover when slider is filled up
+    - [x] Brush menu
+    - [x] Color menu 
+      - [x] Regular pen
+      - [x] Eraser
 - [ ] Delay to be able to hold ctrl+z and ctrl+shift+z
 - [ ] ReadME with all the future things to add
 

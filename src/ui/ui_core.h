@@ -96,11 +96,6 @@ struct UI_Text_font_size_stack { UI_Text_font_size_node* first; U64 count; B32 p
 struct UI_ID_node { Str8 id; UI_ID_node* next; };
 struct UI_ID_stack { UI_ID_node* first; U64 count; B32 pop_after_first_use; };
 
-struct UI_Box_data {
-  B32 is_found;
-  Rect on_screen_rect;
-};
-
 struct UI_Box_clip_data {
   B32 is_found;
   Vec2_F32 on_screen_dims;
@@ -163,6 +158,12 @@ struct UI_Box {
   UI_Box* prev_sibling;
   UI_Box* parent;
   U64 children_count;
+};
+
+struct UI_Box_data {
+  B32 is_found;
+  Rect on_screen_rect;
+  UI_Box* parent_box;
 };
 
 struct UI_Context {

@@ -665,6 +665,7 @@ UI_Box_data ui_get_box_data_prev_frame(Str8 id)
   if (!ui_box_is_zero(box)) 
   { 
     box_data.on_screen_rect = box->final_on_screen_rect; 
+    box_data.parent_box = box->parent;
     box_data.is_found = true; 
   }
   return box_data;
@@ -843,13 +844,13 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_even
 
   // todo: not sure about these for now
   {
-    if (is_hovered || ui_is_active(this_frames_box->id))
+    if (is_hovered)
     {
       for (RLI_Event* e = rli_events->first; e; e = e->next)
       {
         if (e->kind == RLI_Event_kind__mouse_wheel)
         {
-          mouse_wheel_move = e->mouse_wheel_move;
+          result_actions.wheel_move = e->mouse_wheel_move;
           RLI_consume_event(e);
           break;
         }

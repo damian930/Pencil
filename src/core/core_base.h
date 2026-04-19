@@ -261,6 +261,7 @@ typedef double F64;
 							list->name_for_last_in_list = 0; \
 						} else { \
 							list->name_for_first_in_list = list->name_for_first_in_list->name_for_next_in_node; \
+							list->name_for_first_in_list->prev = 0; \
 						}
 #define DllPopBack_Name(list, name_for_first_in_list, name_for_last_in_list, name_for_next_in_node, name_for_prev_in_node) \
 						if (list->name_for_first_in_list == list->name_for_last_in_list) { \

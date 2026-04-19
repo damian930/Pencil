@@ -64,6 +64,12 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     slider_box_rect = slider_box_data.on_screen_rect;
   }
 
+  if (slider_actions.is_hovered)
+  {
+    current_value += slider_actions.wheel_move;
+    clamp_f32_inplace(&current_value, min, max);
+  }
+  
   F32 thumb_container_width = slider_box_rect.width;
   F32 max_thumb_offset = thumb_container_width;
   F32 value_ratio = current_value / (max - min);
