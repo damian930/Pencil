@@ -100,6 +100,12 @@ struct G_state {
   // Signals (These are just here like this right now)
   B32 signal_new_pen_size;
   U64 new_pen_size;
+  //
+  B32 signal_new_eraser_size;
+  U64 new_eraser_size;
+  //
+  B32 signal_swap_to_eraser;
+  B32 signal_swap_to_pen;
 
   // Misc
   Font font_texture_for_ui;
@@ -325,6 +331,37 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
         G->new_pen_size = 0;
       }
     }
+    else
+    if (G->signal_new_eraser_size)
+    {
+      Assert(G->is_mid_drawing == false); // Just making sure
+      if (!G->is_mid_drawing)
+      {
+        G->eraser_size = G->new_eraser_size;
+        G->signal_new_eraser_size = false;
+        G->new_eraser_size = 0;
+      }
+    }
+    else 
+    if (G->signal_swap_to_eraser)
+    {
+      Assert(G->is_mid_drawing == false); // Just making sure
+      if (!G->is_mid_drawing)
+      {
+        G->signal_swap_to_eraser = false;
+        G->is_erasing_mode = true;
+      }
+    }
+    else 
+    if (G->signal_swap_to_pen)
+    {
+      Assert(G->is_mid_drawing == false); // Just making sure
+      if (!G->is_mid_drawing)
+      {
+        G->signal_swap_to_pen = false;
+        G->is_erasing_mode = false;
+      }
+    }
   }
   
   // idea: Based on some shortcutes, figure out the next op kind
@@ -334,6 +371,12 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
   // User want to go back to the drawing they have last removed
   
   B32 dont_start_drawing_this_frame = false;
+  // if (IsKeyPressed(KEY_S))
+  // {
+  //  To have a screen shot we would have to have access to the screen texture and then mix the 
+  //  fresh texture with the screen texture, for that we would need to use d3d and not rayli.
+  //  So for now there is not really a great way to do it. 
+  // }
   if (!G->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) 
   {
     dont_start_drawing_this_frame = true; 
@@ -437,13 +480,13 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
       G->draw_texures_width, G->draw_texures_height
     );
   }
-  else // Use wants to start using the eraser pen 
-  if (!G->is_mid_drawing && IsKeyPressed(KEY_C))
+  else // User wants to start using the eraser pen 
+  if (!G->is_mid_drawing && IsKeyPressed(KEY_E))
   {
     dont_start_drawing_this_frame = true;
     G->is_erasing_mode = true;
   }
-  else 
+  else // User wants to start using the brush/pen
   if (!G->is_mid_drawing && IsKeyPressed(KEY_B))
   {
     dont_start_drawing_this_frame = true;
@@ -520,6 +563,7 @@ void update_pencil(G_state* G, B32 is_ui_capturing_mouse)
 
 }
 
+// todo: Maybe have G be const
 void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 {
   int w = GetScreenWidth();
@@ -573,95 +617,274 @@ void update_pencil_ui(G_state* G, RLI_Event_list* rli_events)
 
   UI_Parent(content_inner)
   {
-    ui_spacer(ui_p_of_p(1, 0));
-    UI_Wrapper(Axis2__y)
+    ui_set_next_flags(UI_Box_flag__floating);
+    ui_set_next_size_x(ui_p_of_p(1, 1)); ui_set_next_size_y(ui_p_of_p(1, 1));
+    ui_set_next_layout_axis(Axis2__y);
+    UI_Box* brush_wrapper_box_x = ui_box_make({}, 0);
+
+    Str8 brush_floating_hook_box_id = Str8FromC("Brush floating box hook id");
+
+    static F32 drag_mouse_hold_pos_x = 0;
+    static F32 drag_mouse_hold_pos_y = 0;
+
+    static F32 x_offset = 50;
+    static F32 y_offset = 50;
+
+    // todo: There is a bug here
+    UI_Actions brush_box_actions = ui_actions_from_id(brush_floating_hook_box_id, rli_events);
+    if (!brush_box_actions.was_down && brush_box_actions.is_down)
     {
-      ui_spacer(ui_p_of_p(1, 0));
-
-      ui_set_next_color({ 10, 75, 107, 255 });
-      UI_PaddedBox(ui_px(10), Axis2__y)
-      {
-        UI_Slider_style size_slider_style = {};
-        size_slider_style.height         = 50;
-        size_slider_style.width          = 100;
-        size_slider_style.hover_color    = { 75, 75, 75, 255 };
-        size_slider_style.no_hover_color = { 50, 50, 50, 255 };
-        size_slider_style.text_color     = { 255, 255, 255, 255 };
-        size_slider_style.slided_part_color = { 125, 125, 125, 255 };
-        size_slider_style.fmt_str = "%.0f";
-
-        U64 new_pen_size = (U64)ui_slider(Str8FromC("Size slider id"), &size_slider_style, (F32)G->pen_size, 1, 100, rli_events);
-        if (new_pen_size % 2 == 0 && new_pen_size != 0) { new_pen_size -= 1; }
-        clamp_u64_inplace(&new_pen_size, 1, 99);
-        if (new_pen_size != G->pen_size)
-        {
-          G->signal_new_pen_size = true;
-          G->new_pen_size = new_pen_size;
-        }
-
-        ui_spacer(ui_px(25));
-
-        UI_Slider_style red_color_slider = {};
-        red_color_slider.height         = 50;
-        red_color_slider.width          = 100;
-        red_color_slider.hover_color    = { 75, 75, 75, 255 };
-        red_color_slider.no_hover_color = { 50, 50, 50, 255 };
-        red_color_slider.text_color     = { 255, 255, 255, 255 };
-        red_color_slider.slided_part_color = { 125, 125, 125, 255 };
-        red_color_slider.fmt_str = "%.0f";
-
-        U8 new_pen_red = (U8)ui_slider(Str8FromC("Red color slider"), &size_slider_style, G->pen_color.r, 0, 255, rli_events);
-        G->pen_color.r = new_pen_red;
-
-        ui_spacer(ui_px(25));
-
-        UI_Slider_style green_color_slider = {};
-        green_color_slider.height         = 50;
-        green_color_slider.width          = 100;
-        green_color_slider.hover_color    = { 75, 75, 75, 255 };
-        green_color_slider.no_hover_color = { 50, 50, 50, 255 };
-        green_color_slider.text_color     = { 255, 255, 255, 255 };
-        green_color_slider.slided_part_color = { 125, 125, 125, 255 };
-        green_color_slider.fmt_str = "%.0f";
-
-        U8 new_pen_green = (U8)ui_slider(Str8FromC("Green color slider"), &size_slider_style, G->pen_color.g, 0, 255, rli_events);
-        G->pen_color.g = new_pen_green;
-
-        ui_spacer(ui_px(25));
-
-        UI_Slider_style blue_color_slider = {};
-        blue_color_slider.height         = 50;
-        blue_color_slider.width          = 100;
-        blue_color_slider.hover_color    = { 75, 75, 75, 255 };
-        blue_color_slider.no_hover_color = { 50, 50, 50, 255 };
-        blue_color_slider.text_color     = { 255, 255, 255, 255 };
-        blue_color_slider.slided_part_color = { 125, 125, 125, 255 };
-        blue_color_slider.fmt_str = "%.0f";
-
-        U8 new_pen_blue = (U8)ui_slider(Str8FromC("Blue color slider"), &size_slider_style, G->pen_color.b, 0, 255, rli_events);
-        G->pen_color.b = new_pen_blue;
-
-        ui_spacer(ui_px(25));
-
-        UI_Slider_style alpha_color_slider = {};
-        alpha_color_slider.height         = 50;
-        alpha_color_slider.width          = 100;
-        alpha_color_slider.hover_color    = { 75, 75, 75, 255 };
-        alpha_color_slider.no_hover_color = { 50, 50, 50, 255 };
-        alpha_color_slider.text_color     = { 255, 255, 255, 255 };
-        alpha_color_slider.slided_part_color = { 125, 125, 125, 255 };
-        alpha_color_slider.fmt_str = "%.0f";
-
-        U8 new_pen_alpha = (U8)ui_slider(Str8FromC("Aplha color slider"), &size_slider_style, G->pen_color.a, 0, 255, rli_events);
-        G->pen_color.a = new_pen_alpha;
-      }
-
-      ui_spacer(ui_px(25));
-      ui_spacer(ui_p_of_p(1, 0));
+      ui_set_active(brush_floating_hook_box_id);
+      UI_Box_data box_data = ui_get_box_data_prev_frame(brush_floating_hook_box_id);
+      drag_mouse_hold_pos_x = (F32)GetMouseX() - box_data.on_screen_rect.x;
+      drag_mouse_hold_pos_y = (F32)GetMouseY() - box_data.on_screen_rect.y;
     }
-    ui_spacer(ui_px(10));
-  }
+    else if (brush_box_actions.is_down)
+    {
+      x_offset = (F32)GetMouseX() - drag_mouse_hold_pos_x;
+      y_offset = (F32)GetMouseY() - drag_mouse_hold_pos_y;
+    }
+    else {
+      ui_reset_active_match(brush_floating_hook_box_id);
+      drag_mouse_hold_pos_x = 0;
+      drag_mouse_hold_pos_y = 0;
+    }
 
+    UI_Parent(brush_wrapper_box_x)
+    {
+      ui_spacer(ui_px(y_offset));
+
+      ui_set_next_size_x(ui_p_of_p(1, 1)); ui_set_next_size_y(ui_p_of_p(1, 1));
+      ui_set_next_layout_axis(Axis2__x);
+      UI_Box* brush_wrapper_box_y = ui_box_make({}, 0);
+      UI_Parent(brush_wrapper_box_y)
+      {
+        ui_spacer(ui_px(x_offset));
+
+        ui_set_next_size_x(ui_px(400)); ui_set_next_size_y(ui_px(400));
+        ui_set_next_layout_axis(Axis2__y);
+        // ui_set_next_corner_radius(0.15f);
+        ui_set_next_color({ 255, 255, 255, 255 });
+        UI_Box* brushes_menu_box = ui_box_make({}, 0);
+        UI_Parent(brushes_menu_box)
+        {
+          // Header hook box
+          ui_set_next_size_x(ui_p_of_p(1, 0)); ui_set_next_size_y(ui_children_sum());
+          ui_set_next_layout_axis(Axis2__y);
+          ui_set_next_color({ 151, 184, 210, 255 });
+          UI_Box* hook_box = ui_box_make(brush_floating_hook_box_id, 0);
+          UI_Parent(hook_box)
+          {
+            ui_spacer(ui_px(5));
+
+            UI_PaddedBox(ui_px(5), Axis2__x)
+            {
+              ui_set_next_text_color({ 0, 0, 0, 255 });
+              ui_set_next_font_size(24);
+              ui_label_c("Brushes");
+            }
+
+            ui_spacer(ui_px(5));
+          }
+  
+          UI_PaddedBox(ui_px(5), Axis2__y) 
+          {
+            ui_spacer(ui_px(10));
+  
+            if (G->is_erasing_mode)
+            {
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style size_slider_style = {};
+                size_slider_style.height         = 20;
+                size_slider_style.width          = 180;
+                size_slider_style.hover_color    = { 169, 205, 246, 255 };
+                size_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                size_slider_style.text_color     = { 0, 0, 0, 255 };
+                size_slider_style.font_size      = 20;
+                size_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                size_slider_style.fmt_str = "%.0f";
+    
+                U64 new_eraser_size = (U64)ui_slider(Str8FromC("Eraser size slider id"), &size_slider_style, (F32)G->eraser_size, 1, 100, rli_events);
+                if (new_eraser_size != G->eraser_size)
+                {
+                  G->signal_new_eraser_size = true;
+                  G->new_eraser_size = new_eraser_size;
+                } 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Pen size");
+              }
+    
+              ui_spacer(ui_px(10));
+
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                ui_set_next_color({ 175, 203, 255, 255 });
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                UI_PaddedBox(ui_px(5), Axis2__x)
+                {
+                  UI_Actions pen_button = ui_button(Str8FromC("Brush - [B]## button"), rli_events);
+                  if (pen_button.is_clicked)
+                  {
+                    G->signal_swap_to_pen= true;
+                  }
+                }
+              }
+            }
+            else
+            {
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style size_slider_style = {};
+                size_slider_style.height         = 20;
+                size_slider_style.width          = 180;
+                size_slider_style.hover_color    = { 169, 205, 246, 255 };
+                size_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                size_slider_style.text_color     = { 0, 0, 0, 255 };
+                size_slider_style.font_size      = 20;
+                size_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                size_slider_style.fmt_str = "%.0f";
+    
+                U64 new_pen_size = (U64)ui_slider(Str8FromC("Pen size slider id"), &size_slider_style, (F32)G->pen_size, 1, 100, rli_events);
+                clamp_u64_inplace(&new_pen_size, 1, 100);
+                if (new_pen_size != G->pen_size)
+                {
+                  G->signal_new_pen_size = true;
+                  G->new_pen_size = new_pen_size;
+                } 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Pen size");
+              }
+    
+              ui_spacer(ui_px(2));
+    
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style red_slider_style = {};
+                red_slider_style.height         = 20;
+                red_slider_style.width          = 180;
+                red_slider_style.hover_color    = { 169, 205, 246, 255 };
+                red_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                red_slider_style.text_color     = { 0, 0, 0, 255 };
+                red_slider_style.font_size      = 20;
+                red_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                red_slider_style.fmt_str = "%.0f";
+    
+                U8 new_r_color = (U8)ui_slider(Str8FromC("Red slider style id"), &red_slider_style, (F32)G->pen_color.r, 0, 255, rli_events);
+                G->pen_color.r = new_r_color; 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Red color");
+              }
+    
+              ui_spacer(ui_px(2));
+    
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style green_slider_style = {};
+                green_slider_style.height         = 20;
+                green_slider_style.width          = 180;
+                green_slider_style.hover_color    = { 169, 205, 246, 255 };
+                green_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                green_slider_style.text_color     = { 0, 0, 0, 255 };
+                green_slider_style.font_size      = 20;
+                green_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                green_slider_style.fmt_str = "%.0f";
+    
+                U8 new_g_color = (U8)ui_slider(Str8FromC("Green slider style id"), &green_slider_style, (F32)G->pen_color.g, 0, 255, rli_events);
+                G->pen_color.g = new_g_color; 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Green color");
+              }
+    
+              ui_spacer(ui_px(2));
+    
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style blue_slider_style = {};
+                blue_slider_style.height         = 20;
+                blue_slider_style.width          = 180;
+                blue_slider_style.hover_color    = { 169, 205, 246, 255 };
+                blue_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                blue_slider_style.text_color     = { 0, 0, 0, 255 };
+                blue_slider_style.font_size      = 20;
+                blue_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                blue_slider_style.fmt_str = "%.0f";
+    
+                U8 new_b_color = (U8)ui_slider(Str8FromC("Blue slider style id"), &blue_slider_style, (F32)G->pen_color.b, 0, 255, rli_events);
+                G->pen_color.b = new_b_color; 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Blue color");
+              }
+    
+              ui_spacer(ui_px(2));
+    
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                UI_Slider_style alpa_slider_style = {};
+                alpa_slider_style.height         = 20;
+                alpa_slider_style.width          = 180;
+                alpa_slider_style.hover_color    = { 169, 205, 246, 255 };
+                alpa_slider_style.no_hover_color = { 220, 220, 220, 255 };
+                alpa_slider_style.text_color     = { 0, 0, 0, 255 };
+                alpa_slider_style.font_size      = 20;
+                alpa_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                alpa_slider_style.fmt_str = "%.0f";
+    
+                U8 new_a_color = (U8)ui_slider(Str8FromC("Alpha slider style id"), &alpa_slider_style, (F32)G->pen_color.a, 0, 255, rli_events);
+                G->pen_color.a = new_a_color; 
+    
+                ui_spacer(ui_px(10));
+    
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                ui_label_c("Alpha color");
+              }
+              
+              ui_spacer(ui_px(10));
+      
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                ui_set_next_color({ 175, 203, 255, 255 });
+                ui_set_next_text_color({ 0, 0, 0, 255 });
+                ui_set_next_font_size(20);
+                UI_PaddedBox(ui_px(5), Axis2__x)
+                {
+                  UI_Actions eraser_button = ui_button(Str8FromC("Eraser - [E]## button"), rli_events);
+                  if (eraser_button.is_clicked)
+                  {
+                    G->signal_swap_to_eraser= true;
+                  }
+                }
+              }
+            }
+
+          }
+        }
+      }
+    }
+  }
+  
   ui_end_build();
 }
 
@@ -702,6 +925,8 @@ int main()
   // FLAG_WINDOW_TOPMOST
   SetConfigFlags(FLAG_VSYNC_HINT | FLAG_WINDOW_TRANSPARENT);
   InitWindow(800, 600, "Pencil");
+
+  // HideCursor();
 
   Image logo = LoadImage("../data/logo.png");
   HandleLater(logo.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
@@ -761,6 +986,8 @@ int main()
   
   for (;!WindowShouldClose();)
   {
+    if (IsKeyPressed(KEY_ESCAPE)) { return 0; }
+
     // todo: 
     // There shoud be a good way to just stop doing what the user is doing 
     // in the update loop to not have to deal with braking bugs.
@@ -850,6 +1077,24 @@ int main()
       
       if (are_we_interactive) { ui_draw(); }
       
+      // Cursor
+      // if (are_we_interactive)
+      // {
+      //   if (ui_has_active())
+      //   {
+      //     ShowCursor();
+      //   }
+      //   else 
+      //   {
+      //     ShowCursor();
+      //     // V4U8 color = G.pen_color;
+      //     // color.r = ~color.r;
+      //     // color.g = ~color.g;
+      //     // color.b = ~color.b;
+      //     DrawCircleLinesV(GetMousePosition(), (F32)G.pen_size, { color.r, color.g, color.b, color.a });
+      //   } 
+      // }
+
       DrawFPS(0, 0);
     }
   }

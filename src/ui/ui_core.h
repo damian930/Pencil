@@ -278,6 +278,7 @@ void ui_draw();
 B32 ui_has_active();
 B32 ui_is_active(Str8 box_id);
 void ui_reset_active();
+void ui_reset_active_match(Str8 id_to_match);
 void ui_set_active(Str8 box_id);
 
 // - Other box data

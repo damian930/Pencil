@@ -36,7 +36,9 @@ struct UI_Slider_style {
   V4 hover_color;
   V4 no_hover_color;
   V4 slided_part_color;
+  
   V4 text_color;
+  F32 font_size;
 };
 F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, RLI_Event_list* rli_event_list)
 {
@@ -97,6 +99,7 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
     {
       ui_set_next_text_color(slider_style->text_color);
+      ui_set_next_font_size(slider_style->font_size);
       ui_label_fmt(slider_style->fmt_str, current_value);
     }
   }

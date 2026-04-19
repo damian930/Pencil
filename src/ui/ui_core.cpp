@@ -748,7 +748,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_even
 {
   // todo: I dont know how to make this be nicer in the api yet
   // todo: more than 1 update for the same box is possible in the same frame
-  Assert(this_frames_box->id.count != 0);
+  if (this_frames_box->id.count == 0) { return UI_Actions{}; }
+
   Assert(this_frames_box->has_been_updated_this_build == false); // todo: Deal with this better
   this_frames_box->has_been_updated_this_build = true;
 
