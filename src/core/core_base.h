@@ -683,6 +683,11 @@ struct V2S32 {
 tu_specific V2S32 v2s32(S32 x, S32 y) { V2S32 v = { x, y }; return v; }
 tu_specific B32 v2s32_match(V2S32 v1, V2S32 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
 
+// - Colors 
+V4U8 black()  { return v4u8(0, 0, 0, 0); }
+V4U8 white()  { return v4u8(255, 255, 255, 255); }
+V4U8 yellow() { return v4u8(255, 255, 0, 255); }
+V4U8 pink()   { return v4u8(255, 0, 255, 255); }
 
 
 #endif

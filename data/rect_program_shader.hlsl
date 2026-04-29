@@ -9,9 +9,19 @@ cbuffer constants : register(b0)
 
   float window_width_in_px;
   float window_height_in_px;
+
+  uint red;
+  uint green;
+  uint blue;
+  uint alpha;
 }
 
-float4 vs_main(uint id : SV_VertexID) : SV_Position
+struct PS_Input {
+ float4 pos : SV_POSITION;
+ float4 color : COLOR;
+};
+
+PS_Input vs_main(uint id : SV_VertexID)
 {
   // origin here is the top left of the rect
   float rect_origin_x_in_px = _rect_origin_x_in_px;
@@ -35,11 +45,15 @@ float4 vs_main(uint id : SV_VertexID) : SV_Position
   float2 final_pos = rect_point_in_px;
   final_pos.x = (rect_point_in_px.x / window_width_in_px) * 2.0 - 1.0; 
   final_pos.y = (rect_point_in_px.y / window_height_in_px) * 2.0 - 1.0f;
-
-  return float4(final_pos, 0, 1);
+  
+  PS_Input result;
+  result.pos = float4(final_pos, 0, 1);
+  result.color = float4(red, green, blue, alpha) / 255.0; 
+  
+  return result;
 }
 
-float4 ps_main() : SV_TARGET
+float4 ps_main(PS_Input input) : SV_TARGET
 {
-  return float4(1, 1, 1, 1); 
+  return input.color; 
 }

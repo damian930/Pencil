@@ -17,8 +17,25 @@ abstract.
 #include "platform.h"
 #include "platform_win32.cpp"
 
-#include "pencil/pencil.h"
-#include "pencil/pencil.cpp"
+// #include "pencil/pencil.h"
+// #include "pencil/pencil.cpp"
+
+void OutputDebugStringF(const char* fmt, ...)
+{
+  #if DEBUG_MODE
+  va_list argptr;
+  va_start(argptr, fmt);
+  Scratch scratch = get_scratch(0, 0);
+  Data_buffer buffer = data_buffer_make(scratch.arena, 128);
+  int ret = vsprintf_s((char*)buffer.data, buffer.count, fmt, argptr);
+  if (ret >= 0 && ret < buffer.count)
+  {
+    OutputDebugStringA((char*)buffer.data);
+  } else { InvalidCodePath(); }
+  end_scratch(&scratch);
+  va_end(argptr);
+  #endif
+}
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
@@ -64,24 +81,24 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - D3D 
   //
-  D3D_state grafics = {};
+  D3D_state d3d = {};
   {
     HRESULT hr = S_OK;
     #define HR(hr_value) HandleLater(hr == S_OK)
 
     // Factory
     {
-      hr = CreateDXGIFactory2(0, IID_IDXGIFactory2, (void**)&grafics.dxgi_factory);
+      hr = CreateDXGIFactory2(0, IID_IDXGIFactory2, (void**)&d3d.dxgi_factory);
       HR(hr);
     }
-    IDXGIFactory2* dxgi_factory = grafics.dxgi_factory;
+    IDXGIFactory2* dxgi_factory = d3d.dxgi_factory;
 
     // Adapter
     {
-      hr = dxgi_factory->EnumAdapters(0, &grafics.dxgi_adapter);
+      hr = dxgi_factory->EnumAdapters(0, &d3d.dxgi_adapter);
       HR(hr);
     }
-    IDXGIAdapter* dxgi_adapter = grafics.dxgi_adapter;
+    IDXGIAdapter* dxgi_adapter = d3d.dxgi_adapter;
 
     // Device, Context
     {
@@ -89,19 +106,19 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       hr = D3D11CreateDevice(
         dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null, 
         D3D11_CREATE_DEVICE_DEBUG, levels, ArrayCount(levels),
-        D3D11_SDK_VERSION, &grafics.device, Null, &grafics.context
+        D3D11_SDK_VERSION, &d3d.device, Null, &d3d.context
       );
       HR(hr);
     }
-    ID3D11Device* d3d_device = grafics.device;
-    ID3D11DeviceContext* d3d_context = grafics.context;   
+    ID3D11Device* d3d_device = d3d.device;
+    ID3D11DeviceContext* d3d_context = d3d.context;   
 
     // todo on release: Only use this for the debug version
     // Debug
     {
       // Debug for device
       ID3D11InfoQueue* debug_q = 0;
-      hr = grafics.device->QueryInterface(IID_ID3D11InfoQueue, (void**)&debug_q);
+      hr = d3d.device->QueryInterface(IID_ID3D11InfoQueue, (void**)&debug_q);
       HR(hr);
 
       debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
@@ -133,27 +150,43 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
       desc.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
       desc.Flags       = 0;
-      hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &grafics.swap_chain);
+      hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &d3d.swap_chain);
       HR(hr);
     }
-    IDXGISwapChain1* d3d_swap_chain = grafics.swap_chain;
+    IDXGISwapChain1* d3d_swap_chain = d3d.swap_chain;
   }
 
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  for (;!os_shoud_close_window();)
+  for (;!os_window_should_close();)
   {
-    arena_clear(win32_state->frame_events_arena);
-    win32_state->frame_events = {};
-
     os_win32_frame_begin();
     
-    static Pencil_state P = {};
-    pencil_update(&P, &win32_state->frame_events, &grafics);
-    // pencil_render();
+    static U64 counter = 0;
+    OS_Key_state a_state = os_get_key_state(OS_Key__A);
+    {
+      OutputDebugStringF("Key: %s \n", str8_from_os_key(a_state.key).data);
+      OutputDebugStringF("Counter: %lld \n", counter++);
+      if (a_state.is_down) { OutputDebugStringF("Down \n"); }
+      // if (a_state.is) { OutputDebugStringF("Repeat down \n"); }
+      if (a_state.is_up) { OutputDebugStringF("Up \n"); }
+      if (a_state.is_clicked) { OutputDebugStringF("Clicked \n"); }
+      OutputDebugStringF("\n");
+    }
+
+    // note: For now the app updates are event based, so each event we update the state
+    //       Then we update the retained state of the keys in the system and keep on going.
+    //       -- 
+    //       Dont know if this is a good idea, but for now thats what imma do
+
+    // static Pencil_state P = {}; // todo: Remove state from here
+    // for (OS_Event* ev = win32_state->frame_events.first; ev; ev = ev->next)
+    // {
+    //   pencil_update(&P, false, ev, &d3d);
+    // }
     
-    grafics.swap_chain->Present(0, 0);
+    d3d.swap_chain->Present(0, 0);
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us

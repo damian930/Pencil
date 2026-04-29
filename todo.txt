@@ -9,6 +9,8 @@
 [ ] - Start having Fresh and Not_Fresh textures to be able to later have draw queue
 
 
+Feature ideas:
+- Screen shot
 
 
 

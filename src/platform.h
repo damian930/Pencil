@@ -13,6 +13,97 @@
 ///////////////////////////////////////////////////////////
 // - Events
 // 
+enum OS_Key : U32 {
+  OS_Key__NONE,
+
+  // Mods
+  OS_Key__Shift,
+  OS_Key__Control,
+
+  // Letters 
+  OS_Key__A,              // 'a'   shifted: 'A'
+  OS_Key__B,              // 'b'   shifted: 'B'
+  OS_Key__C,              // 'c'   shifted: 'C'
+  OS_Key__D,              // 'd'   shifted: 'D'
+  OS_Key__E,              // 'e'   shifted: 'E'
+  OS_Key__F,              // 'f'   shifted: 'F'
+  OS_Key__G,              // 'g'   shifted: 'G'
+  OS_Key__H,              // 'h'   shifted: 'H'
+  OS_Key__I,              // 'i'   shifted: 'I'
+  OS_Key__J,              // 'j'   shifted: 'J'
+  OS_Key__K,              // 'k'   shifted: 'K'
+  OS_Key__L,              // 'l'   shifted: 'L'
+  OS_Key__M,              // 'm'   shifted: 'M'
+  OS_Key__N,              // 'n'   shifted: 'N'
+  OS_Key__O,              // 'o'   shifted: 'O'
+  OS_Key__P,              // 'p'   shifted: 'P'
+  OS_Key__Q,              // 'q'   shifted: 'Q'
+  OS_Key__R,              // 'r'   shifted: 'R'
+  OS_Key__S,              // 's'   shifted: 'S'
+  OS_Key__T,              // 't'   shifted: 'T'
+  OS_Key__U,              // 'u'   shifted: 'U'
+  OS_Key__V,              // 'v'   shifted: 'V'
+  OS_Key__W,              // 'w'   shifted: 'W'
+  OS_Key__X,              // 'x'   shifted: 'X'
+  OS_Key__Y,              // 'y'   shifted: 'Y'
+  OS_Key__Z,              // 'z'   shifted: 'Z'
+
+  // Numbers
+  OS_Key__0,              // '0'   shifted: ')'
+  OS_Key__1,              // '1'   shifted: '!'
+  OS_Key__2,              // '2'   shifted: '@'
+  OS_Key__3,              // '3'   shifted: '#'
+  OS_Key__4,              // '4'   shifted: '$'
+  OS_Key__5,              // '5'   shifted: '%'
+  OS_Key__6,              // '6'   shifted: '^'
+  OS_Key__7,              // '7'   shifted: '&'
+  OS_Key__8,              // '8'   shifted: '*'
+  OS_Key__9,              // '9'   shifted: '('
+
+  // Other printable 
+  OS_Key__Space,          // ' '   shifted: ' '
+  OS_Key__Backtick,       // '`'   shifted: '~'
+  OS_Key__Minus,          // '-'   shifted: '_'
+  OS_Key__Equals,         // '='   shifted: '+'
+  OS_Key__Left_bracket,   // '['   shifted: '{'
+  OS_Key__Right_bracket,  // ']'   shifted: '}'
+  OS_Key__Backslash,      // '\'   shifted: '|'
+  OS_Key__Semicolon,      // ';'   shifted: ':'
+  OS_Key__Apostrophe,     // '\''  shifted: '"'
+  OS_Key__Comma,          // ','   shifted: '<'
+  OS_Key__Period,         // '.'   shifted: '>'
+  OS_Key__Slash,          // '/'   shifted: '?'
+
+  // Other 
+  OS_Key__Left_arrow,
+  OS_Key__Right_arrow,
+  OS_Key__Up_arrow,
+  OS_Key__Down_arrow,
+  OS_Key__Home,
+  OS_Key__End,
+  OS_Key__Page_up,
+  OS_Key__Page_down,
+  OS_Key__Backspace,
+  OS_Key__Delete,
+  OS_Key__Insert,
+  OS_Key__Escape,
+  OS_Key__Tab,
+  OS_Key__Enter,
+  OS_Key__Caps_lock,
+
+  OS_Key__COUNT,
+};
+
+enum OS_Mouse_button : U32 {
+  OS_Mouse_button__NONE,
+  OS_Mouse_button__Left,
+  OS_Mouse_button__Right,
+  OS_Mouse_button__Middle,
+  OS_Mouse_button__Side_far,
+  OS_Mouse_button__Side_near,
+  OS_Mouse_button__COUNT,
+};
+
 enum OS_Event_modifier : U32 {
   OS_Event_modifier__NONE,
   OS_Event_modifier__Shift,
@@ -22,36 +113,65 @@ typedef U32 OS_Event_modifiers;
 
 enum OS_Event_kind {
   OS_Event_kind__NONE,
+  OS_Event_kind__Key,
   OS_Event_kind__Mouse_went_up,
   OS_Event_kind__Mouse_went_down,
 };
 
-struct OS_Event {
-  OS_Event_kind kind;
-  
-  V2S32 mouse_pos;
-  
-  OS_Event_modifiers mods;
-  
-  OS_Event* next;
-  OS_Event* prev;
+struct OS_Key_state {
+  OS_Key key;
+
+  B8 is_up;
+  B8 is_down;
+
+  B8 was_up;
+  B8 was_down;
+
+  B8 is_clicked;
 };
 
-struct OS_Event_list {
-  OS_Event* first;
-  OS_Event* last;
-  U64 count;
+struct OS_Mouse_button_state {
+  OS_Mouse_button button;
+  
+  B8 is_up;
+  B8 is_down;
+
+  B8 was_up;
+  B8 was_down;
 };
 
-enum OS_Mouse_button {
-  OS_Mouse_button__NONE,
-  OS_Mouse_button__Left,
-  OS_Mouse_button__Right,
-  OS_Mouse_button__Middle, 
-  OS_Mouse_button__Side_far,
-  OS_Mouse_button__Side_near,
-  OS_Mouse_button__Count,
-};
+// struct OS_Event {
+//   OS_Event_kind kind;
+  
+//   // Fat stuff for now
+//   OS_Key key;
+//   B8 key_went_up;
+//   B8 key_went_down;
+//   B8 key_repeat_on_hold;
+//   //
+//   V2S32 mouse_pos;
+//   //
+//   OS_Event_modifiers mods;
+  
+//   OS_Event* next;
+//   OS_Event* prev;
+// };
+
+// struct OS_Event_list {
+//   OS_Event* first;
+//   OS_Event* last;
+//   U64 count;
+// };
+
+// enum OS_Mouse_button {
+//   OS_Mouse_button__NONE,
+//   OS_Mouse_button__Left,
+//   OS_Mouse_button__Right,
+//   OS_Mouse_button__Middle, 
+//   OS_Mouse_button__Side_far,
+//   OS_Mouse_button__Side_near,
+//   OS_Mouse_button__Count,
+// };
 
 // struct OS_Mouse_button_state {
 //   B32 is_down;
@@ -95,6 +215,11 @@ struct Grafics_rect_program_uniform_data {
 
   F32 window_width;
   F32 window_height;
+
+  U32 red;
+  U32 green;
+  U32 blue;
+  U32 alpha;
 
   F32 _padding[2];
 };
