@@ -17,8 +17,8 @@ abstract.
 #include "platform.h"
 #include "platform_win32.cpp"
 
-// #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.h"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...)
 {
@@ -159,32 +159,43 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - App loop
   //
+  Pencil_state P = {}; 
+
+  P.arena = arena_alloc(Megabytes(64));
+  P.frame_arena = arena_alloc(Megabytes(64));
+
+  P.draw_texures_width = os_get_client_area_dims().x;
+  P.draw_texures_height = os_get_client_area_dims().y;
+
+  P.draw_texture_always_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
+  P.draw_texture_not_that_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
+
+  B32 rect_program_suc = true;
+  P.rect_program = grafics_create_program_from_file(d3d.device, L"../data/rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
+  Assert(rect_program_suc);
+
+  B32 texture_to_screen_succ = true;
+  P.texture_to_screen_program = grafics_create_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
+  Assert(texture_to_screen_succ);
+
   for (;!os_window_should_close();)
   {
     os_win32_frame_begin();
-    
-    static U64 counter = 0;
-    OS_Key_state a_state = os_get_key_state(OS_Key__A);
-    {
-      OutputDebugStringF("Key: %s \n", str8_from_os_key(a_state.key).data);
-      OutputDebugStringF("Counter: %lld \n", counter++);
-      if (a_state.is_down) { OutputDebugStringF("Down \n"); }
-      // if (a_state.is) { OutputDebugStringF("Repeat down \n"); }
-      if (a_state.is_up) { OutputDebugStringF("Up \n"); }
-      if (a_state.is_clicked) { OutputDebugStringF("Clicked \n"); }
-      OutputDebugStringF("\n");
-    }
 
-    // note: For now the app updates are event based, so each event we update the state
-    //       Then we update the retained state of the keys in the system and keep on going.
-    //       -- 
-    //       Dont know if this is a good idea, but for now thats what imma do
-
-    // static Pencil_state P = {}; // todo: Remove state from here
-    // for (OS_Event* ev = win32_state->frame_events.first; ev; ev = ev->next)
+    // static U64 counter = 0;
+    // OS_Key_state a_state = os_get_key_state(OS_Key__A);
     // {
-    //   pencil_update(&P, false, ev, &d3d);
+    //   OutputDebugStringF("Key: %s \n", str8_from_os_key(a_state.key).data);
+    //   OutputDebugStringF("Counter: %lld \n", counter++);
+    //   if (a_state.is_down) { OutputDebugStringF("Down \n"); }
+    //   // if (a_state.is) { OutputDebugStringF("Repeat down \n"); }
+    //   if (a_state.is_up) { OutputDebugStringF("Up \n"); }
+    //   if (a_state.is_clicked) { OutputDebugStringF("Clicked \n"); }
+    //   OutputDebugStringF("\n");
     // }
+
+    pencil_update(&P, false, &d3d);
+    pencil_render(&P, &d3d);
     
     d3d.swap_chain->Present(0, 0);
   }

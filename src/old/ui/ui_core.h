@@ -419,8 +419,8 @@ void __ui_push_defaults_onto_stacks()
 }
 
 // todo: Remove this, this is a dev time thing for now
-// static inline void ui_set_next_r_color(Color r_color) { ui_set_next_color({ (F32)r_color.r, (F32)r_color.g, (F32)r_color.b, (F32)r_color.a }); }
-#define RAYLIB_COLOR_FROM_VEC(vec4) Color{(U8)vec4.r, (U8)vec4.g, (U8)vec4.b, (U8)vec4.a} 
+// static inline void ui_set_next_r_color(Color r_color) { ui_set_next_color({ (F32)r_color.r, (F32)r_color.P, (F32)r_color.b, (F32)r_color.a }); }
+#define RAYLIB_COLOR_FROM_VEC(vec4) Color{(U8)vec4.r, (U8)vec4.P, (U8)vec4.b, (U8)vec4.a} 
 
 /* List of things i think i have to be able to do with this ui for it to be ok --> 
   -      hover state for boxes

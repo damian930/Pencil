@@ -24,13 +24,13 @@ struct Pencil_state {
   Arena* arena;
   Arena* frame_arena;
   
-  U64 pen_size;
-  V4U8 pen_color;
+  // U64 pen_size;
+  // V4U8 pen_color;
 
-  U64 eraser_size;
+  // U64 eraser_size;
 
-  U64 draw_texures_width;
-  U64 draw_texures_height;
+  U32 draw_texures_width;
+  U32 draw_texures_height;
   ID3D11RenderTargetView* draw_texture_always_fresh; 
   ID3D11RenderTargetView* draw_texture_not_that_fresh;
 
@@ -47,23 +47,23 @@ struct Pencil_state {
 
   // Stuff for while drawing
   B32 is_mid_drawing;
-  B32 is_erasing_mode;
+  // B32 is_erasing_mode;
 
   // Signals (These are just here like this right now)
-  B32 signal_new_pen_size;
-  U64 new_pen_size;
+  // B32 signal_new_pen_size;
+  // U64 new_pen_size;
   //
-  B32 signal_new_eraser_size;
-  U64 new_eraser_size;
-  //
-  B32 signal_swap_to_eraser;
-  B32 signal_swap_to_pen;
+  // B32 signal_new_eraser_size;
+  // U64 new_eraser_size;
+  // 
+  // B32 signal_swap_to_eraser;
+  // B32 signal_swap_to_pen;
 
   // Misc
   // Font font_texture_for_ui;
-  V2U64 last_screen_dims;
-  B32 show_brush_ui_menu;
-  Str8 brush_menu_ui_id;
+  // V2U64 last_screen_dims;
+  // B32 show_brush_ui_menu;
+  // Str8 brush_menu_ui_id;
 
   // Stuff for drawing that i dont yet have as a separate thing
   D3D_program rect_program;  
@@ -93,7 +93,7 @@ void draw_rect(
     u_data.window_width  = (F32)os_get_client_area_dims().x;
     u_data.window_height = (F32)os_get_client_area_dims().y;
     u_data.red   = color.r;
-    u_data.green = color.g;
+    u_data.green = color.P;
     u_data.blue  = color.b;
     u_data.alpha = color.a;
 
@@ -144,9 +144,97 @@ void draw_rect(
   context->Draw(4, 0);
 }
 
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, const OS_Event* os_event, D3D_state* d3d)
+struct Draw_record_registration_result {
+  B32 succ;
+  Draw_record* record;  
+};
+
+Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
+{
+  Draw_record* result = 0;
+  if (P->first_free_draw_record)
+  {
+    result = P->first_free_draw_record;
+    DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
+    *result = Draw_record{};
+  }
+  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
+  {
+    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
+    P->count_of_pool_draw_records_in_use += 1;
+    *result = Draw_record{};
+  }
+  return result;
+}
+
+// todo: Does this really need to care about is_ui_capturing_mouse, or shoud this
+//       be handled by the caller ????
+Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_state* d3d, B32 is_ui_capturing_mouse)
+{
+  if (P->is_mid_drawing || is_ui_capturing_mouse) { return Draw_record_registration_result{}; }
+
+  // Freeing all the records that are in front of the current one
+  if (P->current_record != 0)
+  {
+    for (Draw_record* record = P->last_record; record != 0;) 
+    {
+      if (record == P->current_record) { break; }
+      record->texture_before_we_affected->Release();
+      record->texture_after_we_affected->Release();
+      
+      DllPopBack_Name(P, first_record, last_record, next, prev);
+      Draw_record* prev_record = record->prev;
+      
+      *record = Draw_record{};
+      DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
+      
+      record = prev_record;
+    }
+  }
+
+  Draw_record* new_draw_record = get_new_draw_record_from_pool__nullable(P);
+  if (new_draw_record == 0)
+  {
+    Draw_record* oldest_record = P->first_record;
+    DllPopFront_Name(P, first_record, last_record, next, prev);
+    
+    *oldest_record = Draw_record{};
+    DllPushBack_Name(P, oldest_record, first_free_draw_record, last_free_draw_record, next, prev);
+
+    new_draw_record = get_new_draw_record_from_pool__nullable(P);
+  }
+  Assert(new_draw_record != 0); // This has to be true, its an ivariant
+
+  // Adding the new draw record to the draw record queue
+  DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev);  Assert(P->last_record == new_draw_record);
+
+  new_draw_record->texture_before_we_affected = d3d_make_rtv(d3d, P->draw_texures_width, P->draw_texures_height);
+  HandleLater(new_draw_record->texture_before_we_affected != 0);
+
+  new_draw_record->texture_after_we_affected = d3d_make_rtv(d3d, P->draw_texures_width, P->draw_texures_height);
+  HandleLater(new_draw_record->texture_after_we_affected != 0);
+
+  P->current_record = new_draw_record;
+
+  Draw_record_registration_result result = {};
+  result.succ = true;
+  result.record = new_draw_record;
+
+  return result;
+}
+
+void copy_from_texture_to_texture(
+  D3D_state* d3d,
+  ID3D11RenderTargetView* dest_rtv, 
+  ID3D11RenderTargetView* src_rtv
+) {
+  d3d->context->CopyResource((ID3D11Resource*)dest_rtv, (ID3D11Resource*)src_rtv);
+}
+
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
 {
   // Handling signals
+  /*
   {
     if (P->signal_new_pen_size)
     {
@@ -190,6 +278,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, const OS_Event* o
       }
     }
   }
+  */
   
   B32 dont_start_drawing_this_frame = false;
 
@@ -264,7 +353,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, const OS_Event* o
     dont_start_drawing_this_frame = true;
 
     // Creating a new current record
-    Draw_record_registration_result record_reg = register_new_draw_record(G, is_ui_capturing_mouse);
+    Draw_record_registration_result record_reg = register_new_draw_record(P, is_ui_capturing_mouse);
     if (record_reg.succ)
     {
       Draw_record* record = record_reg.record;
@@ -323,80 +412,125 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, const OS_Event* o
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
 
-  // User is about to start drawing
-  // todo: Catch when the mouse goes down
-  B32 mouse_went_down_this_frame = false;
-  if (os_event->kind == OS_Event_kind__)
-
-
-  if (!P->is_mid_drawing && !is_ui_capturing_mouse && mouse_went_down_this_frame) 
+  if (!P->is_mid_drawing && !is_ui_capturing_mouse && os_mouse_button_down(Mouse_button__Left)) 
   {
-    Draw_record_registration_result record_registation = register_new_draw_record(G, is_ui_capturing_mouse);
+    Draw_record_registration_result record_registation = register_new_draw_record(P, d3d, is_ui_capturing_mouse);
     if (record_registation.succ)
     {
+      // todo: What is .succ here about, do we need it ???
       P->is_mid_drawing = true;
     }
   }
   else // Updating active drawing 
-  if (P->is_mid_drawing && IsMouseButtonDown(MOUSE_BUTTON_LEFT))
+  if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left))
   {
-    Vector2 new_pos = GetMousePosition();
-    Vector2 prev_pos = Vector2Subtract(new_pos, GetMouseDelta());
+    V2F32 new_pos = os_get_mouse_pos();
+    // V2F32 prev_pos = os_get_prev_mouse_pos();
     
     // todo: This is not the best way to have this here like this, but for now thats how it is
-    V4U8 color = { 0, 0, 0 ,0 };
-    if (!P->is_erasing_mode) { color = P->pen_color; }
-    U64 pen_size = P->eraser_size;
-    if (!P->is_erasing_mode) { pen_size = P->pen_size; }
-    draw_onto_texture(P->draw_texture_always_fresh, new_pos, prev_pos, pen_size, color, P->is_erasing_mode);
+    // V4U8 color = { 0, 0, 0 ,0 };
+    // if (!P->is_erasing_mode) { color = P->pen_color; }
+    // U64 pen_size = P->eraser_size;
+    // if (!P->is_erasing_mode) { pen_size = P->pen_size; }
+    draw_rect(P, d3d, P->draw_texture_always_fresh, new_pos.x, new_pos.y, 10, 10, yellow());
 
     // todo: Update this comment here (We no longer use cpu side image)
     // note: Here is the only time when the cpu side image is not synced to the gpu one. 
     //       But we do later sync it when we stop drawing.
   }
   else // Here we finalise the draw recordd that the user have been drawing
-  if (P->is_mid_drawing && IsMouseButtonReleased(MOUSE_BUTTON_LEFT))
+  if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__Left))
   {
     Assert(P->current_record != 0);
-    Assert(P->current_record->texture_after_we_affected.texture.id != 0);  // These are expected to already be allocated by this point
-    Assert(P->current_record->texture_before_we_affected.texture.id != 0); // These are expected to already be allocated by this point
+    Assert(P->current_record->texture_after_we_affected != 0);  // These are expected to already be allocated by this point
+    Assert(P->current_record->texture_before_we_affected != 0); // These are expected to already be allocated by this point
     
     P->is_mid_drawing = false;
 
-    U64 draw_t_width = P->draw_texture_always_fresh.texture.width;
-    U64 draw_t_height = P->draw_texture_always_fresh.texture.height;
+    U64 draw_t_width = P->draw_texures_width;
+    U64 draw_t_height = P->draw_texures_height;
 
     Draw_record* record = P->current_record;
-    RenderTexture* texture_before_we_affected = &record->texture_before_we_affected;
-    RenderTexture* texture_after_we_affected  = &record->texture_after_we_affected;
+    ID3D11RenderTargetView* texture_before_we_affected = record->texture_before_we_affected;
+    ID3D11RenderTargetView* texture_after_we_affected  = record->texture_after_we_affected;
     
     // note: By this point, the fresh draw texture is the new final version of what the user has draw
 
     // Storing the prev version of the draw texture 
-    copy_from_texture_to_texture(
-      texture_before_we_affected->texture, v2u64(0, 0),
-      P->draw_texture_not_that_fresh.texture, v2u64(0, 0),
-      P->draw_texures_width, P->draw_texures_height
-    );
+    copy_from_texture_to_texture(d3d, texture_before_we_affected, P->draw_texture_not_that_fresh);
 
     // Storing the new version of the draw texture
-    copy_from_texture_to_texture(
-      texture_after_we_affected->texture, v2u64(0, 0),
-      P->draw_texture_always_fresh.texture, v2u64(0, 0),
-      P->draw_texures_width, P->draw_texures_height
-    );
+    copy_from_texture_to_texture(d3d, texture_after_we_affected, P->draw_texture_always_fresh);
 
     // Updating the prev version of the draw texture to match the new version
-    copy_from_texture_to_texture(
-      P->draw_texture_not_that_fresh.texture, v2u64(0, 0),
-      P->draw_texture_always_fresh.texture, v2u64(0, 0),
-      P->draw_texures_width, P->draw_texures_height
-    );
+    copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
   }
 
   __active_draw_update_routine_end__: {};
 }
 
+void pencil_render(const Pencil_state* P, D3D_state* d3d)
+{
+  // Drawing the texture into the frame buffer
+  {
+    ID3D11DeviceContext* context = d3d->context;
+    ID3D11Device*        device  = d3d->device;
+    
+    context->ClearState();
+
+    ID3D11RenderTargetView* frame_buffer_rtv = d3d_get_frame_buffer_rtv(d3d);
+
+    F32 color[4] = { 0, 0, 0, 0 };
+    context->ClearRenderTargetView(frame_buffer_rtv, color);
+
+    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+    context->VSSetShader(P->texture_to_screen_program.v_shader, 0, 0);
+
+    V2S32 dims = os_get_client_area_dims();
+    D3D11_VIEWPORT vp = {};
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    vp.Width    = (F32)dims.x;
+    vp.Height   = (F32)dims.y;
+    vp.MinDepth = 0;
+    vp.MaxDepth = 1;
+    context->RSSetViewports(1, &vp);
+    
+    // todo: See if this sampler need to be removed later
+    ID3D11SamplerState* sampler;
+    {
+      D3D11_SAMPLER_DESC desc = {};
+      desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
+      desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+      desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+      desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+      desc.MipLODBias = 0;
+      desc.MaxAnisotropy = 1;
+      desc.MinLOD = 0;
+      desc.MaxLOD = D3D11_FLOAT32_MAX;
+      device->CreateSamplerState(&desc, &sampler);
+    }
+
+    ID3D11Resource* resource = 0;
+    P->draw_texture_always_fresh->GetResource(&resource);
+    ID3D11ShaderResourceView* view = 0;
+    device->CreateShaderResourceView(resource, NULL, &view);
+    context->PSSetShader(P->texture_to_screen_program.p_shader, 0, 0);
+    context->PSSetSamplers(0, 1, &sampler);
+    context->PSSetShaderResources(0, 1, &view);
+    resource->Release();
+
+    context->OMSetRenderTargets(1, &frame_buffer_rtv, 0);
+
+    context->Draw(4, 0);
+
+    frame_buffer_rtv->Release();
+  }
+
+}
+
+/*
 void __pencil_update_test__(Pencil_state* P, OS_Event_list* events, D3D_state* d3d)
 {
   static B32 is_initialised = false;
@@ -538,5 +672,6 @@ void __pencil_update_test__(Pencil_state* P, OS_Event_list* events, D3D_state* d
     frame_buffer_rtv->Release();
   }
 }
+*/
 
 #endif

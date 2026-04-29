@@ -2542,18 +2542,18 @@ RMAPI void MatrixDecompose(Matrix mat, Vector3 *translation, Quaternion *rotatio
     const float d = mat.m1;
     const float e = mat.m5;
     const float f = mat.m9;
-    const float g = mat.m2;
+    const float P = mat.m2;
     const float h = mat.m6;
     const float i = mat.m10;
     const float A = e*i - f*h;
-    const float B = f*g - d*i;
-    const float C = d*h - e*g;
+    const float B = f*P - d*i;
+    const float C = d*h - e*P;
 
     // Extract scale
     const float det = a*A + b*B + c*C;
     Vector3 abc = { a, b, c };
     Vector3 def = { d, e, f };
-    Vector3 ghi = { g, h, i };
+    Vector3 ghi = { P, h, i };
 
     float scalex = Vector3Length(abc);
     float scaley = Vector3Length(def);

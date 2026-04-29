@@ -77,6 +77,7 @@ Compiler;
 	#undef BreakPointCond
 	#define BreakPointCond(cond) do { if (!(cond)) { BreakPoint(); } } while(0)  // only works for x86, x64, ARM, ARM64
 #endif
+#define BP BreakPoint()
 
 // todo: test cpp11 verson +, there it is a part of the standard
 #define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)
@@ -617,19 +618,19 @@ tu_specific B32 __mem_compare(U8* m1, U64 size1, U8* m2, U64 size2)
 
 union V4U64 {
 	struct { U64 x; U64 y; U64 z; U64 w; };
-	struct { U64 r; U64 g; U64 b; U64 a; };
+	struct { U64 r; U64 P; U64 b; U64 a; };
 };
 tu_specific V4U64 v4u64(U64 x, U64 y, U64 z, U64 w) { V4U64 v = { x, y, z, w }; return v; }
 
 union V4U8 {
 	struct { U8 x; U8 y; U8 z; U8 w; };
-	struct { U8 r; U8 g; U8 b; U8 a; };
+	struct { U8 r; U8 P; U8 b; U8 a; };
 };
 tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
 
 union Vec4_F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
-	struct { F32 r; F32 g; F32 b; F32 a; };
+	struct { F32 r; F32 P; F32 b; F32 a; };
 };
 typedef Vec4_F32 Vec4;
 typedef Vec4_F32 V4;
@@ -640,7 +641,7 @@ tu_specific B32 vec4_f32_match(Vec4_F32 v1, Vec4_F32 v2)
 {
 	B32 result = (
 		v1.r == v2.r &&
-		v1.g == v2.g &&
+		v1.P == v2.P &&
 		v1.b == v2.b &&
 		v1.a == v2.a 
 	);

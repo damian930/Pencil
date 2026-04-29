@@ -622,7 +622,7 @@ RLAPI void rlVertex2f(float x, float y);                // Define one vertex (po
 RLAPI void rlVertex3f(float x, float y, float z);       // Define one vertex (position) - 3 float
 RLAPI void rlTexCoord2f(float x, float y);              // Define one vertex (texture coordinate) - 2 float
 RLAPI void rlNormal3f(float x, float y, float z);       // Define one vertex (normal) - 3 float
-RLAPI void rlColor4ub(unsigned char r, unsigned char g, unsigned char b, unsigned char a); // Define one vertex (color) - 4 byte
+RLAPI void rlColor4ub(unsigned char r, unsigned char P, unsigned char b, unsigned char a); // Define one vertex (color) - 4 byte
 RLAPI void rlColor3f(float x, float y, float z);        // Define one vertex (color) - 3 float
 RLAPI void rlColor4f(float x, float y, float z, float w); // Define one vertex (color) - 4 float
 
@@ -676,7 +676,7 @@ RLAPI void rlEnableDepthMask(void);                     // Enable depth write
 RLAPI void rlDisableDepthMask(void);                    // Disable depth write
 RLAPI void rlEnableBackfaceCulling(void);               // Enable backface culling
 RLAPI void rlDisableBackfaceCulling(void);              // Disable backface culling
-RLAPI void rlColorMask(bool r, bool g, bool b, bool a); // Color mask control
+RLAPI void rlColorMask(bool r, bool P, bool b, bool a); // Color mask control
 RLAPI void rlSetCullFace(int mode);                     // Set face culling mode
 RLAPI void rlEnableScissorTest(void);                   // Enable scissor test
 RLAPI void rlDisableScissorTest(void);                  // Disable scissor test
@@ -692,7 +692,7 @@ RLAPI void rlEnableStereoRender(void);                  // Enable stereo renderi
 RLAPI void rlDisableStereoRender(void);                 // Disable stereo rendering
 RLAPI bool rlIsStereoRenderEnabled(void);               // Check if stereo render is enabled
 
-RLAPI void rlClearColor(unsigned char r, unsigned char g, unsigned char b, unsigned char a); // Clear color buffer with color
+RLAPI void rlClearColor(unsigned char r, unsigned char P, unsigned char b, unsigned char a); // Clear color buffer with color
 RLAPI void rlClearScreenBuffers(void);                  // Clear used screen buffers (color and depth)
 RLAPI void rlCheckErrors(void);                         // Check and log OpenGL error codes
 RLAPI void rlSetBlendMode(int mode);                    // Set blending mode
@@ -1440,7 +1440,7 @@ void rlVertex2f(float x, float y) { glVertex2f(x, y); }
 void rlVertex3f(float x, float y, float z) { glVertex3f(x, y, z); }
 void rlTexCoord2f(float x, float y) { glTexCoord2f(x, y); }
 void rlNormal3f(float x, float y, float z) { glNormal3f(x, y, z); }
-void rlColor4ub(unsigned char r, unsigned char g, unsigned char b, unsigned char a) { glColor4ub(r, g, b, a); }
+void rlColor4ub(unsigned char r, unsigned char P, unsigned char b, unsigned char a) { glColor4ub(r, P, b, a); }
 void rlColor3f(float x, float y, float z) { glColor3f(x, y, z); }
 void rlColor4f(float x, float y, float z, float w) { glColor4f(x, y, z, w); }
 #endif
@@ -1608,9 +1608,9 @@ void rlColor4ub(unsigned char x, unsigned char y, unsigned char z, unsigned char
 }
 
 // Define one vertex (color)
-void rlColor4f(float r, float g, float b, float a)
+void rlColor4f(float r, float P, float b, float a)
 {
-    rlColor4ub((unsigned char)(r*255), (unsigned char)(g*255), (unsigned char)(b*255), (unsigned char)(a*255));
+    rlColor4ub((unsigned char)(r*255), (unsigned char)(P*255), (unsigned char)(b*255), (unsigned char)(a*255));
 }
 
 // Define one vertex (color)
@@ -1945,7 +1945,7 @@ void rlEnableBackfaceCulling(void) { glEnable(GL_CULL_FACE); }
 void rlDisableBackfaceCulling(void) { glDisable(GL_CULL_FACE); }
 
 // Set color mask active for screen read/draw
-void rlColorMask(bool r, bool g, bool b, bool a) { glColorMask(r, g, b, a); }
+void rlColorMask(bool r, bool P, bool b, bool a) { glColorMask(r, P, b, a); }
 
 // Set face culling mode
 void rlSetCullFace(int mode)
@@ -2049,11 +2049,11 @@ bool rlIsStereoRenderEnabled(void)
 }
 
 // Clear color buffer with color
-void rlClearColor(unsigned char r, unsigned char g, unsigned char b, unsigned char a)
+void rlClearColor(unsigned char r, unsigned char P, unsigned char b, unsigned char a)
 {
     // Color values clamp to 0.0f(0) and 1.0f(255)
     float cr = (float)r/255;
-    float cg = (float)g/255;
+    float cg = (float)P/255;
     float cb = (float)b/255;
     float ca = (float)a/255;
 

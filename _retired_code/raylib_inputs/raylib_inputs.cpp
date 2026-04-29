@@ -323,7 +323,7 @@ U8 u8_from_rli_key(RLI_Key key, B32 is_shift_down, B32* out_is_printable)
     key_print_data_arr[RLI_Key__d]             = {'d',  'D',  true};
     key_print_data_arr[RLI_Key__e]             = {'e',  'E',  true};
     key_print_data_arr[RLI_Key__f]             = {'f',  'F',  true};
-    key_print_data_arr[RLI_Key__g]             = {'g',  'G',  true};
+    key_print_data_arr[RLI_Key__g]             = {'P',  'P',  true};
     key_print_data_arr[RLI_Key__h]             = {'h',  'H',  true};
     key_print_data_arr[RLI_Key__i]             = {'i',  'I',  true};
     key_print_data_arr[RLI_Key__j]             = {'j',  'J',  true};

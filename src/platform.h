@@ -13,95 +13,95 @@
 ///////////////////////////////////////////////////////////
 // - Events
 // 
-enum OS_Key : U32 {
-  OS_Key__NONE,
+enum Key : U32 {
+  Key__NONE,
 
   // Mods
-  OS_Key__Shift,
-  OS_Key__Control,
+  Key__Shift,
+  Key__Control,
 
   // Letters 
-  OS_Key__A,              // 'a'   shifted: 'A'
-  OS_Key__B,              // 'b'   shifted: 'B'
-  OS_Key__C,              // 'c'   shifted: 'C'
-  OS_Key__D,              // 'd'   shifted: 'D'
-  OS_Key__E,              // 'e'   shifted: 'E'
-  OS_Key__F,              // 'f'   shifted: 'F'
-  OS_Key__G,              // 'g'   shifted: 'G'
-  OS_Key__H,              // 'h'   shifted: 'H'
-  OS_Key__I,              // 'i'   shifted: 'I'
-  OS_Key__J,              // 'j'   shifted: 'J'
-  OS_Key__K,              // 'k'   shifted: 'K'
-  OS_Key__L,              // 'l'   shifted: 'L'
-  OS_Key__M,              // 'm'   shifted: 'M'
-  OS_Key__N,              // 'n'   shifted: 'N'
-  OS_Key__O,              // 'o'   shifted: 'O'
-  OS_Key__P,              // 'p'   shifted: 'P'
-  OS_Key__Q,              // 'q'   shifted: 'Q'
-  OS_Key__R,              // 'r'   shifted: 'R'
-  OS_Key__S,              // 's'   shifted: 'S'
-  OS_Key__T,              // 't'   shifted: 'T'
-  OS_Key__U,              // 'u'   shifted: 'U'
-  OS_Key__V,              // 'v'   shifted: 'V'
-  OS_Key__W,              // 'w'   shifted: 'W'
-  OS_Key__X,              // 'x'   shifted: 'X'
-  OS_Key__Y,              // 'y'   shifted: 'Y'
-  OS_Key__Z,              // 'z'   shifted: 'Z'
+  Key__A,              // 'a'   shifted: 'A'
+  Key__B,              // 'b'   shifted: 'B'
+  Key__C,              // 'c'   shifted: 'C'
+  Key__D,              // 'd'   shifted: 'D'
+  Key__E,              // 'e'   shifted: 'E'
+  Key__F,              // 'f'   shifted: 'F'
+  Key__G,              // 'P'   shifted: 'P'
+  Key__H,              // 'h'   shifted: 'H'
+  Key__I,              // 'i'   shifted: 'I'
+  Key__J,              // 'j'   shifted: 'J'
+  Key__K,              // 'k'   shifted: 'K'
+  Key__L,              // 'l'   shifted: 'L'
+  Key__M,              // 'm'   shifted: 'M'
+  Key__N,              // 'n'   shifted: 'N'
+  Key__O,              // 'o'   shifted: 'O'
+  Key__P,              // 'p'   shifted: 'P'
+  Key__Q,              // 'q'   shifted: 'Q'
+  Key__R,              // 'r'   shifted: 'R'
+  Key__S,              // 's'   shifted: 'S'
+  Key__T,              // 't'   shifted: 'T'
+  Key__U,              // 'u'   shifted: 'U'
+  Key__V,              // 'v'   shifted: 'V'
+  Key__W,              // 'w'   shifted: 'W'
+  Key__X,              // 'x'   shifted: 'X'
+  Key__Y,              // 'y'   shifted: 'Y'
+  Key__Z,              // 'z'   shifted: 'Z'
 
   // Numbers
-  OS_Key__0,              // '0'   shifted: ')'
-  OS_Key__1,              // '1'   shifted: '!'
-  OS_Key__2,              // '2'   shifted: '@'
-  OS_Key__3,              // '3'   shifted: '#'
-  OS_Key__4,              // '4'   shifted: '$'
-  OS_Key__5,              // '5'   shifted: '%'
-  OS_Key__6,              // '6'   shifted: '^'
-  OS_Key__7,              // '7'   shifted: '&'
-  OS_Key__8,              // '8'   shifted: '*'
-  OS_Key__9,              // '9'   shifted: '('
+  Key__0,              // '0'   shifted: ')'
+  Key__1,              // '1'   shifted: '!'
+  Key__2,              // '2'   shifted: '@'
+  Key__3,              // '3'   shifted: '#'
+  Key__4,              // '4'   shifted: '$'
+  Key__5,              // '5'   shifted: '%'
+  Key__6,              // '6'   shifted: '^'
+  Key__7,              // '7'   shifted: '&'
+  Key__8,              // '8'   shifted: '*'
+  Key__9,              // '9'   shifted: '('
 
   // Other printable 
-  OS_Key__Space,          // ' '   shifted: ' '
-  OS_Key__Backtick,       // '`'   shifted: '~'
-  OS_Key__Minus,          // '-'   shifted: '_'
-  OS_Key__Equals,         // '='   shifted: '+'
-  OS_Key__Left_bracket,   // '['   shifted: '{'
-  OS_Key__Right_bracket,  // ']'   shifted: '}'
-  OS_Key__Backslash,      // '\'   shifted: '|'
-  OS_Key__Semicolon,      // ';'   shifted: ':'
-  OS_Key__Apostrophe,     // '\''  shifted: '"'
-  OS_Key__Comma,          // ','   shifted: '<'
-  OS_Key__Period,         // '.'   shifted: '>'
-  OS_Key__Slash,          // '/'   shifted: '?'
+  Key__Space,          // ' '   shifted: ' '
+  Key__Backtick,       // '`'   shifted: '~'
+  Key__Minus,          // '-'   shifted: '_'
+  Key__Equals,         // '='   shifted: '+'
+  Key__Left_bracket,   // '['   shifted: '{'
+  Key__Right_bracket,  // ']'   shifted: '}'
+  Key__Backslash,      // '\'   shifted: '|'
+  Key__Semicolon,      // ';'   shifted: ':'
+  Key__Apostrophe,     // '\''  shifted: '"'
+  Key__Comma,          // ','   shifted: '<'
+  Key__Period,         // '.'   shifted: '>'
+  Key__Slash,          // '/'   shifted: '?'
 
   // Other 
-  OS_Key__Left_arrow,
-  OS_Key__Right_arrow,
-  OS_Key__Up_arrow,
-  OS_Key__Down_arrow,
-  OS_Key__Home,
-  OS_Key__End,
-  OS_Key__Page_up,
-  OS_Key__Page_down,
-  OS_Key__Backspace,
-  OS_Key__Delete,
-  OS_Key__Insert,
-  OS_Key__Escape,
-  OS_Key__Tab,
-  OS_Key__Enter,
-  OS_Key__Caps_lock,
+  Key__Left_arrow,
+  Key__Right_arrow,
+  Key__Up_arrow,
+  Key__Down_arrow,
+  Key__Home,
+  Key__End,
+  Key__Page_up,
+  Key__Page_down,
+  Key__Backspace,
+  Key__Delete,
+  Key__Insert,
+  Key__Escape,
+  Key__Tab,
+  Key__Enter,
+  Key__Caps_lock,
 
-  OS_Key__COUNT,
+  Key__COUNT,
 };
 
-enum OS_Mouse_button : U32 {
-  OS_Mouse_button__NONE,
-  OS_Mouse_button__Left,
-  OS_Mouse_button__Right,
-  OS_Mouse_button__Middle,
-  OS_Mouse_button__Side_far,
-  OS_Mouse_button__Side_near,
-  OS_Mouse_button__COUNT,
+enum Mouse_button : U32 {
+  Mouse_button__NONE,
+  Mouse_button__Left,
+  Mouse_button__Right,
+  Mouse_button__Middle,
+  Mouse_button__Side_far,
+  Mouse_button__Side_near,
+  Mouse_button__COUNT,
 };
 
 enum OS_Event_modifier : U32 {
@@ -119,7 +119,7 @@ enum OS_Event_kind {
 };
 
 struct OS_Key_state {
-  OS_Key key;
+  Key key;
 
   B8 is_up;
   B8 is_down;
@@ -131,7 +131,7 @@ struct OS_Key_state {
 };
 
 struct OS_Mouse_button_state {
-  OS_Mouse_button button;
+  Mouse_button button;
   
   B8 is_up;
   B8 is_down;
@@ -253,7 +253,33 @@ ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d)
   return frame_buffer_rtv;
 }
 
+ID3D11RenderTargetView* d3d_make_rtv(D3D_state* d3d, U32 width, U32 height)
+{
+  ID3D11Texture2D* texture = 0;
+  {
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width      = width;
+    desc.Height     = height;
+    desc.MipLevels  = 1;
+    desc.ArraySize  = 1;
+    desc.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc = { 1, 0 };
+    desc.Usage      = D3D11_USAGE_DEFAULT;
+    desc.BindFlags  = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
 
+    HRESULT hr = d3d->device->CreateTexture2D(&desc, Null, &texture);
+    Assert(hr == S_OK);
+  }
+
+  ID3D11RenderTargetView* rtv = 0;
+  {
+    HRESULT hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &rtv);
+    Assert(hr == S_OK);
+  }
+
+  texture->Release();
+  return rtv;
+}
 
 D3D_program grafics_create_program_from_file(
   ID3D11Device* d3d_device,

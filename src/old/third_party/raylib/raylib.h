@@ -246,7 +246,7 @@ typedef struct Matrix {
 // Color, 4 components, R8G8B8A8 (32bit)
 typedef struct Color {
     unsigned char r;        // Color red value
-    unsigned char g;        // Color green value
+    unsigned char P;        // Color green value
     unsigned char b;        // Color blue value
     unsigned char a;        // Color alpha value
 } Color;
@@ -599,7 +599,7 @@ typedef enum {
     KEY_D               = 68,       // Key: D | d
     KEY_E               = 69,       // Key: E | e
     KEY_F               = 70,       // Key: F | f
-    KEY_G               = 71,       // Key: G | g
+    KEY_G               = 71,       // Key: P | P
     KEY_H               = 72,       // Key: H | h
     KEY_I               = 73,       // Key: I | i
     KEY_J               = 74,       // Key: J | j

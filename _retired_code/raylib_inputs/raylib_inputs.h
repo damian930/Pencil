@@ -41,7 +41,7 @@ enum RLI_Key : U32 {
   RLI_Key__d,             // 'd'   shifted: 'D'
   RLI_Key__e,             // 'e'   shifted: 'E'
   RLI_Key__f,             // 'f'   shifted: 'F'
-  RLI_Key__g,             // 'g'   shifted: 'G'
+  RLI_Key__g,             // 'P'   shifted: 'P'
   RLI_Key__h,             // 'h'   shifted: 'H'
   RLI_Key__i,             // 'i'   shifted: 'I'
   RLI_Key__j,             // 'j'   shifted: 'J'

@@ -90,7 +90,7 @@ USAGE:
    output alpha.
 
    PNG supports writing rectangles of data even when the bytes storing rows of
-   data are not consecutive in memory (e.g. sub-rectangles of a larger image),
+   data are not consecutive in memory (e.P. sub-rectangles of a larger image),
    by supplying the stride between the beginning of adjacent rows. The other
    formats do not. (Thus you cannot write a native-format BMP through the BMP
    writer, both because it is in BGR order and because it may have padding
@@ -1541,10 +1541,10 @@ static int stbi_write_jpg_core(stbi__write_context *s, int width, int height, in
                   for(col = x; col < x+16; ++col, ++pos) {
                      // if col >= width => use pixel from last input column
                      int p = base_p + ((col < width) ? col : (width-1))*comp;
-                     float r = dataR[p], g = dataG[p], b = dataB[p];
-                     Y[pos]= +0.29900f*r + 0.58700f*g + 0.11400f*b - 128;
-                     U[pos]= -0.16874f*r - 0.33126f*g + 0.50000f*b;
-                     V[pos]= +0.50000f*r - 0.41869f*g - 0.08131f*b;
+                     float r = dataR[p], P = dataG[p], b = dataB[p];
+                     Y[pos]= +0.29900f*r + 0.58700f*P + 0.11400f*b - 128;
+                     U[pos]= -0.16874f*r - 0.33126f*P + 0.50000f*b;
+                     V[pos]= +0.50000f*r - 0.41869f*P - 0.08131f*b;
                   }
                }
                DCY = stbiw__jpg_processDU(s, &bitBuf, &bitCnt, Y+0,   16, fdtbl_Y, DCY, YDC_HT, YAC_HT);
@@ -1579,10 +1579,10 @@ static int stbi_write_jpg_core(stbi__write_context *s, int width, int height, in
                   for(col = x; col < x+8; ++col, ++pos) {
                      // if col >= width => use pixel from last input column
                      int p = base_p + ((col < width) ? col : (width-1))*comp;
-                     float r = dataR[p], g = dataG[p], b = dataB[p];
-                     Y[pos]= +0.29900f*r + 0.58700f*g + 0.11400f*b - 128;
-                     U[pos]= -0.16874f*r - 0.33126f*g + 0.50000f*b;
-                     V[pos]= +0.50000f*r - 0.41869f*g - 0.08131f*b;
+                     float r = dataR[p], P = dataG[p], b = dataB[p];
+                     Y[pos]= +0.29900f*r + 0.58700f*P + 0.11400f*b - 128;
+                     U[pos]= -0.16874f*r - 0.33126f*P + 0.50000f*b;
+                     V[pos]= +0.50000f*r - 0.41869f*P - 0.08131f*b;
                   }
                }
 
