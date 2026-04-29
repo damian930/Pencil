@@ -5,6 +5,7 @@
 #include "stdint.h" // For int types
 #include "stdio.h"  // For printf
 #include "stdarg.h" // For va_args
+#include "string.h" // For memset
 
 /* todo:
 	[ ] - Remove todos
@@ -108,7 +109,7 @@ typedef float  F32;
 typedef double F64;
 
 // #define static (reatined, persitent)
-#define global static 
+#define global // note: This is just to be able to serach for globals quicly
 #define Null NULL 
 #define tu_specific static inline // tu -> translation unit  
 
@@ -667,6 +668,16 @@ tu_specific U64 u64_divide_and_ceil(U64 v, U64 divisor)
 // 	U64 _v = (U64)((v + divisor - 1) / divisor);
 // 	return _v;
 // }
+
+struct V2S32 {
+	struct {
+		S32 x;
+		S32 y;
+	};
+	S32 v[2];
+};
+tu_specific V2S32 v2s32(S32 x, S32 y) { V2S32 v = { x, y }; return v; }
+tu_specific B32 v2s32_match(V2S32 v1, V2S32 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
 
 #endif
 

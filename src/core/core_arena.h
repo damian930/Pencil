@@ -1,8 +1,6 @@
 #ifndef BASE_CORE_ARENA_H
 #define BASE_CORE_ARENA_H
 
-#include "stdlib.h"         // For malloc
-#include "string.h"         // For memset
 #include "core/core_base.h"
 
 struct Arena {
@@ -36,7 +34,8 @@ tu_specific U8* arena_push_nozero(Arena* arena, U64 size_to_push);
 tu_specific U8* arena_push(Arena* arena, U64 size_to_push);
 #define ArenaPush(arena_p, Type)           (Type*)arena_push(arena_p, sizeof(Type))
 #define ArenaPushArr(arena_p, Type, count) (Type*)arena_push(arena_p, count * sizeof(Type))
-#define ArenaCurrentPos(arena_p, Type)     ArenaPushArr(arena_p, Type, 0)
+#define ArenaCurrentPosP(arena_p, Type)     ArenaPushArr(arena_p, Type, 0)
+#define ArenaCurrentPosU64(arena_p)         (U64)ArenaPushArr(arena_p, int, 0)
 
 tu_specific B32 arena_is_consumed(Arena* arena);
 tu_specific B32 arena_can_fit(Arena* arena, U64 size);

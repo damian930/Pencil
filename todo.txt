@@ -1,28 +1,34 @@
-Features to add for jam:
-- [x] Clear 
-- [ ] Better eraser pen
-    - [x] Different icon for it
-    - [x] Have a differnt pen size for the eraser
-- [ ] Better cursor that shows the size of the pen or eraser
-- [-] Screen shot of the drawing on top of the screen, basically
-- [x] A little better ui
-  - 2 different menus like in milton and paint for color and for brushes
-    - [x] Wheel scrol for sliders
-    - [ ] Another color for hover when slider is filled up
-    - [x] Brush menu
-    - [x] Color menu 
-      - [x] Regular pen
-      - [x] Eraser
-- [ ] Delay to be able to hold ctrl+z and ctrl+shift+z
-- [ ] ReadME with all the future things to add
+[ ] - Draw a rect on mouse inputs to the screen using D3Ddddas;asldkflasdkfjasdl;kfjasdkl;f;
+[ ] - Black full screen window
+[ ] - Start drawing to a texture using d3d and then renderin the texture
+[ ] - Implement a draw mode logic
+  [ ] - Full screen transparent window (if tranparent doesnt work then screenshot)
+  [ ] - Global shortcut to switch between draw and non draw mode and top and non top most window
+  [ ] - Pen size change on mouse wheel
+  [ ] - Add back the ui from the raylib version to be able to change stuff quicly
+[ ] - Start having Fresh and Not_Fresh textures to be able to later have draw queue
 
-Features to add:
-- way to use the screen in the draw mode
-  This shoud be done by a settable key combination which will just turn off the draw mode.
-  I guess i need hookd for this.
-- delay on line removing when control z is held down (-- use rli events for that, there is a delay there)
-- shortcut to clear the screen
-- something that represents the size of the pen when in the drawing mode. Like in milton on paint
-- README
-- shortucut settings
-- way to take a screen shot of the drawn thing
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

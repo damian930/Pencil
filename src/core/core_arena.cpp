@@ -1,7 +1,6 @@
 #ifndef BASE_CORE_ARENA_CPP
 #define BASE_CORE_ARENA_CPP
 
-#include "stdio.h"           // For printf
 #include "core/core_arena.h"
 
 ///////////////////////////////////////////////////////////
