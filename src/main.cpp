@@ -64,7 +64,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - D3D 
   //
-  Grafics grafics = {};
+  D3D_state grafics = {};
   {
     HRESULT hr = S_OK;
     #define HR(hr_value) HandleLater(hr == S_OK)
@@ -89,19 +89,19 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       hr = D3D11CreateDevice(
         dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null, 
         D3D11_CREATE_DEVICE_DEBUG, levels, ArrayCount(levels),
-        D3D11_SDK_VERSION, &grafics.d3d_device, Null, &grafics.d3d_context
+        D3D11_SDK_VERSION, &grafics.device, Null, &grafics.context
       );
       HR(hr);
     }
-    ID3D11Device* d3d_device = grafics.d3d_device;
-    ID3D11DeviceContext* d3d_context = grafics.d3d_context;   
+    ID3D11Device* d3d_device = grafics.device;
+    ID3D11DeviceContext* d3d_context = grafics.context;   
 
     // todo on release: Only use this for the debug version
     // Debug
     {
       // Debug for device
       ID3D11InfoQueue* debug_q = 0;
-      hr = grafics.d3d_device->QueryInterface(IID_ID3D11InfoQueue, (void**)&debug_q);
+      hr = grafics.device->QueryInterface(IID_ID3D11InfoQueue, (void**)&debug_q);
       HR(hr);
 
       debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
@@ -133,48 +133,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
       desc.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
       desc.Flags       = 0;
-      hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &grafics.d3d_swap_chain);
+      hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &grafics.swap_chain);
       HR(hr);
     }
-    IDXGISwapChain1* d3d_swap_chain = grafics.d3d_swap_chain;
-
-    B32 rect_program_suc = true;
-    grafics.rect_program = grafics_create_program_from_file(d3d_device, L"../data/rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
-    Assert(rect_program_suc);
-
-    B32 texture_to_screen_succ = true;
-    grafics.texture_to_screen_program = grafics_create_program_from_file(d3d_device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
-    Assert(texture_to_screen_succ);
-
-    // Creating fresh draw texture
-    {
-      D3D11_TEXTURE2D_DESC texture_desc = {};
-      texture_desc.Width            = os_get_client_area_dims().x;
-      texture_desc.Height           = os_get_client_area_dims().y;
-      texture_desc.MipLevels        = 1;
-      texture_desc.ArraySize        = 1;
-      texture_desc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
-      texture_desc.SampleDesc.Count = 1;
-      texture_desc.Usage            = D3D11_USAGE_DEFAULT; // Read and write by the gpu
-      texture_desc.BindFlags        = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
-      
-      ID3D11Texture2D* texture = 0;
-      hr = d3d_device->CreateTexture2D(&texture_desc, 0, &texture);
-      HR(hr);
-
-      hr = d3d_device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &grafics.draw_texture_rtv);
-      HR(hr);
-
-      texture->Release();
-    }
-
-    // Creating the rtv for the frame buffer
-    {
-      ID3D11Texture2D* backbuffer;
-      d3d_swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backbuffer);
-      d3d_device->CreateRenderTargetView((ID3D11Resource*)backbuffer, NULL, &grafics.frame_buffer_rtv);
-      backbuffer->Release();
-    }
+    IDXGISwapChain1* d3d_swap_chain = grafics.swap_chain;
   }
 
   ///////////////////////////////////////////////////////////
@@ -187,10 +149,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     os_win32_frame_begin();
     
-    pencil_update(&win32_state->frame_events, &grafics);
+    static Pencil_state P = {};
+    pencil_update(&P, &win32_state->frame_events, &grafics);
     // pencil_render();
     
-    grafics.d3d_swap_chain->Present(0, 0);
+    grafics.swap_chain->Present(0, 0);
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us

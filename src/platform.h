@@ -106,21 +106,29 @@ struct D3D_program {
   ID3D11Buffer* uniform_data;
 };
 
-struct Grafics {
+struct D3D_state {
   IDXGIFactory2* dxgi_factory;
   IDXGIAdapter* dxgi_adapter;
 
-  ID3D11Device* d3d_device;
-  ID3D11DeviceContext* d3d_context;
+  ID3D11Device* device;
+  ID3D11DeviceContext* context;
   
-  IDXGISwapChain1* d3d_swap_chain;
-
-  D3D_program rect_program;
-  D3D_program texture_to_screen_program;
-
-  ID3D11RenderTargetView* draw_texture_rtv;
-  ID3D11RenderTargetView* frame_buffer_rtv;
+  IDXGISwapChain1* swap_chain;
 };
+
+// note: This has to then later be released with ->Release() call 
+// todo: I am not sure why i would need a call for this, since storing a frame buffer in the flip model is kind of weird
+ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d)
+{
+  ID3D11RenderTargetView* frame_buffer_rtv = 0;
+  ID3D11Texture2D* backbuffer;
+  d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backbuffer);
+  d3d->device->CreateRenderTargetView((ID3D11Resource*)backbuffer, NULL, &frame_buffer_rtv);
+  backbuffer->Release();
+  return frame_buffer_rtv;
+}
+
+
 
 D3D_program grafics_create_program_from_file(
   ID3D11Device* d3d_device,

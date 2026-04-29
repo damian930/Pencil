@@ -3,13 +3,27 @@
 
 #include "platform.h"
 
-struct G_state {
-  B32 is_draw_mode;
+// todo: I dont yet know where to have these, so just having them here
+
+// D3D_program rect_program;
+// D3D_program texture_to_screen_program;
+
+// ID3D11RenderTargetView* draw_texture_rtv;
+// ID3D11RenderTargetView* frame_buffer_rtv;
+
+struct Pencil_state {
+  ID3D11RenderTargetView* draw_texture_rtv;
+  D3D_program rect_program;  
+  D3D_program texture_to_screen_program;
 };
 
-void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
-{
-  ID3D11DeviceContext* context = grafics->d3d_context;
+void draw_rect(
+  Pencil_state* P,
+  D3D_state* d3d, ID3D11RenderTargetView* render_target,  
+  F32 x, F32 y, F32 width, F32 height, F32 color
+) {
+  ID3D11DeviceContext* context = d3d->context;
+  ID3D11Device* device = d3d->device;
 
   context->ClearState();
   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
@@ -32,7 +46,7 @@ void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
     desc.MiscFlags      = {};
     desc.StructureByteStride = {};
-    grafics->d3d_device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    device->CreateBuffer(&desc, NULL, &uniform_buffer);
     
     D3D11_MAPPED_SUBRESOURCE mapped = {};
     context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
@@ -40,7 +54,7 @@ void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
     context->Unmap((ID3D11Resource*)uniform_buffer, 0);
   }
 
-  context->VSSetShader(grafics->rect_program.v_shader, 0, 0);
+  context->VSSetShader(P->rect_program.v_shader, 0, 0);
   context->VSSetConstantBuffers(0, 1, &uniform_buffer);
   // uniform_buffer->Release();
 
@@ -51,7 +65,7 @@ void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
     desc.FillMode = D3D11_FILL_SOLID;
     desc.CullMode = D3D11_CULL_NONE;
     desc.DepthClipEnable = true;
-    grafics->d3d_device->CreateRasterizerState(&desc, &rasterizer_state);
+    device->CreateRasterizerState(&desc, &rasterizer_state);
   }
 
   D3D11_VIEWPORT vp = {};
@@ -64,16 +78,52 @@ void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
   context->RSSetState(rasterizer_state);
   // rasterizer_state->Release();
   context->RSSetViewports(1, &vp);
-  context->PSSetShader(grafics->rect_program.p_shader, 0, 0);
+  context->PSSetShader(P->rect_program.p_shader, 0, 0);
 
   // todo: This shoud be a separate call to the draw thing that picks the render target
-  context->OMSetRenderTargets(1, &grafics->draw_texture_rtv, 0);
+  context->OMSetRenderTargets(1, &P->draw_texture_rtv, 0);
 
   context->Draw(4, 0);
 }
 
-void pencil_update(OS_Event_list* events, Grafics* grafics)
+void pencil_update(Pencil_state* P, OS_Event_list* events, D3D_state* d3d)
 {
+  static B32 is_initialised = false;
+  if (!is_initialised)
+  {
+    is_initialised = true;
+
+    *P = Pencil_state{};
+    { // draw_texture_rtv  
+      
+      D3D11_TEXTURE2D_DESC texture_desc = {};
+      texture_desc.Width            = os_get_client_area_dims().x;
+      texture_desc.Height           = os_get_client_area_dims().y;
+      texture_desc.MipLevels        = 1;
+      texture_desc.ArraySize        = 1;
+      texture_desc.Format           = DXGI_FORMAT_R8G8B8A8_UNORM;
+      texture_desc.SampleDesc.Count = 1;
+      texture_desc.Usage            = D3D11_USAGE_DEFAULT; // Read and write by the gpu
+      texture_desc.BindFlags        = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+      
+      HRESULT hr = S_OK;
+      ID3D11Texture2D* texture = 0;
+      hr = d3d->device->CreateTexture2D(&texture_desc, 0, &texture);
+      HandleLater(hr == S_OK);
+
+      hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &P->draw_texture_rtv);
+      HandleLater(hr == S_OK);
+    }
+
+    B32 rect_program_suc = true;
+    P->rect_program = grafics_create_program_from_file(d3d->device, L"../data/rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
+    Assert(rect_program_suc);
+
+    B32 texture_to_screen_succ = true;
+    P->texture_to_screen_program = grafics_create_program_from_file(d3d->device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
+    Assert(texture_to_screen_succ);
+  }
+
   static B32 is_left_mouse_down = false;
 
   OS_Event* left_mouse_down_ev = 0;
@@ -115,22 +165,26 @@ void pencil_update(OS_Event_list* events, Grafics* grafics)
       F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
       F32 x = prev_pos.x + dx * t;
       F32 y = prev_pos.y + dy * t;
-      draw_rect(grafics, x, y, rect_width, rect_height, 0);
+      draw_rect(P, d3d, P->draw_texture_rtv, x, y, rect_width, rect_height, {});
     }
   }
 
   // Drawing the texture into the frame buffer
   {
     // todo: Draw a point into a texture and then draw that texture into the frame buffer
-    ID3D11DeviceContext* context = grafics->d3d_context;
+    ID3D11DeviceContext* context = d3d->context;
+    ID3D11Device* device = d3d->device;
+    
     context->ClearState();
 
+    ID3D11RenderTargetView* frame_buffer_rtv = d3d_get_frame_buffer_rtv(d3d);
+
     F32 color[4] = { 0, 0, 0, 0 };
-    context->ClearRenderTargetView(grafics->frame_buffer_rtv, color);
+    context->ClearRenderTargetView(frame_buffer_rtv, color);
 
     context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-    context->VSSetShader(grafics->texture_to_screen_program.v_shader, 0, 0);
+    context->VSSetShader(P->texture_to_screen_program.v_shader, 0, 0);
 
     V2S32 dims = os_get_client_area_dims();
     D3D11_VIEWPORT vp = {};
@@ -154,19 +208,19 @@ void pencil_update(OS_Event_list* events, Grafics* grafics)
       desc.MaxAnisotropy = 1;
       desc.MinLOD = 0;
       desc.MaxLOD = D3D11_FLOAT32_MAX;
-      grafics->d3d_device->CreateSamplerState(&desc, &sampler);
+      device->CreateSamplerState(&desc, &sampler);
     }
 
     ID3D11Resource* resource = 0;
-    grafics->draw_texture_rtv->GetResource(&resource);
+    P->draw_texture_rtv->GetResource(&resource);
     ID3D11ShaderResourceView* view = 0;
-    grafics->d3d_device->CreateShaderResourceView(resource, NULL, &view);
-    context->PSSetShader(grafics->texture_to_screen_program.p_shader, 0, 0);
+    device->CreateShaderResourceView(resource, NULL, &view);
+    context->PSSetShader(P->texture_to_screen_program.p_shader, 0, 0);
     context->PSSetSamplers(0, 1, &sampler);
     context->PSSetShaderResources(0, 1, &view);
     resource->Release();
 
-    context->OMSetRenderTargets(1, &grafics->frame_buffer_rtv, 0);
+    context->OMSetRenderTargets(1, &frame_buffer_rtv, 0);
 
     context->Draw(4, 0);
   }
