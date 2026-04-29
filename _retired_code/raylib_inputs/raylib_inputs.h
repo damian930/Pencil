@@ -134,7 +134,7 @@ struct RLI_Event {
   
   RLI_Modifiers modifiers;
 
-  Vec2_F32 mouse_pos;
+  V2F32 mouse_pos;
 
   F32 mouse_wheel_move;
 
@@ -161,7 +161,7 @@ struct RLI_Context {
 
   Arena* frame_event_arena;
   RLI_Event_list frame_event_list;
-  Vec2_F32 last_mouse_pos;
+  V2F32 last_mouse_pos;
 };
 
 extern RLI_Context* Raylib_inputs_g_context;

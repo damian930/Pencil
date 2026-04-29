@@ -7,6 +7,71 @@ struct G_state {
   B32 is_draw_mode;
 };
 
+void draw_rect(Grafics* grafics, F32 x, F32 y, F32 width, F32 height, F32 color)
+{
+  ID3D11DeviceContext* context = grafics->d3d_context;
+
+  context->ClearState();
+  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    Grafics_rect_program_uniform_data u_data = {};
+    u_data.rect_origin_x = x;
+    u_data.rect_origin_y = y;
+    u_data.rect_width    = width;
+    u_data.rect_height   = height;
+    u_data.window_width  = (F32)os_get_client_area_dims().x;
+    u_data.window_height = (F32)os_get_client_area_dims().y;
+    
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC;
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    desc.MiscFlags      = {};
+    desc.StructureByteStride = {};
+    grafics->d3d_device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    memcpy(mapped.pData, &u_data, sizeof(u_data));
+    context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+  }
+
+  context->VSSetShader(grafics->rect_program.v_shader, 0, 0);
+  context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+  // uniform_buffer->Release();
+
+  ID3D11RasterizerState* rasterizer_state = 0;
+  {
+    // disable culling
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    grafics->d3d_device->CreateRasterizerState(&desc, &rasterizer_state);
+  }
+
+  D3D11_VIEWPORT vp = {};
+  vp.TopLeftX = 0;
+  vp.TopLeftY = 0;
+  vp.Width    = (F32)os_get_client_area_dims().x;
+  vp.Height   = (F32)os_get_client_area_dims().y;
+  vp.MinDepth = 0;
+  vp.MaxDepth = 1;
+  context->RSSetState(rasterizer_state);
+  // rasterizer_state->Release();
+  context->RSSetViewports(1, &vp);
+  context->PSSetShader(grafics->rect_program.p_shader, 0, 0);
+
+  // todo: This shoud be a separate call to the draw thing that picks the render target
+  context->OMSetRenderTargets(1, &grafics->draw_texture_rtv, 0);
+
+  context->Draw(4, 0);
+}
+
 void pencil_update(OS_Event_list* events, Grafics* grafics)
 {
   static B32 is_left_mouse_down = false;
@@ -32,62 +97,26 @@ void pencil_update(OS_Event_list* events, Grafics* grafics)
     }
   }
 
-  // Drawing the texture
+  // Drawing rects 
   if (is_left_mouse_down)
   {
-    // todo: Draw a point into a texture and then draw that texture into the frame buffer
-    ID3D11DeviceContext* context = grafics->d3d_context;
-    
-    context->ClearState();
+    F32 rect_width = 10;
+    F32 rect_height = 10;
 
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-    // context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
+    V2F32 new_pos = os_get_mouse_pos();
+    V2F32 prev_pos = os_get_prev_mouse_pos();
 
-    ID3D11Buffer* uniform_buffer = 0;
+    F32 dx = new_pos.x - prev_pos.x;
+    F32 dy = new_pos.y - prev_pos.y;
+    F32 length = sqrtf(dx * dx + dy * dy);
+    U64 steps = (U64)length;
+    for (U64 i = 0; i <= steps; i++) 
     {
-      Grafics_rect_program_uniform_data u_data = {};
-      u_data.is_origin_relative_to_top_left = false;
-      u_data.rect_origin_x = (F32)os_get_mouse_pos_rel_to_client_area().x;
-      u_data.rect_origin_y = (F32)os_get_mouse_pos_rel_to_client_area().y;
-      u_data.rect_width    = (F32)5;
-      u_data.rect_height   = (F32)5;
-      u_data.window_width  = (F32)os_get_client_area_dims().x;
-      u_data.window_height = (F32)os_get_client_area_dims().y;
-      
-      D3D11_BUFFER_DESC desc = {};
-      desc.ByteWidth      = sizeof(u_data);
-      desc.Usage          = D3D11_USAGE_DYNAMIC;
-      desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-      desc.MiscFlags      = {};
-      desc.StructureByteStride = {};
-      grafics->d3d_device->CreateBuffer(&desc, NULL, &uniform_buffer);
-      
-      D3D11_MAPPED_SUBRESOURCE mapped = {};
-      context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+      F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
+      F32 x = prev_pos.x + dx * t;
+      F32 y = prev_pos.y + dy * t;
+      draw_rect(grafics, x, y, rect_width, rect_height, 0);
     }
-
-    context->VSSetShader(grafics->rect_program.v_shader, 0, 0);
-    context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-    uniform_buffer->Release();
-
-    V2S32 dims = os_get_client_area_dims();
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    vp.Width    = (F32)dims.x;
-    vp.Height   = (F32)dims.y;
-    vp.MinDepth = 0;
-    vp.MaxDepth = 1;
-    context->RSSetViewports(1, &vp);
-    
-    context->PSSetShader(grafics->rect_program.p_shader, 0, 0);
-    
-    context->OMSetRenderTargets(1, &grafics->draw_texture_rtv, 0);
-
-    context->Draw(4, 0);
   }
 
   // Drawing the texture into the frame buffer

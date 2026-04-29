@@ -10,10 +10,16 @@
 // #pragma comment (lib, "d3dcompiler.lib")
 
 struct OS_State {
-  WNDCLASSEXA window_class;
-  HWND window_handle;
   HINSTANCE app_instance;
   
+  // Single window data
+  WNDCLASSEXA window_class;
+  HWND window_handle;
+  B32 os_should_close_window;
+
+  V2S32 this_frame_mouse_pos;
+  V2S32 prev_frame_mouse_pos;
+
   // OS_Mouse_button_states mouse_button_states;
   Arena* frame_events_arena;
   OS_Event_list frame_events;
@@ -44,6 +50,7 @@ V2S32 os_get_client_area_dims()
 }
 
 // note: This gets them in the screen coordinates
+/*
 V2S32 os_get_mouse_pos_rel_to_screen()
 {
   POINT p = {};
@@ -51,22 +58,32 @@ V2S32 os_get_mouse_pos_rel_to_screen()
   Assert(succ);
   return v2s32(p.x, p.y);
 }
+*/
 
-V2S32 os_get_mouse_pos_rel_to_client_area()
+// note: This is relative to the signle window's client area we have right now in the app
+V2F32 os_get_mouse_pos()
 {
-  BOOL succ = false;
-  POINT p = {};
+  V2S32 s32_pos = os_get_state()->this_frame_mouse_pos;
+  V2F32 f32_pos = v2f32((F32)s32_pos.x, (F32)s32_pos.y);
+  return f32_pos;
+}
 
-  succ = GetCursorPos(&p);
-  Assert(succ);
+// note: This is relative to the signle window's client area we have right now in the app
+V2F32 os_get_prev_mouse_pos()
+{
+  V2S32 s32_pos = os_get_state()->prev_frame_mouse_pos;
+  V2F32 f32_pos = v2f32((F32)s32_pos.x, (F32)s32_pos.y);
+  return f32_pos;
+}
 
-  succ = ScreenToClient(os_get_state()->window_handle, &p);
-  Assert(succ);
-
-  V2S32 result = {};
-  result.x = p.x;
-  result.y = p.y;
-  return result;
+V2F32 os_get_mouse_delta()
+{
+  V2F32 this_frame = os_get_mouse_pos();
+  V2F32 prev_frame = os_get_prev_mouse_pos();
+  V2F32 delta = {};
+  delta.x = this_frame.x - prev_frame.x;
+  delta.y = this_frame.y - prev_frame.y;
+  return delta;
 }
 
 LRESULT win_proc(
@@ -131,14 +148,14 @@ LRESULT win_proc(
 
     } break;
 
-    case WM_CLOSE: 
+    case WM_CLOSE: // This is when the close button for the windows default window is pressed 
     {
-      DestroyWindow(window_handle);
+      win32_state->os_should_close_window = true;
     } break;
 
     case WM_DESTROY: 
     {
-      PostQuitMessage(0);
+      // todo: This might want to be a separate event or something for the window closing
     } break;
   }
 
@@ -150,7 +167,39 @@ LRESULT win_proc(
   return result;
 }
 
-// todo: Revise this, this might not clear all the above created stuff on fail
+B32 os_shoud_close_window()
+{
+  return os_get_state()->os_should_close_window;
+}
+
+void os_win32_frame_begin()
+{
+  OS_State* os_state = os_get_state();
+  
+  B32 stop_the_app = false;
+  (void)stop_the_app;
+  MSG msg;
+  for (;PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
+  {
+    if (msg.message == WM_QUIT) { stop_the_app = true; break; }
+    TranslateMessage(&msg);
+    DispatchMessageA(&msg);
+  }
+
+  // Mouse positions
+  os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
+  {
+    // todo:
+    // os_state->this_frame_mouse_pos = v2s32(f32_is_nan);
+    POINT p = {};
+    BOOL succ = {};
+    succ = GetCursorPos(&p); Assert(succ);
+    succ = ScreenToClient(os_get_state()->window_handle, &p); Assert(succ);
+    // note: When window is closed we cant get relative to widnow,
+    //       do i want to create a value for the invalid mosue pos that will have some like nan for the float
+    os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
+  }
+}
 
 
 #endif

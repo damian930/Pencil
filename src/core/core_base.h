@@ -6,6 +6,7 @@
 #include "stdio.h"  // For printf
 #include "stdarg.h" // For va_args
 #include "string.h" // For memset
+#include "math.h"   // For math
 
 /* todo:
 	[ ] - Remove todos
@@ -419,6 +420,7 @@ global const U32 f32_exponent = 0x7f800000;
 global const U32 f32_mantisa  = 0x007fffff;
 tu_specific F32 f32_inf();
 tu_specific F32 f32_neg_inf();
+tu_specific F32 f32_nan();
 tu_specific B32 f32_is_nan(F32 f);
 
 global const S64 s64_min = 0x8000000000000000;
@@ -529,18 +531,20 @@ global const U64 bit_61 = (1ULL << 61);
 global const U64 bit_62 = (1ULL << 62);
 global const U64 bit_63 = (1ULL << 63);
 
-union Vec2_F32 {
+union V2F32 {
 	struct {
 		F32 x;
 		F32 y;
 	};
 	F32 v[2];
 };
-typedef Vec2_F32 Vec2;
-typedef Vec2_F32 V2;
+typedef V2F32 Vec2;
+typedef V2F32 V2;
 
-tu_specific Vec2_F32 vec2_f32_make(F32 x, F32 y) { Vec2_F32 v = { x, y }; return v; }
-tu_specific B32 vec2_f32_match(Vec2_F32 v1, Vec2_F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
+tu_specific V2F32 v2f32(F32 x, F32 y) { V2F32 v = { x, y }; return v; }
+tu_specific B32 v2f32_match(V2F32 v1, V2F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
+tu_specific F32 v2f32_len_sq(V2F32 v) { F32 len = (v.x * v.x) + (v.y * v.y); return len; }
+tu_specific F32 v2f32_len(V2F32 v) { F32 len = sqrtf(v2f32_len_sq(v)); return len; }
 
 struct V2U64 {
 	struct {
@@ -572,9 +576,9 @@ struct Rect {
 	F32 height;
 };
 
-tu_specific Vec2_F32 rect_dims(Rect rect);
+tu_specific V2F32 rect_dims(Rect rect);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
-tu_specific B32 is_point_inside_rectV(Vec2_F32 v, Rect r);
+tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
 
 // note: this is static inline just cause i didnt care to move it to cpp file
@@ -679,6 +683,7 @@ struct V2S32 {
 tu_specific V2S32 v2s32(S32 x, S32 y) { V2S32 v = { x, y }; return v; }
 tu_specific B32 v2s32_match(V2S32 v1, V2S32 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
 
-#endif
 
+
+#endif
 

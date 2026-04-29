@@ -1,8 +1,6 @@
 // note: All these are to be bottom up
 cbuffer constants : register(b0)
 {
-  bool is_origin_relative_to_top_left;
-
   float _rect_origin_x_in_px;
   float _rect_origin_y_in_px;
 
@@ -15,28 +13,23 @@ cbuffer constants : register(b0)
 
 float4 vs_main(uint id : SV_VertexID) : SV_Position
 {
-  // todo: Have to flip the thing when 
-  
-  // origin here is the bottom left of the rect
+  // origin here is the top left of the rect
   float rect_origin_x_in_px = _rect_origin_x_in_px;
   float rect_origin_y_in_px = _rect_origin_y_in_px;
-  if (is_origin_relative_to_top_left) { 
-    // rect_origin_y_in_px = window_height_in_px - _rect_origin_y_in_px - rect_height_in_px; 
-  }
-  const float2 rect_origin_in_px = float2(rect_origin_x_in_px, rect_origin_y_in_px);
   
-  float2 rect_point_in_px = rect_origin_in_px;
+  float2 rect_point_in_px = float2(rect_origin_x_in_px, rect_origin_y_in_px);
   if (id == 0) { // bottom left of the rect
+    rect_point_in_px.y += rect_height_in_px;
   }
   else if (id == 1) { // top left of the rect
-    rect_point_in_px.y += rect_height_in_px;
+    // this is origin  
   }
   else if (id == 2) { // bottom right of the rect
     rect_point_in_px.x += rect_width_in_px;
+    rect_point_in_px.y += rect_height_in_px;
   }
   else if (id == 3) { // top right of the rect
     rect_point_in_px.x += rect_width_in_px;
-    rect_point_in_px.y += rect_height_in_px;
   }
 
   float2 final_pos = rect_point_in_px;

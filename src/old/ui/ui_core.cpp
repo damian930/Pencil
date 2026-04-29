@@ -10,8 +10,8 @@
 
 UI_Context* _ui_g_context = 0;
 UI_Box _ui_g_zero_box = {};
-Vec2_F32 _ui_g_clip_offset_stub = {};
-Vec2_F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, F32 font_size) { Assert(0, "Dude, you forgot to set a text measuing function."); return Vec2_F32{}; }
+V2F32 _ui_g_clip_offset_stub = {};
+V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, F32 font_size) { Assert(0, "Dude, you forgot to set a text measuing function."); return V2F32{}; }
 
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 {
@@ -49,7 +49,7 @@ Arena* ui_build_arena()
 
 F32 ui_get_mouse_x()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
 F32 ui_get_mouse_y()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
-Vec2_F32 ui_get_mouse() { return vec2_f32_make(ui_get_mouse_x(), ui_get_mouse_y()); }
+V2F32 ui_get_mouse() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 
 void ui_set_text_measuring_function(UI_text_measuring_ft* fp)
@@ -63,12 +63,12 @@ UI_text_measuring_ft* ui_get_text_measuring_function()
   return ui_get_context()->text_measuring_fp;
 }
 
-Vec2_F32 ui_measure_text(Str8 str)
+V2F32 ui_measure_text(Str8 str)
 {
   return ui_get_text_measuring_function()(str, ui_get_font(), ui_get_font_size());
 }
 
-Vec2_F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size)
+V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size)
 {
   return ui_get_text_measuring_function()(str, font, font_size);
 }
@@ -234,7 +234,7 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
     case UI_Size_kind__text:
     {
       UI_text_measuring_ft* text_mesure_f = ui_get_text_measuring_function();
-      Vec2_F32 dims = text_mesure_f(root->text_style.text, root->text_style.font, root->text_style.font_size);
+      V2F32 dims = text_mesure_f(root->text_style.text, root->text_style.font, root->text_style.font_size);
       root->final_on_screen_size.v[axis] = dims.v[axis];
     } break;
   }
@@ -686,7 +686,7 @@ UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id)
     for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
       Axis2 axis = box->layout_axis;
-      Vec2_F32 child_dims = rect_dims(child->final_on_screen_rect);
+      V2F32 child_dims = rect_dims(child->final_on_screen_rect);
       result_data.content_dims.v[axis] += child_dims.v[axis];
       axis = axis2_other(axis);
       result_data.content_dims.v[axis] = Max(result_data.content_dims.v[axis], child_dims.v[axis]);

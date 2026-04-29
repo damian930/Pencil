@@ -88,6 +88,14 @@ F32 f32_neg_inf()
 	return u.f32;
 }
 
+F32 f32_nan()
+{
+	union { U32 u32; F32 f32; } u;
+	u.u32 = f32_exponent;
+	u.f32 = ~0;
+	return (F32)u.f32;
+}
+
 B32 f32_is_nan(F32 f)
 {
 	union { U32 u32; F32 f32; } u;
@@ -142,9 +150,9 @@ B32 range_u64_is_valid(RangeU64 range)
 	return result;
 }
 
-Vec2_F32 rect_dims(Rect rect)
+V2F32 rect_dims(Rect rect)
 {
-	Vec2_F32 dims = {};
+	V2F32 dims = {};
 	dims.x = rect.width;
 	dims.y = rect.height;
 	return dims;
@@ -159,7 +167,7 @@ B32 is_point_inside_rect(F32 x, F32 y, Rect r)
 	return is_inside;	
 }
 
-B32 is_point_inside_rectV(Vec2_F32 v, Rect r)
+B32 is_point_inside_rectV(V2F32 v, Rect r)
 {
 	B32 is_inside = (
 		r.x <= v.x && v.x < r.x + r.width  &&

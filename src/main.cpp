@@ -146,18 +146,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     grafics.texture_to_screen_program = grafics_create_program_from_file(d3d_device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
     Assert(texture_to_screen_succ);
 
-    /*
-    ID3D11RasterizerState* rasterizer_state = 0;
-    {
-      // disable culling
-      D3D11_RASTERIZER_DESC desc = {};
-      desc.FillMode = D3D11_FILL_SOLID;
-      desc.CullMode = D3D11_CULL_NONE;
-      desc.DepthClipEnable = true;
-      d3d_device->CreateRasterizerState(&desc, &rasterizer_state);
-    }
-    */
-
     // Creating fresh draw texture
     {
       D3D11_TEXTURE2D_DESC texture_desc = {};
@@ -192,22 +180,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  for (;;)
+  for (;!os_shoud_close_window();)
   {
     arena_clear(win32_state->frame_events_arena);
     win32_state->frame_events = {};
 
-    // Processing messages
-    B32 stop_the_app = false;
-    MSG msg;
-    for (;PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
-    {
-      if (msg.message == WM_QUIT) { stop_the_app = true; break; }
-      TranslateMessage(&msg);
-      DispatchMessageA(&msg);
-    }
-    if (stop_the_app) { break; }
-
+    os_win32_frame_begin();
+    
     pencil_update(&win32_state->frame_events, &grafics);
     // pencil_render();
     

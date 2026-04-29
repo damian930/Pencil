@@ -96,7 +96,7 @@ RLI_Event_list* RLI_get_frame_inputs()
     B8 was_down             = prev_key_state->is_down;
     B8 is_down              = was_down; 
     B8 is_repeat_down       = false;
-    Vec2_F32 mouse_pos        = {}; 
+    V2F32 mouse_pos        = {}; 
     RLI_Event_kind kind     = {};
 
     if (RLI_Key__mouse_left <= rli_key && rli_key <= RLI_Key__mouse_right)
@@ -104,7 +104,7 @@ RLI_Event_list* RLI_get_frame_inputs()
       // todo: This mapping here is wrong for non left/right/middle buttons
       MouseButton raylib_mouse_button = (MouseButton)((U32)rli_key - (U32)RLI_Key__mouse_left + (U32)MOUSE_BUTTON_LEFT);
       is_down = IsMouseButtonDown(raylib_mouse_button);
-      mouse_pos = vec2_f32_make((F32)GetMouseX(), (F32)GetMouseY());
+      mouse_pos = v2f32((F32)GetMouseX(), (F32)GetMouseY());
       kind = RLI_Event_kind__mouse_button;
 
       if (was_down != is_down) {
@@ -249,8 +249,8 @@ RLI_Event_list* RLI_get_frame_inputs()
     rli->frame_event_list.count += 1;
   }
 
-  Vec2_F32 mouse_pos = vec2_f32_make((F32)GetMouseX(), (F32)GetMouseY());
-  if (!vec2_f32_match(mouse_pos, rli->last_mouse_pos))
+  V2F32 mouse_pos = v2f32((F32)GetMouseX(), (F32)GetMouseY());
+  if (!v2f32_match(mouse_pos, rli->last_mouse_pos))
   {
     rli->last_mouse_pos = mouse_pos;
     RLI_Event* mouse_move_event = ArenaPush(rli->frame_event_arena, RLI_Event);

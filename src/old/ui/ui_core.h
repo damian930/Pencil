@@ -12,7 +12,7 @@
   - there are no assert right now it place that show that you use the ui bulding part of the ui core before ui begin the build process
 */
 
-typedef Vec2_F32 (UI_text_measuring_ft) (Str8 text, Font font, F32 font_size);
+typedef V2F32 (UI_text_measuring_ft) (Str8 text, Font font, F32 font_size);
 
 enum UI_Size_kind {
   UI_Size_kind__px,
@@ -98,9 +98,9 @@ struct UI_ID_stack { UI_ID_node* first; U64 count; B32 pop_after_first_use; };
 
 struct UI_Box_clip_data {
   B32 is_found;
-  Vec2_F32 on_screen_dims;
-  Vec2_F32 content_dims;
-  Vec2_F32* clip_offset;
+  V2F32 on_screen_dims;
+  V2F32 content_dims;
+  V2F32* clip_offset;
 };
 
 struct UI_Actions {
@@ -142,13 +142,13 @@ struct UI_Box {
 
   // Some more extensions
   Texture2D texture_to_draw;
-  Vec2_F32 clip_offset; 
+  V2F32 clip_offset; 
 
   Str8 id; // Per build  
   B32 has_been_updated_this_build;
 
-  Vec2_F32 final_on_screen_size;          // Result of the sizing pass
-  Vec2_F32 final_parent_offset; // Result of the relative to parent pass
+  V2F32 final_on_screen_size;          // Result of the sizing pass
+  V2F32 final_parent_offset; // Result of the relative to parent pass
   Rect final_on_screen_rect;      // These are the result of the finals layout pass 
   
   // Per build box tree
@@ -182,6 +182,7 @@ struct UI_Context {
   F32 mouse_x;
   F32 mouse_y;
 
+  // todo: Maybe dont call this "active", but rather "exclusive"
   Str8 currently_active_box_id; // This is for semantic ui meaning
   
   // === todo: I dont know how to explaine this fully even to myself at this moment --> this is for inputs, not semantic meaning 
@@ -214,7 +215,7 @@ struct UI_Context {
 // - Context variables
 extern UI_Context* _ui_g_context;
 extern UI_Box _ui_g_zero_box;
-Vec2_F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
+V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
 
 // - Size makers
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
@@ -235,13 +236,13 @@ void ui_set_context(UI_Context* context);
 Arena* ui_build_arena();
 F32 ui_get_mouse_x();
 F32 ui_get_mouse_y();
-Vec2_F32 ui_get_mouse();
+V2F32 ui_get_mouse();
 
 // - Text measure function stuff
 void ui_set_text_measuring_function(UI_text_measuring_ft* fp);
 UI_text_measuring_ft* ui_get_text_measuring_function();
-Vec2_F32 ui_measure_text(Str8 str);
-Vec2_F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size);
+V2F32 ui_measure_text(Str8 str);
+V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size);
 
 // - Context 
 void ui_init();
