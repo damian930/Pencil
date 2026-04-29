@@ -46,6 +46,7 @@ void pencil_update(OS_Event_list* events, Grafics* grafics)
     ID3D11Buffer* uniform_buffer = 0;
     {
       Grafics_rect_program_uniform_data u_data = {};
+      u_data.is_origin_relative_to_top_left = false;
       u_data.rect_origin_x = (F32)os_get_mouse_pos_rel_to_client_area().x;
       u_data.rect_origin_y = (F32)os_get_mouse_pos_rel_to_client_area().y;
       u_data.rect_width    = (F32)5;

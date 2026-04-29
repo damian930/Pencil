@@ -87,6 +87,8 @@ extern OS_State __os_g_state;
 #pragma comment (lib, "d3dcompiler.lib")
 
 struct Grafics_rect_program_uniform_data {
+  B32 is_origin_relative_to_top_left;
+  
   F32 rect_origin_x;
   F32 rect_origin_y;
 
@@ -96,7 +98,7 @@ struct Grafics_rect_program_uniform_data {
   F32 window_width;
   F32 window_height;
 
-  F32 _padding[2];
+  F32 _padding[1];
 };
 
 struct D3D_program {
