@@ -369,6 +369,7 @@ struct Image_buffer {
   U64 width_in_px;
   U64 height_in_px;
   U64 bytes_per_pixel;
+  // U64 row_stride; // There are no images right now that might have extra padding
 };
 
 Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* src_texture)
@@ -404,21 +405,23 @@ Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* s
 
   Image_buffer image = {};
   {
-    U64 size_for_image = texture_height * texture_width * bytes_per_pixel;
-    image.width_in_px  = texture_width;
-    image.height_in_px = texture_height;
-    image.data         = ArenaPushArr(arena, U8, size_for_image);
-
     D3D11_MAPPED_SUBRESOURCE mapped = {};
     hr = d3d->context->Map((ID3D11Resource*)copy_texture, 0, D3D11_MAP_READ, 0, &mapped);
     {
+      U64 size_for_image = texture_height * texture_width * bytes_per_pixel;
+      image.bytes_per_pixel = bytes_per_pixel;
+      // image.row_stride      = (U64)mapped.RowPitch; 
+      image.width_in_px     = texture_width;
+      image.height_in_px    = texture_height;
+      image.data            = ArenaPushArr(arena, U8, size_for_image);
+
       HandleLater(hr == S_OK);
       if (mapped.pData)
       {
         for (U64 row_index = 0; row_index < texture_height; row_index += 1)
         {
           memcpy(
-            image.data + row_index * texture_width, 
+            image.data + row_index * texture_width * bytes_per_pixel, 
             (U8*)mapped.pData + row_index * mapped.RowPitch,
             texture_width * bytes_per_pixel
           );
@@ -432,6 +435,33 @@ Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* s
   end_scratch(&scratch);
 
   return image;
+}
+
+// note: I wanted to maybe make this be just a zero id for texture like in opengl, 
+//       but since this is a pointer I cant just return a 0 pointer
+//       or have a struct to reference as 0, since you cant make an instance of this type other than a 
+//       pointer to it.
+struct D3D_Texture_result {
+  B32 succ;  
+  ID3D11Texture2D* texture;
+};
+
+D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
+{
+  HRESULT hr = S_OK;
+  
+  ID3D11Resource* resource = 0;
+  rtv->GetResource(&resource);
+
+  ID3D11Texture2D* texture = 0;
+  hr = resource->QueryInterface(IID_ID3D11Texture2D, (void**)&texture);
+
+  D3D_Texture_result result = {};
+  result.texture = texture;
+  result.succ    = (hr == S_OK);
+
+  resource->Release();
+  return result;
 }
 
 

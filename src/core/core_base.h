@@ -77,7 +77,7 @@ Compiler;
 	#undef BreakPointCond
 	#define BreakPointCond(cond) do { if (!(cond)) { BreakPoint(); } } while(0)  // only works for x86, x64, ARM, ARM64
 #endif
-#define BP BreakPoint()
+#define BP BreakPoint();
 
 // todo: test cpp11 verson +, there it is a part of the standard
 #define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)

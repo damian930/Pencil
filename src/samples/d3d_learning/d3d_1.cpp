@@ -14,7 +14,7 @@
 #pragma comment (lib, "dxguid.lib")    // This is for the ids for the all the interfaces
 #pragma comment (lib, "d3dcompiler.lib")
 
-LRESULT win_proc(
+LRESULT win32_proc(
   HWND window_handle,
   UINT message,
   WPARAM w_param,
@@ -50,7 +50,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   WNDCLASSEXA wc = {};
   wc.cbSize        = sizeof(wc);
   wc.style         = 0;
-  wc.lpfnWndProc   = win_proc;
+  wc.lpfnWndProc   = win32_proc;
   wc.hInstance     = app_instance;
   wc.hIcon         = Null;
   wc.hCursor       = Null;

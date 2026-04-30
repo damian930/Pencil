@@ -41,6 +41,7 @@ struct Pencil_state {
   Draw_record* first_free_draw_record;
   Draw_record* last_free_draw_record;
   
+  // todo: I have that current record might be 0 sometimes and we have to check for it or we crash, at least dont crash
   Draw_record* first_record;
   Draw_record* last_record;
   Draw_record* current_record;

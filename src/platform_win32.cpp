@@ -200,6 +200,32 @@ OS_Key_state os_get_key_state(Key key)
   return key_state;
 }
 
+B32 os_key_down(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return state.is_down;
+}
+
+B32 os_key_up(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return state.is_up;
+}
+
+B32 os_key_went_down(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return (state.is_down && state.was_up);
+}
+
+B32 os_key_went_up(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return (state.is_up && state.was_down);
+}
+
+// ---
+
 OS_Mouse_button_state os_get_mouse_button_state(Mouse_button button)
 {
   OS_State* os = os_get_state();
@@ -231,7 +257,7 @@ B32 os_mouse_button_went_up(Mouse_button button)
   return (state.is_up && state.was_down);
 }
 
-LRESULT win_proc(
+LRESULT win32_proc(
   HWND window_handle,
   UINT message,
   WPARAM w_param,
@@ -249,19 +275,22 @@ LRESULT win_proc(
     case WM_KEYDOWN: 
     case WM_KEYUP: 
     {
-      // win32_state->key_states + 
-      B32 key_found = true;
       Key key = {};
 
-      if ('A' <= w_param && w_param <= 'Z')
-      {
-        key = (Key)((U32)Key__A + (w_param - 'A'));
+      if ('A' <= w_param && w_param <= 'Z') { key = (Key)((U32)Key__A + (w_param - 'A')); }
+      else {
+        switch (w_param)
+        {
+          default:         { InvalidCodePath();  } break;
+          case VK_SHIFT:   { key = Key__Shift;   } break;
+          case VK_CONTROL: { key = Key__Control; } break;
+        }
       }
-      else { key_found = false; }
+      Assert(key != Key__NONE);
 
       // Unwrapping the message data
       B32 went_down = false;
-      B32 went_up = false;
+      B32 went_up   = false;
       {
         U16 key_repeat_count = (U16)l_param;
         U8 scan_code         = (U8)(l_param >> 16);
@@ -275,11 +304,11 @@ LRESULT win_proc(
         XOR(went_down, went_up); // Just making sure
       }
 
-      if (key_found)
+      if (key != Key__NONE)
       {
+        // note: was down/up are not touched here, since they are updated in the frame_begin routine
+        
         OS_Key_state* key_state = win32_state->key_states + key;
-
-        // was down/up are not touched here, since they are updated in the frame_begin routine
 
         if (went_down) { 
           key_state->is_down = true;

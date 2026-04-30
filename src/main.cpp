@@ -43,6 +43,78 @@ void OutputDebugStringF(const char* fmt, ...)
 #include "third_party/stb/stb_image_write.h"
 #endif
 
+void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
+{
+  // todo: I dont like the api for the D3D_Texture_result. 
+  //       The way we have to get the texture out and it is 0 if the succ is false
+  //       and then when we have to release it and then the pointer is the result is kind of 
+  //       also the same the one we released. Sucks. I would like there to just be a singe
+  //       poiner or whatever that i have to work with.
+  //       The less things to manage and think about, the better.
+
+  // Loading up always_fresh_texture
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_always_fresh);
+    if (fresh_texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
+      Assert(image.bytes_per_pixel == 4);
+      stbi_flip_vertically_on_write(true); 
+      int succ = stbi_write_png("always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
+      Assert(succ);
+      fresh_texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+
+  /*
+  // Loading up not_fresh_texture
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result not_fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_not_that_fresh);
+    if (not_fresh_texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
+      int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      Assert(succ);
+      not_fresh_texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+  
+  // Loading up current texture_after_we_affected
+  if (P->current_record != 0)
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_after_we_affected);
+    if (texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      Assert(succ);
+      texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+
+  // Loading up current texture_before_we_affected
+  if (P->current_record != 0)
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_before_we_affected);
+    if (texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      Assert(succ);
+      texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+  */
+}
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   allocate_thread_context();
@@ -56,7 +128,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //
   win32_state->window_class.cbSize        = sizeof(WNDCLASSEXA);
   win32_state->window_class.style         = 0;
-  win32_state->window_class.lpfnWndProc   = win_proc;
+  win32_state->window_class.lpfnWndProc   = win32_proc;
   win32_state->window_class.hInstance     = app_instance;
   win32_state->window_class.hIcon         = Null;
   win32_state->window_class.hCursor       = Null;
@@ -184,44 +256,23 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   P.texture_to_screen_program = grafics_create_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
   Assert(texture_to_screen_succ);
 
+  F32 _color_[4] = { 0, 0, 1, 1 };
+  d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
+
   for (;!os_window_should_close();)
   {
     os_win32_frame_begin();
-
-    // static U64 counter = 0;
-    // OS_Key_state a_state = os_get_key_state(OS_Key__A);
-    // {
-    //   OutputDebugStringF("Key: %s \n", str8_from_os_key(a_state.key).data);
-    //   OutputDebugStringF("Counter: %lld \n", counter++);
-    //   if (a_state.is_down) { OutputDebugStringF("Down \n"); }
-    //   // if (a_state.is) { OutputDebugStringF("Repeat down \n"); }
-    //   if (a_state.is_up) { OutputDebugStringF("Up \n"); }
-    //   if (a_state.is_clicked) { OutputDebugStringF("Clicked \n"); }
-    //   OutputDebugStringF("\n");
-    // }
 
     pencil_update(&P, false, &d3d);
     pencil_render(&P, &d3d);
     
     d3d.swap_chain->Present(0, 0);
 
-    
-    {
-      F32 _color_[4] = { 0, 0, 1, 1 };
-      d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
-
-      Arena* arena = arena_alloc(Megabytes(512));
-      ID3D11Resource* resource = 0;
-      P.draw_texture_always_fresh->GetResource(&resource);
-      ID3D11Texture2D* texture = 0;
-      HRESULT hr = resource->QueryInterface(IID_ID3D11Texture2D, (void**)&texture);
-      Assert(hr == S_OK);
-
-      Image_buffer image = d3d_export_texture(arena, &d3d, texture);
-      int res = stbi_write_png("test_png.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
-      Assert(res);
+    if (os_key_down(Key__Shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
+      __debug_export_current_record_images(&P, &d3d);
+      BP;
     }
-    BP;
+    
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us
