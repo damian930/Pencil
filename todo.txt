@@ -3,14 +3,17 @@
       the cpu if they are identicall
 [x] - Split the cpp and the header file for os, its getting hard to see the code
 [x] - Split the cpp and the header file for pencil, its getting hard to see the code
-[ ] - Start having an fps counter and hitting the fps
+[x] - Start having an fps counter and hitting the fps
+[ ] - Start having ctrl+z 
+[ ] - Start having ctrl+shift+z 
+[ ] - Draw in circles
+[ ] - Draw a continuous line
+[ ] - 
+[ ] - 
+[ ] - Fix the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
+      and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
+      not_that_fresh texture at the end of draw, instead of the fresh texture at the start of draw.
 [ ] - Display the fps on the screen to have it be like in raylib  
-[ ] - 
-[ ] - 
-[ ] - 
-[ ] - 
-[ ] - 
-
 
 
 

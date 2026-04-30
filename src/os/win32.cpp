@@ -11,7 +11,8 @@
 
 struct OS_State {
   HINSTANCE app_instance;
-  
+  U64 perf_freq_count_per_sec;
+
   // Single window data
   WNDCLASSEXA window_class;
   HWND window_handle;
@@ -35,7 +36,10 @@ OS_State __os_g_state = {};
 //
 void os_init()
 {
-  // __os_g_state.frame_events_arena = arena_alloc(Megabytes(64));
+  // Performance frequency
+  LARGE_INTEGER freq_lr = {};
+  BOOL succ = QueryPerformanceFrequency(&freq_lr); Assert(succ);
+  __os_g_state.perf_freq_count_per_sec = freq_lr.QuadPart;
 
   // Setting keys
   StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
@@ -193,13 +197,13 @@ B32 os_key_up(Key key)
 B32 os_key_went_down(Key key)
 {
   OS_Key_state state = os_get_key_state(key);
-  return (state.is_down && state.was_up);
+  return (state.was_up && state.is_down );
 }
 
 B32 os_key_went_up(Key key)
 {
   OS_Key_state state = os_get_key_state(key);
-  return (state.is_up && state.was_down);
+  return (state.was_down && state.is_up);
 }
 
 Str8 str8_from_os_key(Key key)
@@ -209,9 +213,9 @@ Str8 str8_from_os_key(Key key)
   {
     default: { str = Str8FromC("__UNMATCHED__"); Assert(0); } break;
 
-    case Key__NONE:          { str = Str8FromC("__NONE__");        } break;
-    case Key__Shift:         { str = Str8FromC("__SHIFT__");       } break;
-    case Key__Control:       { str = Str8FromC("__CONTROL__");     } break;
+    case Key__NONE:    { str = Str8FromC("__NONE__");    } break;
+    case Key__Shift:   { str = Str8FromC("__SHIFT__");   } break;
+    case Key__Control: { str = Str8FromC("__CONTROL__"); } break;
 
     // Letters a-z
     case Key__A: { str = Str8FromC("a"); } break;
@@ -322,6 +326,53 @@ B32 os_mouse_button_went_up(Mouse_button button)
 }
 
 ///////////////////////////////////////////////////////////
+// - Time
+//
+Readable_time os_get_readable_time()
+{
+  SYSTEMTIME sys_time = {};
+  GetLocalTime(&sys_time);
+
+  Readable_time time = {};
+  time.year       = sys_time.wYear;
+  time.month      = (Month)(sys_time.wMonth - 1);
+  time.day        = (U8)sys_time.wDay;
+  time.hour       = (U8)sys_time.wHour;
+  time.minute     = (U8)sys_time.wMinute;
+  time.second     = (U8)sys_time.wSecond;
+  time.milisecond = sys_time.wMilliseconds;
+  
+  return time;
+}
+
+Time os_get_time_ms()
+{
+  Readable_time r_time = os_get_readable_time();
+  Time time = time_from_readable_time(&r_time); 
+  return time;
+}
+
+U64 os_get_perf_counter()
+{
+  LARGE_INTEGER lr_end = {};
+  BOOL succ = QueryPerformanceCounter(&lr_end); Assert(succ);
+  return lr_end.QuadPart;
+}
+
+U64 os_get_perf_freq_per_sec()
+{
+  OS_State* state = os_get_state();
+  return state->perf_freq_count_per_sec;
+}
+
+void os_sleep(U64 ms)
+{
+  Assert(ms <= u32_max);
+  ms = Min(ms, u32_max);
+  Sleep((U32)ms);
+}
+
+///////////////////////////////////////////////////////////
 // - Misc
 //
 LRESULT win32_proc(
@@ -376,6 +427,7 @@ LRESULT win32_proc(
         // note: was down/up are not touched here, since they are updated in the frame_begin routine
         
         OS_Key_state* key_state = win32_state->key_states + key;
+        Assert(key_state->key == key);
 
         if (went_down) { 
           key_state->is_down = true;

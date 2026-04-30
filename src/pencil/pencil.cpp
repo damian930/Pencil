@@ -218,8 +218,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
 
   // These are different modes that we might want to change
   // if (!P->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) 
-  /*
-  if (!P->is_mid_drawing && is_combination_to_switch_to_draw_mode)
+  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && os_key_went_down(Key__Z)) 
   {
     dont_start_drawing_this_frame = true; 
 
@@ -235,52 +234,37 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
 
     if (next_record)
     {
-      RenderTexture future_texture = next_record->texture_after_we_affected;
+      ID3D11RenderTargetView* future_texture = next_record->texture_after_we_affected;
       
       // Change the affected part from the fresh texture to the stored old version
-      copy_from_texture_to_texture(
-        P->draw_texture_always_fresh.texture, v2u64(0, 0), 
-        future_texture.texture, v2u64(0, 0), 
-        (U64)future_texture.texture.width, (U64)future_texture.texture.height
-      );
+      copy_from_texture_to_texture(d3d, P->draw_texture_always_fresh, future_texture);
 
       // Change the affected part from the not so fresh texture to the stored old version
-      copy_from_texture_to_texture(
-        P->draw_texture_not_that_fresh.texture, v2u64(0, 0), 
-        future_texture.texture, v2u64(0, 0), 
-        (U64)future_texture.texture.width, (U64)future_texture.texture.height
-      );
+      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, future_texture);
 
       P->current_record = next_record;
     }
   }
   else // User wants to remove the last line they drew
-  if (!P->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z)) 
+  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_went_down(Key__Z)) 
   {
     dont_start_drawing_this_frame = true;
 
     if (P->current_record != 0)
     {
-      Draw_record* record                    = P->current_record;
-      RenderTexture texture_before_we_affected = record->texture_before_we_affected;
+      Draw_record* record = P->current_record;
+      ID3D11RenderTargetView* texture_before_we_affected = record->texture_before_we_affected;
       
       // Change the affected part from the fresh texture to the stored old version
-      copy_from_texture_to_texture(
-        P->draw_texture_always_fresh.texture, v2u64(0, 0), 
-        texture_before_we_affected.texture, v2u64(0, 0), 
-        (U64)texture_before_we_affected.texture.width, (U64)texture_before_we_affected.texture.height
-      );
+      copy_from_texture_to_texture(d3d, P->draw_texture_always_fresh, texture_before_we_affected);
 
       // Change the affected part from the not so fresh texture to the stored old version
-      copy_from_texture_to_texture(
-        P->draw_texture_not_that_fresh.texture, v2u64(0, 0), 
-        texture_before_we_affected.texture, v2u64(0, 0), 
-        (U64)texture_before_we_affected.texture.width, (U64)texture_before_we_affected.texture.height
-      );
-      
+      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, texture_before_we_affected);
+
       P->current_record = P->current_record->prev;
     }
   }
+  /*
   else // User want to clear the screen
   if (!P->is_mid_drawing && IsKeyPressed(KEY_DELETE))
   {

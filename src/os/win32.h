@@ -171,6 +171,16 @@ B32 os_mouse_button_up(Mouse_button button);
 B32 os_mouse_button_went_down(Mouse_button button);
 B32 os_mouse_button_went_up(Mouse_button button);
 
+// - Time
+Readable_time os_get_readable_time();
+Time os_get_time_ms();
+U64 os_get_perf_counter();
+U64 os_get_perf_freq_per_sec();
+void os_sleep(U64 ms);
+// U64 os_get_mouse_double_click_max_time_ms();
+// U64 os_get_keyboard_initial_repeat_delay();
+// U64 os_get_keyboard_subsequent_repeat_delay();
+
 ///////////////////////////////////////////////////////////
 // - Grafics
 //

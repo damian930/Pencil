@@ -59,7 +59,6 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
     if (fresh_texture_res.succ)
     {
       Image_buffer image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
-      Assert(image.bytes_per_pixel == 4);
       stbi_flip_vertically_on_write(true); 
       int succ = stbi_write_png("always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
@@ -68,7 +67,6 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
     else { Assert(0); }
   }
 
-  /*
   // Loading up not_fresh_texture
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
@@ -76,7 +74,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
     if (not_fresh_texture_res.succ)
     {
       Image_buffer image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
-      int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       not_fresh_texture_res.texture->Release();
     } 
@@ -91,7 +89,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
     if (texture_res.succ)
     {
       Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
-      int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       texture_res.texture->Release();
     } 
@@ -106,13 +104,12 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
     if (texture_res.succ)
     {
       Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
-      int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       texture_res.texture->Release();
     } 
     else { Assert(0); }
   }
-  */
 }
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
@@ -259,20 +256,84 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   F32 _color_[4] = { 0, 0, 1, 1 };
   d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
 
+  // U64 frame_rate = 60;
   for (;!os_window_should_close();)
   {
+    // F64 wanted_frame_time = 1.0 / (F64)frame_rate;
+    F64 frame_start_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
+    
     os_frame_begin();
+    OutputDebugStringF("============================================== \n");
+    OutputDebugStringF("FRAME START \n");
 
     pencil_update(&P, false, &d3d);
     pencil_render(&P, &d3d);
     
-    d3d.swap_chain->Present(0, 0);
+    // static U64 counter = 0;
+    // static B32 in = false;
+    // if (!in && os_key_down(Key__Control) && os_key_down(Key__Z))
+    // {
+    //   in = true;
+    //   counter += 1;
+    //   // OutputDebugStringF("SHORTCUT \n");
+    //   // BP;
+    // }
+    // else {
+    //   in = false;
+    // }
+    // OutputDebugStringF("COUNTER :: %lld \n", counter);
 
-    if (os_key_down(Key__Shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
-      __debug_export_current_record_images(&P, &d3d);
-      BP;
-    }
+    // if (os_key_went_down(Key__Control))
+    // {
+    //   OutputDebugStringF("CONTROL went down \n");
+    // }
+    // if (os_key_down(Key__Control))
+    // {
+    //   OutputDebugStringF("CONTROL down \n");
+    // }
+    // if (os_key_went_up(Key__Control))
+    // {
+    //   OutputDebugStringF("CONTROL went_up \n");
+    // }
+
+    // if (os_key_went_down(Key__Z))
+    // {
+    //   OutputDebugStringF("Z went down \n");
+    // }
+    // if (os_key_down(Key__Z))
+    // {
+    //   OutputDebugStringF("Z down \n");
+    // }
+    // if (os_key_went_up(Key__Z))
+    // {
+    //   OutputDebugStringF("Z went_up \n");
+    // }
+
+    d3d.swap_chain->Present(1, 0);
     
+    F64 frame_end_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
+    F64 frame_time_in_sec = frame_end_time - frame_start_time;
+    
+    // #if DEBUG_MODE
+    #if 0
+    {
+      OutputDebugStringF("Frame time in sec: %f \n", frame_time_in_sec);
+      OutputDebugStringF("Frame rate: %f \n", 1 / frame_time_in_sec);
+      OutputDebugStringF("\n");
+    }
+    #endif
+
+    #if DEBUG_MODE
+    {
+      if (os_key_down(Key__Shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
+        __debug_export_current_record_images(&P, &d3d);
+        BP;
+      }
+    }
+    #endif
+  
+    OutputDebugStringF("FRAME END \n");
+    OutputDebugStringF("============================================== \n\n");
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us
