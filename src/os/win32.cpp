@@ -1,7 +1,7 @@
-#ifndef PLATFORM_WIN32_CPP
-#define PLATFORM_WIN32_CPP 
+#ifndef OS_WIN32_CPP
+#define OS_WIN32_CPP 
 
-#include "platform.h"
+#include "os/win32.h"
 #pragma comment (lib, "user32.lib")
 
 // #pragma comment (lib, "d3d11.lib")
@@ -30,6 +30,9 @@ struct OS_State {
 
 OS_State __os_g_state = {};
 
+///////////////////////////////////////////////////////////
+// - State
+//
 void os_init()
 {
   // __os_g_state.frame_events_arena = arena_alloc(Megabytes(64));
@@ -53,13 +56,79 @@ void os_init()
   }
 }
 
+void os_release()
+{
+  InvalidCodePath();
+}
+
 OS_State* os_get_state()
 {
   return &__os_g_state;
 }
 
 ///////////////////////////////////////////////////////////
-// - Misc
+// - Frame
+//
+void os_frame_begin()
+{
+  OS_State* os_state = os_get_state();
+  
+  // Setting the prev frame to the old input data 
+  {
+    StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
+    for (U64 i = 0; i < Key__COUNT; i += 1) 
+    {
+      OS_Key_state* key_state = __os_g_state.key_states + i;
+      key_state->was_down = key_state->is_down;
+      key_state->was_up = key_state->is_up;
+    }
+
+    // Setting mouse buttons
+    StaticAssert(ArrayCount(__os_g_state.mouse_button_states) == Mouse_button__COUNT);
+    for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
+    {
+      OS_Mouse_button_state* button_state = __os_g_state.mouse_button_states + i;
+      button_state->was_down = button_state->is_down;
+      button_state->was_up = button_state->is_up;
+    }
+  }
+
+  // Creating frame events though the winproc
+  for (MSG msg = {};PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
+  {
+    TranslateMessage(&msg);
+    DispatchMessageA(&msg);
+  }
+
+  // Mouse positions
+  os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
+  {
+    // todo:
+    // os_state->this_frame_mouse_pos = v2s32(f32_is_nan);
+    POINT p = {};
+    BOOL succ = {};
+    succ = GetCursorPos(&p); Assert(succ);
+    succ = ScreenToClient(os_get_state()->window_handle, &p); Assert(succ);
+    // note: When window is closed we cant get relative to widnow,
+    //       do i want to create a value for the invalid mosue pos that will have some like nan for the float
+    os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
+  }
+
+  // // Key states
+  // StaticAssert(ArrayCount(os_state->key_states) == OS_Key__COUNT);
+  // // for (os_state->frame_events;)
+  // // for (U64 i = 0; i < OS_Key__COUNT; i += 1) 
+  // // {
+
+
+  // // }
+
+}
+
+void os_frame_end();
+
+///////////////////////////////////////////////////////////
+// - Windowing
 //
 V2S32 os_get_client_area_dims()
 {
@@ -70,18 +139,6 @@ V2S32 os_get_client_area_dims()
   return result;
 }
 
-// note: This gets them in the screen coordinates
-/*
-V2S32 os_get_mouse_pos_rel_to_screen()
-{
-  POINT p = {};
-  BOOL succ = GetCursorPos(&p);
-  Assert(succ);
-  return v2s32(p.x, p.y);
-}
-*/
-
-// note: This is relative to the signle window's client area we have right now in the app
 V2F32 os_get_mouse_pos()
 {
   V2S32 s32_pos = os_get_state()->this_frame_mouse_pos;
@@ -89,7 +146,6 @@ V2F32 os_get_mouse_pos()
   return f32_pos;
 }
 
-// note: This is relative to the signle window's client area we have right now in the app
 V2F32 os_get_prev_mouse_pos()
 {
   V2S32 s32_pos = os_get_state()->prev_frame_mouse_pos;
@@ -107,7 +163,45 @@ V2F32 os_get_mouse_delta()
   return delta;
 }
 
-// AGI here
+B32 os_window_should_close()
+{
+  return os_get_state()->os_should_close_window;
+}
+
+///////////////////////////////////////////////////////////
+// - Inputs for keyboard
+//
+OS_Key_state os_get_key_state(Key key)
+{
+  OS_State* os = os_get_state();
+  OS_Key_state key_state = os->key_states[key];
+  return key_state;
+}
+
+B32 os_key_down(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return state.is_down;
+}
+
+B32 os_key_up(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return state.is_up;
+}
+
+B32 os_key_went_down(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return (state.is_down && state.was_up);
+}
+
+B32 os_key_went_up(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return (state.is_up && state.was_down);
+}
+
 Str8 str8_from_os_key(Key key)
 { 
   Str8 str = {};
@@ -193,39 +287,9 @@ Str8 str8_from_os_key(Key key)
   return str;
 }
 
-OS_Key_state os_get_key_state(Key key)
-{
-  OS_State* os = os_get_state();
-  OS_Key_state key_state = os->key_states[key];
-  return key_state;
-}
-
-B32 os_key_down(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return state.is_down;
-}
-
-B32 os_key_up(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return state.is_up;
-}
-
-B32 os_key_went_down(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return (state.is_down && state.was_up);
-}
-
-B32 os_key_went_up(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return (state.is_up && state.was_down);
-}
-
-// ---
-
+///////////////////////////////////////////////////////////
+// - Inputs for mouse 
+//
 OS_Mouse_button_state os_get_mouse_button_state(Mouse_button button)
 {
   OS_State* os = os_get_state();
@@ -257,6 +321,9 @@ B32 os_mouse_button_went_up(Mouse_button button)
   return (state.is_up && state.was_down);
 }
 
+///////////////////////////////////////////////////////////
+// - Misc
+//
 LRESULT win32_proc(
   HWND window_handle,
   UINT message,
@@ -373,67 +440,211 @@ LRESULT win32_proc(
 }
 
 
+///////////////////////////////////////////////////////////
+// - Grafics 
+//
+D3D_program grafics_create_program_from_file(
+  ID3D11Device* d3d_device,
+  const WCHAR* shader_program_file, 
+  const char* v_shader_main_f_name,
+  const char* p_shader_main_f_name,
+  B32* out_opt_is_succ
+) {
+  B32 is_succ = true;
 
-B32 os_window_should_close()
-{
-  return os_get_state()->os_should_close_window;
-}
+  // Getting v shader compiled
+  ID3DBlob* v_blob = 0;
+  if (is_succ)
+  {
+    ID3DBlob* error_blob = 0;
 
-void os_win32_frame_begin()
-{
-  OS_State* os_state = os_get_state();
+    HRESULT hr = D3DCompileFromFile(
+      shader_program_file, Null, Null,
+      "vs_main", "vs_5_0", Null, Null, &v_blob, &error_blob
+    );
+
+    if (error_blob != 0 || hr != S_OK)
+    {
+      if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
+      is_succ = false;
+    }
+
+    if (error_blob != 0) { error_blob->Release(); }
+  }
+
+  ID3DBlob* p_blob = 0;
+  if (is_succ)
+  {
+    ID3DBlob* error_blob = 0;
   
-  // Setting the prev frame to the old input data 
-  {
-    StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
-    for (U64 i = 0; i < Key__COUNT; i += 1) 
+    HRESULT hr = D3DCompileFromFile(
+      shader_program_file, Null, Null,
+      "ps_main", "ps_5_0", Null, Null, &p_blob, &error_blob
+    );
+
+    if (error_blob != 0 || hr != S_OK)
     {
-      OS_Key_state* key_state = __os_g_state.key_states + i;
-      key_state->was_down = key_state->is_down;
-      key_state->was_up = key_state->is_up;
+      if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
+      is_succ = false;
     }
 
-    // Setting mouse buttons
-    StaticAssert(ArrayCount(__os_g_state.mouse_button_states) == Mouse_button__COUNT);
-    for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
-    {
-      OS_Mouse_button_state* button_state = __os_g_state.mouse_button_states + i;
-      button_state->was_down = button_state->is_down;
-      button_state->was_up = button_state->is_up;
-    }
+    if (error_blob != 0) { error_blob->Release(); }
   }
 
-  // Creating frame events though the winproc
-  for (MSG msg = {};PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
+  ID3D11VertexShader* v_shader = 0;
+  ID3D11PixelShader* p_shader = 0;
+  if (is_succ)
   {
-    TranslateMessage(&msg);
-    DispatchMessageA(&msg);
+    HRESULT hr = S_OK;
+    hr = d3d_device->CreateVertexShader(v_blob->GetBufferPointer(), v_blob->GetBufferSize(), Null, &v_shader);
+    if (hr != S_OK) { is_succ = false; }
+    hr = d3d_device->CreatePixelShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), Null, &p_shader);
+    if (hr != S_OK) { is_succ = false; }
+    
+    // D3D11_INPUT_ELEMENT_DESC layout_decs = {};
+    // hr = d3d_device->CreateInputLayout(&layout_decs, 0, v_blob->GetBufferPointer(), v_blob->GetBufferSize(), &grafics.input_layout_for_rect_program);
+    // HR(hr);
   }
 
-  // Mouse positions
-  os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
-  {
-    // todo:
-    // os_state->this_frame_mouse_pos = v2s32(f32_is_nan);
-    POINT p = {};
-    BOOL succ = {};
-    succ = GetCursorPos(&p); Assert(succ);
-    succ = ScreenToClient(os_get_state()->window_handle, &p); Assert(succ);
-    // note: When window is closed we cant get relative to widnow,
-    //       do i want to create a value for the invalid mosue pos that will have some like nan for the float
-    os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
-  }
+  if (p_blob != 0) { p_blob->Release(); }  
+  if (v_blob != 0) { v_blob->Release(); }  
 
-  // // Key states
-  // StaticAssert(ArrayCount(os_state->key_states) == OS_Key__COUNT);
-  // // for (os_state->frame_events;)
-  // // for (U64 i = 0; i < OS_Key__COUNT; i += 1) 
-  // // {
+  // // Creating a uniform buffer
+  // D3D11_BUFFER_DESC uniform_desc = {};
+  // uniform_desc.ByteWidth      = sizeof(Grafics_rect_program_uniform_data);
+  // uniform_desc.Usage          = D3D11_USAGE_DYNAMIC;
+  // uniform_desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+  // uniform_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+  // d3d_device->CreateBuffer(&uniform_desc, NULL, &grafics.uniform_buffer_for_rect_program);
 
-
-  // // }
-
+  if (out_opt_is_succ != 0) { *out_opt_is_succ = is_succ; }
+  D3D_program program = {};
+  program.v_shader     = v_shader;
+  program.p_shader     = p_shader;
+  return program;
 }
+
+ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d)
+{
+  ID3D11RenderTargetView* frame_buffer_rtv = 0;
+  ID3D11Texture2D* backbuffer;
+  d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backbuffer);
+  d3d->device->CreateRenderTargetView((ID3D11Resource*)backbuffer, NULL, &frame_buffer_rtv);
+  backbuffer->Release();
+  return frame_buffer_rtv;
+}
+
+ID3D11RenderTargetView* d3d_make_rtv(D3D_state* d3d, U32 width, U32 height)
+{
+  ID3D11Texture2D* texture = 0;
+  {
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width      = width;
+    desc.Height     = height;
+    desc.MipLevels  = 1;
+    desc.ArraySize  = 1;
+    desc.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc = { 1, 0 };
+    desc.Usage      = D3D11_USAGE_DEFAULT;
+    desc.BindFlags  = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
+
+    HRESULT hr = d3d->device->CreateTexture2D(&desc, Null, &texture);
+    Assert(hr == S_OK);
+  }
+
+  ID3D11RenderTargetView* rtv = 0;
+  {
+    HRESULT hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &rtv);
+    Assert(hr == S_OK);
+  }
+
+  texture->Release();
+  return rtv;
+}
+
+D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
+{
+  HRESULT hr = S_OK;
+  
+  ID3D11Resource* resource = 0;
+  rtv->GetResource(&resource);
+
+  ID3D11Texture2D* texture = 0;
+  hr = resource->QueryInterface(IID_ID3D11Texture2D, (void**)&texture);
+
+  D3D_Texture_result result = {};
+  result.texture = texture;
+  result.succ    = (hr == S_OK);
+
+  resource->Release();
+  return result;
+}
+
+Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* src_texture)
+{
+  HRESULT hr = S_OK;
+
+  Scratch scratch = get_scratch(0, 0);
+  ID3D11Texture2D* copy_texture = 0;
+
+  U64 texture_height = 0;
+  U64 texture_width  = 0;
+  DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+  {
+    D3D11_TEXTURE2D_DESC desc = {};
+    src_texture->GetDesc(&desc);
+    desc.BindFlags      = 0;
+    desc.Usage          = D3D11_USAGE_STAGING;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+    texture_height = (U64)desc.Height;
+    texture_width  = (U64)desc.Width;
+    format         = desc.Format;
+
+    hr = d3d->device->CreateTexture2D(&desc, 0, &copy_texture);
+    HandleLater(hr == S_OK);
+
+    d3d->context->CopyResource((ID3D11Resource*)copy_texture, (ID3D11Resource*)src_texture);
+  }
+
+  // note: For now only this one
+  HandleLater(format == DXGI_FORMAT_R8G8B8A8_UNORM);
+  U64 bytes_per_pixel = 4;
+
+  Image_buffer image = {};
+  {
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)copy_texture, 0, D3D11_MAP_READ, 0, &mapped);
+    {
+      U64 size_for_image = texture_height * texture_width * bytes_per_pixel;
+      image.bytes_per_pixel = bytes_per_pixel;
+      // image.row_stride      = (U64)mapped.RowPitch; 
+      image.width_in_px     = texture_width;
+      image.height_in_px    = texture_height;
+      image.data            = ArenaPushArr(arena, U8, size_for_image);
+
+      HandleLater(hr == S_OK);
+      if (mapped.pData)
+      {
+        for (U64 row_index = 0; row_index < texture_height; row_index += 1)
+        {
+          memcpy(
+            image.data + row_index * texture_width * bytes_per_pixel, 
+            (U8*)mapped.pData + row_index * mapped.RowPitch,
+            texture_width * bytes_per_pixel
+          );
+        }
+      }
+    }
+    d3d->context->Unmap((ID3D11Resource*)copy_texture, 0);
+  }
+
+  copy_texture->Release();
+  end_scratch(&scratch);
+
+  return image;
+}
+
 
 
 #endif

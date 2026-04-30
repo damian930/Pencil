@@ -1,75 +1,7 @@
 #ifndef PENCIL_CPP
 #define PENCIL_CPP
 
-#include "platform.h"
-
-// todo: I dont yet know where to have these, so just having them here
-
-// D3D_program rect_program;
-// D3D_program texture_to_screen_program;
-
-// ID3D11RenderTargetView* draw_texture_rtv;
-// ID3D11RenderTargetView* frame_buffer_rtv;
-
-struct Draw_record {
-  ID3D11RenderTargetView* texture_before_we_affected; // This is allocated when done drawing
-  ID3D11RenderTargetView* texture_after_we_affected;  // This is allocated when done drawing
-
-  // These are also used for draw record free list
-  Draw_record* next;
-  Draw_record* prev;
-};
-
-struct Pencil_state {
-  Arena* arena;
-  Arena* frame_arena;
-  
-  // U64 pen_size;
-  // V4U8 pen_color;
-
-  // U64 eraser_size;
-
-  U32 draw_texures_width;
-  U32 draw_texures_height;
-  ID3D11RenderTargetView* draw_texture_always_fresh; 
-  ID3D11RenderTargetView* draw_texture_not_that_fresh;
-
-  // Pool of draw records
-  #define DRAW_RECORDS_MAX_COUNT 50
-  Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
-  U64 count_of_pool_draw_records_in_use; // This inludes if they are in the free list
-  Draw_record* first_free_draw_record;
-  Draw_record* last_free_draw_record;
-  
-  // todo: I have that current record might be 0 sometimes and we have to check for it or we crash, at least dont crash
-  Draw_record* first_record;
-  Draw_record* last_record;
-  Draw_record* current_record;
-
-  // Stuff for while drawing
-  B32 is_mid_drawing;
-  // B32 is_erasing_mode;
-
-  // Signals (These are just here like this right now)
-  // B32 signal_new_pen_size;
-  // U64 new_pen_size;
-  //
-  // B32 signal_new_eraser_size;
-  // U64 new_eraser_size;
-  // 
-  // B32 signal_swap_to_eraser;
-  // B32 signal_swap_to_pen;
-
-  // Misc
-  // Font font_texture_for_ui;
-  // V2U64 last_screen_dims;
-  // B32 show_brush_ui_menu;
-  // Str8 brush_menu_ui_id;
-
-  // Stuff for drawing that i dont yet have as a separate thing
-  D3D_program rect_program;  
-  D3D_program texture_to_screen_program;
-};
+#include "pencil.h"
 
 // todo: I dont like that P stored the shaders and all and we ahve to pss it in here like we do
 void draw_rect(
@@ -144,11 +76,6 @@ void draw_rect(
 
   context->Draw(4, 0);
 }
-
-struct Draw_record_registration_result {
-  B32 succ;
-  Draw_record* record;  
-};
 
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 {
@@ -237,45 +164,7 @@ void copy_from_texture_to_texture(
   
   d3d->context->CopyResource(dest_resource, src_resource);
 }
-
-// void _debug_load_gpu_textures_onto_cpu(const G_state* G)
-// {
-  // Image gpu_image_fresh = LoadImageFromTexture(G->draw_texture_always_fresh.texture);
-  // Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
  
- 
-  /*
-  Image gpu_image_fresh = LoadImageFromTexture(G->draw_texture_always_fresh.texture);
-  Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-  
-  Image gpu_image_other = LoadImageFromTexture(G->draw_texture_not_that_fresh.texture);
-  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-
-  Assert(gpu_image_other.width == gpu_image_fresh.width);
-  Assert(gpu_image_other.height == gpu_image_fresh.height);
-  
-  Texture texture_before_we_affected = {};
-  Texture texture_after_we_affected = {};
-
-  if (G->current_record != 0)
-  {
-    texture_before_we_affected = G->current_record->texture_before_we_affected.texture;
-    texture_after_we_affected = G->current_record->texture_after_we_affected.texture;
-  }
-
-  Image image_before_we_affected = LoadImageFromTexture(texture_before_we_affected);
-  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-  
-  Image image_after_we_affected = LoadImageFromTexture(texture_after_we_affected);
-  Assert(gpu_image_other.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
-
-  ExportImage(gpu_image_fresh, "fresh.png");
-  ExportImage(gpu_image_other, "other.png");
-  ExportImage(image_before_we_affected, "before_we_affected.png");
-  ExportImage(image_after_we_affected, "after_we_affected.png");
-  */
-// }
-
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
 {
   // Handling signals

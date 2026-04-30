@@ -137,7 +137,6 @@ void os_semaphore_signal(OS_Semaphore sem);
 void os_sleep(U64 milliseconds);
 U32 os_get_number_of_threads();
 
-
 struct OS_Image { // For now the convention is PX (U8 r, U8 P, U8 b, U8 a);
   U8* data;
   U64 width;  // px

@@ -14,8 +14,8 @@ abstract.
 #include "core/core_include.h"
 #include "core/core_include.cpp"
 
-#include "platform.h"
-#include "platform_win32.cpp"
+#include "os/win32.h"
+#include "os/win32.cpp"
 
 #include "pencil/pencil.h"
 #include "pencil/pencil.cpp"
@@ -261,7 +261,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   for (;!os_window_should_close();)
   {
-    os_win32_frame_begin();
+    os_frame_begin();
 
     pencil_update(&P, false, &d3d);
     pencil_render(&P, &d3d);
