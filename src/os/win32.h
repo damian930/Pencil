@@ -212,6 +212,20 @@ struct Grafics_rect_program_uniform_data {
   F32 _padding[2];
 };
 
+struct Grafics_circle_program_uniform_data {
+  V4F32 color;
+
+  F32 origin_x; 
+  F32 origin_y; 
+  
+  F32 radius;
+
+  F32 window_width;
+  F32 window_height;
+
+  F32 _padding[3];
+};
+
 struct D3D_program {
   // ID3D11InputLayout* input_layout_for_rect_program;
   ID3D11VertexShader* v_shader;

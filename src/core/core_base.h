@@ -415,6 +415,9 @@ tu_specific Axis2 axis2_other(Axis2 axis) { return (axis == Axis2__x ? Axis2__y 
 //	     If you really want to have them be macros to not generate function jumps, then just have them be 
 //	     inlined, either way, i would assume the compiler to do it eitherway or not do at all 
 
+#pragma warning(push)
+#pragma warning(disable: 4309)
+
 // - F32 constatns
 global const U32 f32_sign     = 0x80000000;
 global const U32 f32_exponent = 0x7f800000;
@@ -426,27 +429,37 @@ tu_specific B32 f32_is_nan(F32 f);
 
 global const S64 s64_min = 0x8000000000000000;
 global const S64 s64_max = 0x7fffffffffffffff;
-StaticAssert(~s64_min == s64_max, "s64_max and s64_min are not right.");
+StaticAssert((S64)~s64_min == s64_max, "s64_max and s64_min are not right.");
 
 global const U64 u64_min = 0x0000000000000000;
 global const U64 u64_max = 0xffffffffffffffff;
-StaticAssert(~u64_min == u64_max, "u64_max and u64_min are not right.");
+StaticAssert((U64)~u64_min == u64_max, "u64_max and u64_min are not right.");
 
 global const S32 s32_min = 0x80000000;
 global const S32 s32_max = 0x7fffffff;
-StaticAssert(~s32_min == s32_max, "s32_max and s32_min are not right.");
+StaticAssert((S32)~s32_min == s32_max, "s32_max and s32_min are not right.");
 
 global const U32 u32_min = 0x00000000;
 global const U32 u32_max = 0xffffffff;
-StaticAssert(~u32_min == u32_max, "u32_max and u32_min are not right.");
+StaticAssert((U32)~u32_min == u32_max, "u32_max and u32_min are not right.");
 
-// todo: signed 16 int
+global const S16 s16_min = 0x8000;
+global const S16 s16_max = 0x7fff;
+StaticAssert((S16)~s16_min == s16_max, "s16_max and s16_min are not right.");
 
-global const U16 u16_max = 0xffff;
 global const U16 u16_min = 0x0000;
+global const U16 u16_max = 0xffff;
+StaticAssert((U16)~u16_min == u16_max, "u16_max and u16_min are not right.");
 
-// todo: signed 8 int
-// todo: unsigned 8 int
+global const S8 s8_min = 0x80;
+global const S8 s8_max = 0x7f;
+StaticAssert((S8)~s8_min == s8_max, "s8_max and s8_min are not right.");
+
+global const U8 u8_min = 0x00;
+global const U8 u8_max = 0xff;
+StaticAssert((U8)~u8_min == u8_max, "u8_max and u8_min are not right.");
+
+#pragma warning(pop)
 
 struct RangeS64 {
 	S64 min;
@@ -624,24 +637,24 @@ tu_specific V4U64 v4u64(U64 x, U64 y, U64 z, U64 w) { V4U64 v = { x, y, z, w }; 
 
 union V4U8 {
 	struct { U8 x; U8 y; U8 z; U8 w; };
-	struct { U8 r; U8 P; U8 b; U8 a; };
+	struct { U8 r; U8 g; U8 b; U8 a; };
 };
 tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
 
-union Vec4_F32 {
+union V4F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
-	struct { F32 r; F32 P; F32 b; F32 a; };
+	struct { F32 r; F32 g; F32 b; F32 a; };
 };
-typedef Vec4_F32 Vec4;
-typedef Vec4_F32 V4;
+typedef V4F32 Vec4;
+typedef V4F32 V4;
 
-tu_specific Vec4_F32 vec4_f32_make(F32 x, F32 y, F32 z, F32 w) { Vec4_F32 v = { x, y, z, w }; return v; }
+tu_specific V4F32 v4f32(F32 x, F32 y, F32 z, F32 w) { V4F32 v = { x, y, z, w }; return v; }
 
-tu_specific B32 vec4_f32_match(Vec4_F32 v1, Vec4_F32 v2)
+tu_specific B32 v4f32_match(V4F32 v1, V4F32 v2)
 {
 	B32 result = (
 		v1.r == v2.r &&
-		v1.P == v2.P &&
+		v1.g == v2.g &&
 		v1.b == v2.b &&
 		v1.a == v2.a 
 	);

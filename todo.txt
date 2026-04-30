@@ -4,10 +4,10 @@
 [x] - Split the cpp and the header file for os, its getting hard to see the code
 [x] - Split the cpp and the header file for pencil, its getting hard to see the code
 [x] - Start having an fps counter and hitting the fps
-[ ] - Start having ctrl+z 
-[ ] - Start having ctrl+shift+z 
+[x] - Start having ctrl+z 
+[x] - Start having ctrl+shift+z 
 [ ] - Draw in circles
-[ ] - Draw a continuous line
+[x] - Draw a continuous line
 [ ] - 
 [ ] - 
 [ ] - Fix the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
@@ -19,7 +19,7 @@
 
 Feature ideas:
 - Screen shot
-
+- Built in color picker for a color on the screen
 
 
 

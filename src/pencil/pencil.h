@@ -62,6 +62,7 @@ struct Pencil_state {
   // Stuff for drawing that i dont yet have as a separate thing
   D3D_program rect_program;  
   D3D_program texture_to_screen_program;
+  D3D_program circle_program;
 };
 
 struct Draw_record_registration_result {

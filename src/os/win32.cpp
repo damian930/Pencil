@@ -402,6 +402,7 @@ LRESULT win32_proc(
           default:         { InvalidCodePath();  } break;
           case VK_SHIFT:   { key = Key__Shift;   } break;
           case VK_CONTROL: { key = Key__Control; } break;
+          case VK_DELETE:  { key = Key__Delete; } break;
         }
       }
       Assert(key != Key__NONE);

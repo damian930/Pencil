@@ -253,8 +253,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   P.texture_to_screen_program = grafics_create_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
   Assert(texture_to_screen_succ);
 
-  F32 _color_[4] = { 0, 0, 1, 1 };
-  d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
+  B32 circle_program_succ = true;
+  P.circle_program = grafics_create_program_from_file(d3d.device, L"../data/circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
+  Assert(circle_program_succ);
 
   // U64 frame_rate = 60;
   for (;!os_window_should_close();)
@@ -265,6 +266,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     os_frame_begin();
     OutputDebugStringF("============================================== \n");
     OutputDebugStringF("FRAME START \n");
+
+    // F32 _color_[4] = { 0, 0, 1, 1 };
+    // d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
 
     pencil_update(&P, false, &d3d);
     pencil_render(&P, &d3d);

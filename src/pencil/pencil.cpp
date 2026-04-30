@@ -26,7 +26,7 @@ void draw_rect(
     u_data.window_width  = (F32)os_get_client_area_dims().x;
     u_data.window_height = (F32)os_get_client_area_dims().y;
     u_data.red   = color.r;
-    u_data.green = color.P;
+    u_data.green = color.g;
     u_data.blue  = color.b;
     u_data.alpha = color.a;
 
@@ -75,6 +75,78 @@ void draw_rect(
   context->OMSetRenderTargets(1, &render_target, 0);
 
   context->Draw(4, 0);
+}
+
+void draw_circle(
+  const Pencil_state* P, 
+  D3D_state* d3d, ID3D11RenderTargetView* render_target,
+  F32 x_origin, F32 y_origin, F32 r, V4U8 color
+) {
+  ID3D11DeviceContext* context = d3d->context;
+  ID3D11Device* device = d3d->device;
+
+  context->ClearState();
+  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    Grafics_circle_program_uniform_data u_data = {};
+    u_data.origin_x      = x_origin; 
+    u_data.origin_y      = y_origin; 
+    u_data.radius        = r;
+    u_data.window_width  = (F32)os_get_client_area_dims().x;
+    u_data.window_height = (F32)os_get_client_area_dims().y;
+    u_data.color = v4f32((F32)color.r / (F32)u8_max, (F32)color.g / (F32)u8_max, (F32)color.b / (F32)u8_max, (F32)color.a / (F32)u8_max);
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC;
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    desc.MiscFlags      = {};
+    desc.StructureByteStride = {};
+    device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    memcpy(mapped.pData, &u_data, sizeof(u_data));
+    context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+  }
+
+  context->VSSetShader(P->circle_program.v_shader, 0, 0);
+  context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  ID3D11RasterizerState* rasterizer_state = 0;
+  {
+    // disable culling
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    device->CreateRasterizerState(&desc, &rasterizer_state);
+  }
+
+  D3D11_VIEWPORT vp = {};
+  vp.TopLeftX = 0;
+  vp.TopLeftY = 0;
+  vp.Width    = (F32)os_get_client_area_dims().x;
+  vp.Height   = (F32)os_get_client_area_dims().y;
+  vp.MinDepth = 0;
+  vp.MaxDepth = 1;
+  context->RSSetState(rasterizer_state);
+  context->RSSetViewports(1, &vp);
+  
+  context->PSSetShader(P->circle_program.p_shader, 0, 0);
+  context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+  
+  // todo: This shoud be a separate call to the draw thing that picks the render target
+  context->OMSetRenderTargets(1, &render_target, 0);
+
+  context->Draw(4, 0);
+
+  rasterizer_state->Release();
+  uniform_buffer->Release();
 }
 
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
@@ -264,50 +336,36 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
       P->current_record = P->current_record->prev;
     }
   }
-  /*
   else // User want to clear the screen
-  if (!P->is_mid_drawing && IsKeyPressed(KEY_DELETE))
+  if (!P->is_mid_drawing && os_key_went_up(Key__Delete))
   {
     dont_start_drawing_this_frame = true;
 
     // Creating a new current record
-    Draw_record_registration_result record_reg = register_new_draw_record(P, is_ui_capturing_mouse);
+    Draw_record_registration_result record_reg = register_new_draw_record(P, d3d, is_ui_capturing_mouse);
     if (record_reg.succ)
     {
       Draw_record* record = record_reg.record;
       P->current_record = record_reg.record;
     
-      U64 w = P->draw_texture_always_fresh.texture.width;
-      U64 h = P->draw_texture_always_fresh.texture.height;
+      U64 w = P->draw_texures_width;
+      U64 h = P->draw_texures_height;
       
-      // todo: These storing of 4 textures might be seprated into their own call
-  
       // Clearing the texture
-      fill_texture_with_color(P->draw_texture_always_fresh, { 0, 0, 0, 0 }, true);
+      F32 _color_[4] = { 0, 0, 0, 0 };
+      d3d->context->ClearRenderTargetView(P->draw_texture_always_fresh, _color_);
   
       // Storing the prev texture state
-      copy_from_texture_to_texture(
-        P->current_record->texture_before_we_affected.texture, v2u64(0, 0),
-        P->draw_texture_not_that_fresh.texture, v2u64(0, 0),
-        P->draw_texures_width, P->draw_texures_height
-      );
+      copy_from_texture_to_texture(d3d, P->current_record->texture_before_we_affected, P->draw_texture_not_that_fresh);
   
       // Storing the new texture state
-      copy_from_texture_to_texture(
-        P->current_record->texture_after_we_affected.texture, v2u64(0, 0),
-        P->draw_texture_always_fresh.texture, v2u64(0, 0),
-        P->draw_texures_width, P->draw_texures_height
-      );
-  
-      // Matching the prev texture state to the new one
-      copy_from_texture_to_texture(
-        P->draw_texture_not_that_fresh.texture, v2u64(0, 0),
-        P->draw_texture_always_fresh.texture, v2u64(0, 0),
-        P->draw_texures_width, P->draw_texures_height
-      );
-    }
+      copy_from_texture_to_texture(d3d, P->current_record->texture_after_we_affected, P->draw_texture_always_fresh);
 
+      // Matching the prev texture state to the new one
+      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
+    }
   }
+  /*
   else // User wants to start using the eraser pen 
   if (!P->is_mid_drawing && IsKeyPressed(KEY_E))
   {
@@ -343,14 +401,30 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d)
   if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left))
   {
     V2F32 new_pos = os_get_mouse_pos();
-    // V2F32 prev_pos = os_get_prev_mouse_pos();
+    V2F32 prev_pos = os_get_prev_mouse_pos();
     
     // todo: This is not the best way to have this here like this, but for now thats how it is
     // V4U8 color = { 0, 0, 0 ,0 };
     // if (!P->is_erasing_mode) { color = P->pen_color; }
     // U64 pen_size = P->eraser_size;
     // if (!P->is_erasing_mode) { pen_size = P->pen_size; }
-    draw_rect(P, d3d, P->draw_texture_always_fresh, new_pos.x, new_pos.y, 10, 10, yellow());
+    // draw_circle(P, d3d, P->draw_texture_always_fresh, new_pos.x, new_pos.y, 10, yellow());
+    
+    // Drawing a continuos line based on delta
+    {
+      F32 dx = new_pos.x - prev_pos.x;
+      F32 dy = new_pos.y - prev_pos.y;
+      F32 length = sqrtf(dx * dx + dy * dy);
+      U64 steps = (U64)length;
+      for (U64 i = 0; i <= steps; i++) 
+      {
+        F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
+        F32 x = prev_pos.x + dx * t;
+        F32 y = prev_pos.y + dy * t;
+        // draw_rect(P, d3d, P->draw_texture_always_fresh, x, y, 10, 10, yellow());
+        draw_circle(P, d3d, P->draw_texture_always_fresh, x, y, 15, yellow());
+      }
+    }
 
     // todo: Update this comment here (We no longer use cpu side image)
     // note: Here is the only time when the cpu side image is not synced to the gpu one. 
