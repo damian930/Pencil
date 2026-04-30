@@ -362,4 +362,77 @@ D3D_program grafics_create_program_from_file(
   return program;
 }
 
+// Image gpu_image_fresh = LoadImageFromTexture(G->draw_texture_always_fresh.texture);
+// Assert(gpu_image_fresh.format == PixelFormat_UNCOMPRESSED_R8G8B8A8);
+struct Image_buffer {
+  U8* data;
+  U64 width_in_px;
+  U64 height_in_px;
+  U64 bytes_per_pixel;
+};
+
+Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* src_texture)
+{
+  HRESULT hr = S_OK;
+
+  Scratch scratch = get_scratch(0, 0);
+  ID3D11Texture2D* copy_texture = 0;
+
+  U64 texture_height = 0;
+  U64 texture_width  = 0;
+  DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+  {
+    D3D11_TEXTURE2D_DESC desc = {};
+    src_texture->GetDesc(&desc);
+    desc.BindFlags      = 0;
+    desc.Usage          = D3D11_USAGE_STAGING;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+
+    texture_height = (U64)desc.Height;
+    texture_width  = (U64)desc.Width;
+    format         = desc.Format;
+
+    hr = d3d->device->CreateTexture2D(&desc, 0, &copy_texture);
+    HandleLater(hr == S_OK);
+
+    d3d->context->CopyResource((ID3D11Resource*)copy_texture, (ID3D11Resource*)src_texture);
+  }
+
+  // note: For now only this one
+  HandleLater(format == DXGI_FORMAT_R8G8B8A8_UNORM);
+  U64 bytes_per_pixel = 4;
+
+  Image_buffer image = {};
+  {
+    U64 size_for_image = texture_height * texture_width * bytes_per_pixel;
+    image.width_in_px  = texture_width;
+    image.height_in_px = texture_height;
+    image.data         = ArenaPushArr(arena, U8, size_for_image);
+
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)copy_texture, 0, D3D11_MAP_READ, 0, &mapped);
+    {
+      HandleLater(hr == S_OK);
+      if (mapped.pData)
+      {
+        for (U64 row_index = 0; row_index < texture_height; row_index += 1)
+        {
+          memcpy(
+            image.data + row_index * texture_width, 
+            (U8*)mapped.pData + row_index * mapped.RowPitch,
+            texture_width * bytes_per_pixel
+          );
+        }
+      }
+    }
+    d3d->context->Unmap((ID3D11Resource*)copy_texture, 0);
+  }
+
+  copy_texture->Release();
+  end_scratch(&scratch);
+
+  return image;
+}
+
+
 #endif

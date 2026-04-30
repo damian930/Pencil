@@ -37,6 +37,12 @@ void OutputDebugStringF(const char* fmt, ...)
   #endif
 }
 
+#define _CRT_SECURE_NO_WARNINGS
+#ifndef STB_IMAGE_WRITE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "third_party/stb/stb_image_write.h"
+#endif
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   allocate_thread_context();
@@ -198,6 +204,24 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     pencil_render(&P, &d3d);
     
     d3d.swap_chain->Present(0, 0);
+
+    
+    {
+      F32 _color_[4] = { 0, 0, 1, 1 };
+      d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
+
+      Arena* arena = arena_alloc(Megabytes(512));
+      ID3D11Resource* resource = 0;
+      P.draw_texture_always_fresh->GetResource(&resource);
+      ID3D11Texture2D* texture = 0;
+      HRESULT hr = resource->QueryInterface(IID_ID3D11Texture2D, (void**)&texture);
+      Assert(hr == S_OK);
+
+      Image_buffer image = d3d_export_texture(arena, &d3d, texture);
+      int res = stbi_write_png("test_png.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px);
+      Assert(res);
+    }
+    BP;
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us

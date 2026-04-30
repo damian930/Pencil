@@ -1,12 +1,16 @@
-[ ] - Draw a rect on mouse inputs to the screen using D3Ddddas;asldkflasdkfjasdl;kfjasdkl;f;
-[ ] - Black full screen window
-[ ] - Start drawing to a texture using d3d and then renderin the texture
-[ ] - Implement a draw mode logic
-  [ ] - Full screen transparent window (if tranparent doesnt work then screenshot)
-  [ ] - Global shortcut to switch between draw and non draw mode and top and non top most window
-  [ ] - Pen size change on mouse wheel
-  [ ] - Add back the ui from the raylib version to be able to change stuff quicly
-[ ] - Start having Fresh and Not_Fresh textures to be able to later have draw queue
+[x] - Fix the source and dest issue (The issue was that was using the worng case for the RTV in d3d. To get the resource out of an rtv you have to use ->GetResouce and not just a cast to the resource like with textures. This is the case bacause the textures inherit the Resource interface, so the cast is fine, but rtvs dont, therefore a call to ->GetResource)
+[ ] - Have a way to export a texture view and then compare on 
+      the cpu if they are identicall
+[ ] - Split the cpp and the header file, its getting hard to see the code
+[ ] - Start having an fps counter and hitting the fps
+[ ] - Display the fps on the screen to have it be like in raylib  
+[ ] - 
+[ ] - 
+[ ] - 
+[ ] - 
+[ ] - 
+
+
 
 
 Feature ideas:
