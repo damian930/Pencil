@@ -295,7 +295,12 @@ void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)
   d3d->context->RSSetViewports(1, &vp);
 }
 
-void d3d_render_end(D3D_State* d3d) {}
+void d3d_render_end(D3D_State* d3d) 
+{
+  
+
+
+}
 
 // todo: Remove this from here
 void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);

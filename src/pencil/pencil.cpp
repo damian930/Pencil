@@ -7,78 +7,6 @@
 // #include "ui/ui_core.cpp"
 
 // todo: I dont like that P stored the shaders and all and we ahve to pss it in here like we do
-void draw_rect(
-  const Pencil_state* P,
-  D3D_State* d3d, ID3D11RenderTargetView* render_target,  
-  F32 x, F32 y, F32 width, F32 height, V4U8 color
-) {
-  ID3D11DeviceContext* context = d3d->context;
-  ID3D11Device* device = d3d->device;
-
-  context->ClearState();
-  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-  
-  // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
-  {
-    Grafics_rect_program_uniform_data u_data = {};
-    u_data.rect_origin_x = x;
-    u_data.rect_origin_y = y;
-    u_data.rect_width    = width;
-    u_data.rect_height   = height;
-    u_data.window_width  = (F32)os_get_client_area_dims().x;
-    u_data.window_height = (F32)os_get_client_area_dims().y;
-    u_data.red   = color.r;
-    u_data.green = color.g;
-    u_data.blue  = color.b;
-    u_data.alpha = color.a;
-
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC;
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    desc.MiscFlags      = {};
-    desc.StructureByteStride = {};
-    device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    memcpy(mapped.pData, &u_data, sizeof(u_data));
-    context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-  }
-
-  context->VSSetShader(P->rect_program.v_shader, 0, 0);
-  context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-  // uniform_buffer->Release();
-
-  ID3D11RasterizerState* rasterizer_state = 0;
-  {
-    // disable culling
-    D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_NONE;
-    desc.DepthClipEnable = true;
-    device->CreateRasterizerState(&desc, &rasterizer_state);
-  }
-
-  D3D11_VIEWPORT vp = {};
-  vp.TopLeftX = 0;
-  vp.TopLeftY = 0;
-  vp.Width    = (F32)os_get_client_area_dims().x;
-  vp.Height   = (F32)os_get_client_area_dims().y;
-  vp.MinDepth = 0;
-  vp.MaxDepth = 1;
-  context->RSSetState(rasterizer_state);
-  // rasterizer_state->Release();
-  context->RSSetViewports(1, &vp);
-  context->PSSetShader(P->rect_program.p_shader, 0, 0);
-
-  // todo: This shoud be a separate call to the draw thing that picks the render target
-  context->OMSetRenderTargets(1, &render_target, 0);
-
-  context->Draw(4, 0);
-}
 
 void draw_circle(
   const Pencil_state* P, 
@@ -425,7 +353,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
         // draw_rect(P, d3d, P->draw_texture_always_fresh, x, y, 10, 10, yellow());
-        draw_circle(P, d3d, P->draw_texture_always_fresh, x, y, 15, yellow());
+        draw_circle(P, d3d, P->draw_texture_always_fresh, x, y, 15, yellow_u());
       }
     }
 
@@ -464,6 +392,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
   __active_draw_update_routine_end__: {};
 }
 
+/*
 void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
 {
   int w = os_get_client_area_dims().x;
@@ -807,6 +736,7 @@ void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
 
   ui_end_build();
 }
+*/
 
 void pencil_render(const Pencil_state* P, D3D_State* d3d)
 {
@@ -842,12 +772,12 @@ void pencil_render(const Pencil_state* P, D3D_State* d3d)
 
     context->VSSetShader(P->texture_to_screen_program.v_shader, 0, 0);
 
-    V2S32 dims = os_get_client_area_dims();
+    V2F32 dims = os_get_client_area_dims();
     D3D11_VIEWPORT vp = {};
     vp.TopLeftX = 0;
     vp.TopLeftY = 0;
-    vp.Width    = (F32)dims.x;
-    vp.Height   = (F32)dims.y;
+    vp.Width    = dims.x;
+    vp.Height   = dims.y;
     vp.MinDepth = 0;
     vp.MaxDepth = 1;
     context->RSSetViewports(1, &vp);

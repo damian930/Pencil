@@ -30,7 +30,7 @@ abstract.
 #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...)
 {
@@ -369,74 +369,49 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     d3d.context->ClearRenderTargetView(frame_buffer, _color_);
     frame_buffer->Release();
   }
-  d3d.swap_chain->Present(1, 0);
-  // Submitting the thing to the dwm composer
+
+  
+  // todo: Do better with this here
+  IDCompositionDevice* comp_device = 0;
   {
     HRESULT hr = {};
     
-    IDXGIDevice* dxgi_device = 0;
+    IDXGIDevice* dxgi_device    = 0;
+    IDCompositionVisual* visual = 0;
+    IDCompositionTarget* target =  0;
+
     hr = d3d.device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
     HR(hr);
     
-    IDCompositionDevice* comp_device = 0;
     hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
     HR(hr);
 
-    IDCompositionTarget* target = 0;
-    hr = comp_device->CreateTargetForHwnd(win32_state->window_handle, true, &target);
-    HR(hr);
-
-    IDCompositionVisual* visual = 0;
     hr = comp_device->CreateVisual(&visual);
     HR(hr);
   
     hr = visual->SetContent((IUnknown*)d3d.swap_chain);
     HR(hr);
     
+    hr = comp_device->CreateTargetForHwnd(win32_state->window_handle, true, &target);
+    HR(hr);
+
     hr = target->SetRoot(visual);
     HR(hr);
 
-    hr = comp_device->Commit();
-    HR(hr);
+    // dxgi_device->Release();
+    // visual->Release();
+    // target->Release();
   }
-
-
-  for (;;) { os_frame_begin(); }
 
   for (;!os_window_should_close();)
   {
     os_frame_begin();
-    static B32 done = false;
-    if (!done)
-    {
-      done = true;
-      d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
-      {
-        ID3D11RenderTargetView* frame_buffer = d3d_get_frame_buffer_rtv(&d3d);
-        d3d.context->OMSetBlendState(blendState, 0, ~0U);
-        F32 _color_[4] = { 0, 0, 1, 1 };
-        d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
-        frame_buffer->Release();
-      }
-      d3d_render_end(&d3d);
-      d3d.swap_chain->Present(1, 0);
-      
-      
-    }
-
-    os_frame_end();
-
-    /*
-    // F64 frame_start_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
-    // OutputDebugStringF("============================================== \n");
-    // OutputDebugStringF("FRAME START \n");
-    
-    os_frame_begin();
     d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    // pencil_update(&P, false, &d3d);
-    // pencil_render(&P, &d3d);
+    pencil_update(&P, false, &d3d);
+    pencil_render(&P, &d3d);
 
+    /*
     // Testing ui for now
     // /*
     UI_Draw_command_list ui_draw_commands = {};
@@ -460,24 +435,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       draw_ui(ui_draw_commands, &d3d, frame_buffer);
       frame_buffer->Release();
     }
-
-    d3d.swap_chain->Present(1, 0);
+    */
 
     d3d_render_end(&d3d);
     os_frame_end();
-    */
-
-    // F64 frame_end_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
-    // F64 frame_time_in_sec = frame_end_time - frame_start_time;
-
-    // #if DEBUG_MODE
-    #if 0
-    {
-      OutputDebugStringF("Frame time in sec: %f \n", frame_time_in_sec);
-      OutputDebugStringF("Frame rate: %f \n", 1 / frame_time_in_sec);
-      OutputDebugStringF("\n");
-    }
-    #endif
+    d3d.swap_chain->Present(1, 0);
+    HRESULT commit_hr = comp_device->Commit();
+    Assert(commit_hr == S_OK);
 
     #if DEBUG_MODE
     {
@@ -487,9 +451,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       }
     }
     #endif
-  
-    // OutputDebugStringF("FRAME END \n");
-    // OutputDebugStringF("============================================== \n\n");
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us
