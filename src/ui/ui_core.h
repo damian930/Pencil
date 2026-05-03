@@ -2,8 +2,6 @@
 #define __UI_H
 
 #include "core/core_include.h"
-#include "third_party/raylib/raylib.h"
-#include "raylib_inputs/raylib_inputs.h"
 
 /* todos:
   - If ther is a parent box and it has a single child and child fills the whole parent, 
@@ -12,12 +10,12 @@
   - there are no assert right now it place that show that you use the ui bulding part of the ui core before ui begin the build process
 */
 
-typedef V2F32 (UI_text_measuring_ft) (Str8 text, Font font, F32 font_size);
+// typedef V2F32 (UI_text_measuring_ft) (Str8 text, Font font, F32 font_size);
 
 enum UI_Size_kind {
   UI_Size_kind__px,
   UI_Size_kind__children_sum,
-  UI_Size_kind__text,
+  // UI_Size_kind__text,
   UI_Size_kind__percent_of_parent,
   // UI_Size_kind__em,
 };
@@ -32,23 +30,23 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__NONE               = (0 << 0),
 
   // note: testing this for now, but these might be a part of a single bigger thing
-  UI_Box_flag__draw_background    = (1 << 1),
-  UI_Box_flag__draw_corner_radius = (1 << 2),
-  UI_Box_flag__draw_borders       = (1 << 3),
+  UI_Box_flag__has_background    = (1 << 1),
+  // UI_Box_flag__draw_corner_radius = (1 << 2),
+  UI_Box_flag__has_borders       = (1 << 3),
 
-  UI_Box_flag__draw_text_contents = (1 << 4),
+  // UI_Box_flag__draw_text_contents = (1 << 4),
 
-  UI_Box_flag__floating_x         = (1 << 5), // note: Right now if floating is inside clip and overflows, it gets clipped,
-  UI_Box_flag__floating_y         = (1 << 6), //       and there is no way to turn it off.
+  // UI_Box_flag__floating_x         = (1 << 5), // note: Right now if floating is inside clip and overflows, it gets clipped,
+  // UI_Box_flag__floating_y         = (1 << 6), //       and there is no way to turn it off.
 
   // UI_Box_flag__clip_x = (1 << 7), 
   // UI_Box_flag__clip_y = (1 << 8), 
 
-  UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
-  UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
+  // UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
+  // UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
 
-  UI_Box_flag__floating = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
-  UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
+  // UI_Box_flag__floating = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
+  // UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
 };
 typedef U32 UI_Box_flags;
 
@@ -63,45 +61,45 @@ struct UI_Semantic_size_node { UI_Size v; UI_Semantic_size_node* next; };
 struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to the shape of the box
-struct UI_Color_node { Vec4_F32 v; UI_Color_node* next; };
+struct UI_Color_node { V4F32 v; UI_Color_node* next; };
 struct UI_Color_stack { UI_Color_node* first; U64 count; B32 pop_after_first_use; };
 
-struct UI_Corner_radius_node { F32 v; UI_Corner_radius_node* next; };
-struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_use; };
+// struct UI_Corner_radius_node { F32 v; UI_Corner_radius_node* next; };
+// struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_use; };
 
 // struct UI_Border_width_node { F32 v; UI_Border_width_node* next; };
 // struct UI_Border_width_stack { UI_Border_width_node* first; U64 count; B32 pop_after_first_use; };
-// struct UI_Border_color_node { Vec4_F32 v; UI_Border_color_node* next; };
+// struct UI_Border_color_node { V4F32 v; UI_Border_color_node* next; };
 // struct UI_Border_color_stack { UI_Border_color_node* first; U64 count; B32 pop_after_first_use; };
 
 // todo: If this is used, then move it out somewhere from here
 struct UI_Border_style {
   F32 width;
-  Vec4_F32 color;
+  V4F32 color;
 };
 struct UI_Border_style_node { UI_Border_style v; UI_Border_style_node* next; };
 struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to text
-struct UI_Text_color_node { Vec4_F32 v; UI_Text_color_node* next; };
-struct UI_Text_color_stack { UI_Text_color_node* first; U64 count; B32 pop_after_first_use; }; 
+// struct UI_Text_color_node { V4F32 v; UI_Text_color_node* next; };
+// struct UI_Text_color_stack { UI_Text_color_node* first; U64 count; B32 pop_after_first_use; }; 
 
-struct UI_Text_font_node { Font v; UI_Text_font_node* next; };
-struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_use; }; 
+// struct UI_Text_font_node { Font v; UI_Text_font_node* next; };
+// struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_use; }; 
 
-struct UI_Text_font_size_node { F32 v; UI_Text_font_size_node* next; };
-struct UI_Text_font_size_stack { UI_Text_font_size_node* first; U64 count; B32 pop_after_first_use; }; 
+// struct UI_Text_font_size_node { F32 v; UI_Text_font_size_node* next; };
+// struct UI_Text_font_size_stack { UI_Text_font_size_node* first; U64 count; B32 pop_after_first_use; }; 
 
 // - Special stacks
-struct UI_ID_node { Str8 id; UI_ID_node* next; };
-struct UI_ID_stack { UI_ID_node* first; U64 count; B32 pop_after_first_use; };
+// struct UI_ID_node { Str8 id; UI_ID_node* next; };
+// struct UI_ID_stack { UI_ID_node* first; U64 count; B32 pop_after_first_use; };
 
-struct UI_Box_clip_data {
-  B32 is_found;
-  V2F32 on_screen_dims;
-  V2F32 content_dims;
-  V2F32* clip_offset;
-};
+// struct UI_Box_clip_data {
+//   B32 is_found;
+//   V2F32 on_screen_dims;
+//   V2F32 content_dims;
+//   V2F32* clip_offset;
+// };
 
 struct UI_Actions {
   // Basics
@@ -112,10 +110,6 @@ struct UI_Actions {
 
   // Composed
   B32 is_clicked;
-
-  // ==== testing these for now
-  B32 enter_got_pressed;
-  B32 escape_got_pressed;
 
   // Other
   F32 wheel_move;
@@ -128,28 +122,29 @@ struct UI_Box {
   UI_Size semantic_size[Axis2__COUNT];
 
   struct {
-    Vec4_F32 color; 
-    F32 corner_radius;
+    V4F32 color; 
+    // F32 corner_radius;
     UI_Border_style border;
   } shape_style;
 
-  struct {
-    Str8 text;
-    Font font;
-    F32 font_size;      
-    Vec4_F32 text_color;
-  } text_style;
+  // struct {
+  //   Str8 text;
+  //   Font font;
+  //   F32 font_size;      
+  //   V4F32 text_color;
+  // } text_style;
 
   // Some more extensions
-  Texture2D texture_to_draw;
-  V2F32 clip_offset; 
+  // Texture2D texture_to_draw;
+  // V2F32 clip_offset; 
 
   Str8 id; // Per build  
   B32 has_been_updated_this_build;
 
-  V2F32 final_on_screen_size;          // Result of the sizing pass
-  V2F32 final_parent_offset; // Result of the relative to parent pass
-  Rect final_on_screen_rect;      // These are the result of the finals layout pass 
+  // Final build data
+  V2F32 final_on_screen_size; // Result of the sizing pass
+  V2F32 final_parent_offset;  // Result of the relative to parent pass
+  Rect final_on_screen_rect;  // These are the result of the finals layout pass 
   
   // Per build box tree
   UI_Box* first_child;
@@ -163,13 +158,12 @@ struct UI_Box {
 struct UI_Box_data {
   B32 is_found;
   Rect on_screen_rect;
-  UI_Box* parent_box;
 };
 
 struct UI_Context {
   // Pesistent
   Arena* context_arena;
-  UI_text_measuring_ft* text_measuring_fp;
+  // UI_text_measuring_ft* text_measuring_fp;
   Arena* build_arenas[2];
   U64 build_generation;
 
@@ -200,22 +194,22 @@ struct UI_Context {
 
   // Shape style stacks
   UI_Color_stack         color_stack;
-  UI_Corner_radius_stack corner_radius_stack;
+  // UI_Corner_radius_stack corner_radius_stack;
   UI_Border_style_stack border_style_stack;
 
   // Text style stacks
-  UI_Text_color_stack text_color_stack;
-  UI_Text_font_stack text_font_stack;
-  UI_Text_font_size_stack text_font_size_stack;
+  // UI_Text_color_stack text_color_stack;
+  // UI_Text_font_stack text_font_stack;
+  // UI_Text_font_size_stack text_font_size_stack;
 
   // Speciall stacks
-  UI_ID_stack id_stack;
+  // UI_ID_stack id_stack;
 };
 
 // - Context variables
 extern UI_Context* _ui_g_context;
 extern UI_Box _ui_g_zero_box;
-V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
+// V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
 
 // - Size makers
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
@@ -239,10 +233,10 @@ F32 ui_get_mouse_y();
 V2F32 ui_get_mouse();
 
 // - Text measure function stuff
-void ui_set_text_measuring_function(UI_text_measuring_ft* fp);
-UI_text_measuring_ft* ui_get_text_measuring_function();
-V2F32 ui_measure_text(Str8 str);
-V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size);
+// void ui_set_text_measuring_function(UI_text_measuring_ft* fp);
+// UI_text_measuring_ft* ui_get_text_measuring_function();
+// V2F32 ui_measure_text(Str8 str);
+// V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size);
 
 // - Context 
 void ui_init();
@@ -272,10 +266,6 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis);
 void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
 void ui_layout_box(UI_Box* root, Axis2 axis);
 
-// - UI draw 
-void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset);
-void ui_draw();
-
 // - Active box stuff
 B32 ui_has_active();
 B32 ui_is_active(Str8 box_id);
@@ -287,11 +277,11 @@ void ui_set_active(Str8 box_id);
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
 UI_Box* ui_get_box_prev_frame(Str8 id);
 UI_Box_data ui_get_box_data_prev_frame(Str8 id);
-UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id);
+// UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id);
 
 // - Actions
-UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_events);
-UI_Actions ui_actions_from_id(Str8 id, RLI_Event_list* rli_events);
+// UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_events);
+// UI_Actions ui_actions_from_id(Str8 id, RLI_Event_list* rli_events);
 
 // - Style stack operations for default settings
 void ui_add_flags(UI_Box_flags flags);   void ui_add_flags_to_next(UI_Box_flags flags);
@@ -306,68 +296,69 @@ void ui_push_size_y(UI_Size v);          void ui_set_next_size_y(UI_Size v);    
 #define UI_SizeY(ui_size)      DeferLoop(ui_push_semantic_size_y(ui_size), ui_pop_semantic_size_y())
 
 // - Style stack operations related to the shape of the box
-void ui_push_color_no_flag(Vec4_F32 v);
-void ui_set_next_color_no_flag(Vec4_F32 v);
+void ui_push_color_no_flag(V4F32 v);
+void ui_set_next_color_no_flag(V4F32 v);
 void ui_pop_color();
 void ui_auto_pop_color_stack();
-Vec4_F32 ui_peek_color();
-Vec4_F32 ui_get_color();
-void ui_push_color(Vec4_F32 v);
-void ui_set_next_color(Vec4_F32 v);
+V4F32 ui_peek_color();
+V4F32 ui_get_color();
+void ui_push_color(V4F32 v);
+void ui_set_next_b_color(V4F32 v);
 
-void ui_push_corner_radius_no_flag(F32 v);
-void ui_set_next_corner_radius_no_flag(F32 v);
-void ui_pop_corner_radius();
-void ui_auto_pop_corner_radius_stack();
-F32 ui_peek_corner_radius();
-F32 ui_get_corner_radius();
-void ui_push_corner_radius(F32 v);
-void ui_set_next_corner_radius(F32 v);
+// void ui_push_corner_radius_no_flag(F32 v);
+// void ui_set_next_corner_radius_no_flag(F32 v);
+// void ui_pop_corner_radius();
+// void ui_auto_pop_corner_radius_stack();
+// F32 ui_peek_corner_radius();
+// F32 ui_get_corner_radius();
+// void ui_push_corner_radius(F32 v);
+// void ui_set_next_corner_radius(F32 v);
 
-void ui_push_border_no_flag(UI_Border_style v);
-void ui_set_next_border_no_flag(UI_Border_style v);
+void ui_push_border_no_flag(F32 width, V4F32 color);
+void ui_set_next_border_no_flag(F32 width, V4F32 color);
 void ui_pop_border();
 void ui_auto_pop_border_stack();
 UI_Border_style ui_peek_border();
 UI_Border_style ui_get_border();
-void ui_push_border(UI_Border_style v);
-void ui_set_next_border(UI_Border_style v);
+void ui_push_border(F32 width, V4F32 color);
+void ui_set_next_border(F32 width, V4F32 color);
 
 // note: These add flags as well to the next, might need a version for no flag style scopes
-#define UI_Color(v)            DeferLoop(ui_push_color(v),         ui_pop_color())
-#define UI_Corner_radius(v)    DeferLoop(ui_push_corner_radius(v), ui_pop_corner_radius())
-#define UI_Border_width(v)     DeferLoop(ui_push_border_width(v),  ui_pop_border_width())
-#define UI_Border_color(v)     DeferLoop(ui_push_border_color(v),  ui_pop_border_color())
+#define UI_Color(v)             DeferLoop(ui_push_b_color(v),           ui_pop_color())
+#define UI_Border(width, color) DeferLoop(ui_push_border(width, color), ui_pop_border())
+// #define UI_Corner_radius(v)    DeferLoop(ui_push_corner_radius(v), ui_pop_corner_radius())
+// #define UI_Border_width(v)     DeferLoop(ui_push_border_width(v),  ui_pop_border_width())
+// #define UI_Border_color(v)     DeferLoop(ui_push_border_color(v),  ui_pop_border_color())
 
 // - Style stack operations for text
-void ui_push_text_color(Vec4_F32 v);
-void ui_set_next_text_color(Vec4_F32 v);
-void ui_pop_text_color();
-void ui_auto_pop_text_color_stack();
-Vec4_F32 ui_peek_text_color();
-Vec4_F32 ui_get_text_color();
+// void ui_push_text_color(V4F32 v);
+// void ui_set_next_text_color(V4F32 v);
+// void ui_pop_text_color();
+// void ui_auto_pop_text_color_stack();
+// V4F32 ui_peek_text_color();
+// V4F32 ui_get_text_color();
 
-void ui_push_font(Font v);
-void ui_set_next_font(Font v);
-void ui_pop_font();
-void ui_auto_pop_font_stack();
-Font ui_peek_font();
-Font ui_get_font();
+// void ui_push_font(Font v);
+// void ui_set_next_font(Font v);
+// void ui_pop_font();
+// void ui_auto_pop_font_stack();
+// Font ui_peek_font();
+// Font ui_get_font();
 
-void ui_push_font_size(F32 v);
-void ui_set_next_font_size(F32 v);
-void ui_pop_font_size();
-void ui_auto_pop_font_size_stack();
-F32 ui_peek_font_size();
-F32 ui_get_font_size();
+// void ui_push_font_size(F32 v);
+// void ui_set_next_font_size(F32 v);
+// void ui_pop_font_size();
+// void ui_auto_pop_font_size_stack();
+// F32 ui_peek_font_size();
+// F32 ui_get_font_size();
 
-#define UI_TextColor(color) DeferLoop(ui_push_text_color(color), ui_pop_text_color())
-#define UI_Font(font)       DeferLoop(ui_push_font(font),        ui_pop_font())
-#define UI_FontSize(size)   DeferLoop(ui_push_font_size(size),   ui_pop_font_size())
+// #define UI_TextColor(color) DeferLoop(ui_push_text_color(color), ui_pop_text_color())
+// #define UI_Font(font)       DeferLoop(ui_push_font(font),        ui_pop_font())
+// #define UI_FontSize(size)   DeferLoop(ui_push_font_size(size),   ui_pop_font_size())
 
 // - Special stacks operations
-void ui_set_next_id(Str8 id); 
-Str8 ui_get_next_id();
+// void ui_set_next_id(Str8 id); 
+// Str8 ui_get_next_id();
 
 // - private part of the api
 static inline 
@@ -381,14 +372,14 @@ void __ui_clear_style_stacks()
   ctx->semantic_size_y_stack = {};
   
   ctx->color_stack         = {};
-  ctx->corner_radius_stack = {};
+  // ctx->corner_radius_stack = {};
   ctx->border_style_stack = {};
 
-  ctx->text_color_stack = {};
-  ctx->text_font_stack  = {};
-  ctx->text_font_size_stack  = {};
+  // ctx->text_color_stack = {};
+  // ctx->text_font_stack  = {};
+  // ctx->text_font_size_stack  = {};
 
-  ctx->id_stack = {};
+  // ctx->id_stack = {};
 }
 
 static inline 
@@ -401,26 +392,22 @@ void __ui_push_defaults_onto_stacks()
   ui_push_size_x(ui_children_sum()); 
   ui_push_size_y(ui_children_sum());
 
-  ui_push_color(vec4_f32_make(0.0f, 0.0f, 0.0f, 0.0f)); 
-  ui_push_corner_radius(0.0f);
-  ui_push_border({ 0.0f, Vec4_F32{0.0f, 0.0f, 0.0f, 0.0f} });
+  ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
+  // ui_push_corner_radius(0.0f);
+  // ui_push_border({ 0.0f, V4F32{0.0f, 0.0f, 0.0f, 0.0f} });
 
-  ui_push_text_color(vec4_f32_make(255.0f, 255.0f, 255.0f, 255.0f));
-  ui_push_font(GetFontDefault()); // todo: Not the biggest fan of this line here
-  ui_push_font_size(32.0f);
+  // ui_push_text_color(vec4_f32_make(255.0f, 255.0f, 255.0f, 255.0f));
+  // ui_push_font(GetFontDefault()); // todo: Not the biggest fan of this line here
+  // ui_push_font_size(32.0f);
 
-  { // Manually setting up the id stack, it is speciall, so manuall here is fine
-    UI_ID_node* default_id = ArenaPush(ui_build_arena(), UI_ID_node);
-    default_id->id = Str8{};
-    StackPush(&ctx->id_stack, default_id);
-    ctx->id_stack.count += 1;
-    ctx->id_stack.pop_after_first_use = false;
-  }
+  // { // Manually setting up the id stack, it is speciall, so manuall here is fine
+  //   UI_ID_node* default_id = ArenaPush(ui_build_arena(), UI_ID_node);
+  //   default_id->id = Str8{};
+  //   StackPush(&ctx->id_stack, default_id);
+  //   ctx->id_stack.count += 1;
+  //   ctx->id_stack.pop_after_first_use = false;
+  // }
 }
-
-// todo: Remove this, this is a dev time thing for now
-// static inline void ui_set_next_r_color(Color r_color) { ui_set_next_color({ (F32)r_color.r, (F32)r_color.P, (F32)r_color.b, (F32)r_color.a }); }
-#define RAYLIB_COLOR_FROM_VEC(vec4) Color{(U8)vec4.r, (U8)vec4.P, (U8)vec4.b, (U8)vec4.a} 
 
 /* List of things i think i have to be able to do with this ui for it to be ok --> 
   -      hover state for boxes
@@ -510,6 +497,35 @@ void __ui_push_defaults_onto_stacks()
     53. Calendar View          Month/week/day grid. Event placement, drag to reschedule.
     54. Settings Page          Sectioned form. Sidebar nav, save state, confirmation.
 */
+
+// note: This is great to have the ui be independant.
+//       Though i dont know if i like it. I have seen this used in clay.
+//       I dont know how to just draw like ryan since i dont have 
+//       a separated layer for drawing like i had before with raylib 
+//       or how ryan has it with "D_" layer.
+///////////////////////////////////////////////////////////
+// - Draw stuff for the ui for the ui
+//
+struct UI_Draw_command {
+  Rect rect;
+
+  V4F32 rect_color;
+  F32 border_width;
+  V4F32 border_color;
+
+  UI_Draw_command* prev;
+  UI_Draw_command* next;
+};
+
+struct UI_Draw_command_list {
+  UI_Draw_command* first;
+  UI_Draw_command* last;
+  U64 count;
+};
+
+// void ui_draw_command_from_ui_root(UI_Box* root);
+
+
 
 #endif
 

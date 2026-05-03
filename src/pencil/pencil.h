@@ -60,9 +60,8 @@ struct Pencil_state {
   // Str8 brush_menu_ui_id;
 
   // Stuff for drawing that i dont yet have as a separate thing
-  D3D_program rect_program;  
-  D3D_program texture_to_screen_program;
-  D3D_program circle_program;
+  D3D_Program texture_to_screen_program;
+  D3D_Program circle_program;
 };
 
 struct Draw_record_registration_result {
@@ -72,15 +71,15 @@ struct Draw_record_registration_result {
 
 void draw_rect(
   const Pencil_state* P,
-  D3D_state* d3d, ID3D11RenderTargetView* render_target,  
+  D3D_State* d3d, ID3D11RenderTargetView* render_target,  
   F32 x, F32 y, F32 width, F32 height, V4U8 color
 );
 
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P);
-Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_state* d3d, B32 is_ui_capturing_mouse);
-void copy_from_texture_to_texture(D3D_state* d3d, ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
+Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_State* d3d, B32 is_ui_capturing_mouse);
+void copy_from_texture_to_texture(D3D_State* d3d, ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
 
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_state* d3d);
-void pencil_render(const Pencil_state* P, D3D_state* d3d);
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d);
+void pencil_render(const Pencil_state* P, D3D_State* d3d);
 
 #endif

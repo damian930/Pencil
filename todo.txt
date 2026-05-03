@@ -6,23 +6,38 @@
 [x] - Start having an fps counter and hitting the fps
 [x] - Start having ctrl+z 
 [x] - Start having ctrl+shift+z 
-[ ] - Draw in circles
+[x] - Draw in circles
 [x] - Draw a continuous line
+[ ] - Have a maximized transparent window
+[ ] - Have a hot key to go in and out of the draw mode
 [ ] - 
+[ ] - Remove the non-client arena for the window 
+[ ] - Finish with the little things about the drawing part you had in the demo
+[ ] - Start doing the ui for the thing. Need text.
+[ ] - Get path to app_data for later use with files and logs
+[ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
+      Do it so if the app is to be run the second time, just go into the draw mode.
+[ ] -  
+[ ] - Add asserts and error messages to the d3d layer and the os layer when the state is not initialised but used, 
+      like when a render func is used before render_begin is called
+[ ] - 
+[ ] - Start getting a texture from the system each frame and drawing it into the frame buffer
 [ ] - 
 [ ] - Fix the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
       and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
       not_that_fresh texture at the end of draw, instead of the fresh texture at the start of draw.
 [ ] - Display the fps on the screen to have it be like in raylib  
 
-
-
 Feature ideas:
-- Screen shot
+- Screen shot with the back of the desktop
+- Screen shot with just the drawn part
 - Built in color picker for a color on the screen
-
-
-
+- Color picker
+- Arrow
+- Customisation for shortcuts
+- Saving of 
+- Visible pen size
+- Pixel ruller so i dont have to use a website for it
 
 
 

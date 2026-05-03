@@ -1,17 +1,15 @@
 #ifndef __UI_CPP
 #define __UI_CPP
 
-#include "ui/ui_core.h"
 #include "core/core_include.cpp"
-#include "raylib_inputs/raylib_inputs.h"
-#include "raylib_inputs/raylib_inputs.cpp"
+#include "ui/ui_core.h"
 
 // todo: Struture this file based on the structure of the .h ui file
 
 UI_Context* _ui_g_context = 0;
 UI_Box _ui_g_zero_box = {};
 V2F32 _ui_g_clip_offset_stub = {};
-V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, F32 font_size) { Assert(0, "Dude, you forgot to set a text measuing function."); return V2F32{}; }
+// V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, F32 font_size) { Assert(0, "Dude, you forgot to set a text measuing function."); return V2F32{}; }
 
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 {
@@ -23,13 +21,13 @@ UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 }
 UI_Size ui_px(F32 value)                     { return ui_size_make(UI_Size_kind__px, value, 1.0f); }
 UI_Size ui_children_sum()                    { return ui_size_make(UI_Size_kind__children_sum, 0.0f, 0.0f); } // note: value is 0.0f there cause it is actually not used by the implementation
-UI_Size ui_text_size()                       { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
+// UI_Size ui_text_size()                       { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
 UI_Size ui_p_of_p(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__percent_of_parent, value, strictness); }
 
 // Just in case if i need these
 UI_Size ui_px_ex(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__px, value, strictness); }
 UI_Size ui_children_sum_ex(F32 strictness)  { return ui_size_make(UI_Size_kind__children_sum, 0.0f, strictness); } // note: value is 0.0f there cause it is actually not used by the implementation
-UI_Size ui_text_size_ex(F32 strictness)     { return ui_size_make(UI_Size_kind__text, 0.0f, strictness); }         // note: value is 0.0f there cause it is actually not used by the implementation
+// UI_Size ui_text_size_ex(F32 strictness)     { return ui_size_make(UI_Size_kind__text, 0.0f, strictness); }         // note: value is 0.0f there cause it is actually not used by the implementation
 
 UI_Context* ui_get_context()
 {
@@ -52,26 +50,26 @@ F32 ui_get_mouse_y()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_
 V2F32 ui_get_mouse() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 
-void ui_set_text_measuring_function(UI_text_measuring_ft* fp)
-{
-  UI_Context* ctx = ui_get_context();
-  ctx->text_measuring_fp = fp;
-}
+// void ui_set_text_measuring_function(UI_text_measuring_ft* fp)
+// {
+//   UI_Context* ctx = ui_get_context();
+//   ctx->text_measuring_fp = fp;
+// }
 
-UI_text_measuring_ft* ui_get_text_measuring_function()
-{
-  return ui_get_context()->text_measuring_fp;
-}
+// UI_text_measuring_ft* ui_get_text_measuring_function()
+// {
+//   return ui_get_context()->text_measuring_fp;
+// }
 
-V2F32 ui_measure_text(Str8 str)
-{
-  return ui_get_text_measuring_function()(str, ui_get_font(), ui_get_font_size());
-}
+// V2F32 ui_measure_text(Str8 str)
+// {
+//   return ui_get_text_measuring_function()(str, ui_get_font(), ui_get_font_size());
+// }
 
-V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size)
-{
-  return ui_get_text_measuring_function()(str, font, font_size);
-}
+// V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size)
+// {
+//   return ui_get_text_measuring_function()(str, font, font_size);
+// }
 
 
 void ui_init()
@@ -84,7 +82,7 @@ void ui_init()
     _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64)); 
   }
 
-  _ui_g_context->text_measuring_fp   = _ui_g_text_measuring_stub_f; 
+  // _ui_g_context->text_measuring_fp   = _ui_g_text_measuring_stub_f; 
   _ui_g_context->root_box            = &_ui_g_zero_box;
   _ui_g_context->current_parent_box  = &_ui_g_zero_box;
   _ui_g_context->prev_frame_root_box = &_ui_g_zero_box; 
@@ -130,26 +128,26 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   
   box->id = str8_copy_alloc(ui_build_arena(), id_and_text);
 
-  if (flags & UI_Box_flag__draw_background)    { box->shape_style.color         = ui_get_color(); }
-  if (flags & UI_Box_flag__draw_corner_radius) { box->shape_style.corner_radius = ui_get_corner_radius(); }
-  if (flags & UI_Box_flag__draw_borders) {
+  if (flags & UI_Box_flag__has_background)    { box->shape_style.color         = ui_get_color(); }
+  // if (flags & UI_Box_flag__draw_corner_radius) { box->shape_style.corner_radius = ui_get_corner_radius(); }
+  if (flags & UI_Box_flag__has_borders) {
     box->shape_style.border = ui_get_border();
   }
 
-  if (flags & UI_Box_flag__draw_text_contents)
-  {
-    Str8 text = ui_get_text_part_from_str8(id_and_text);
-    box->text_style.text       = str8_copy_alloc(ui_build_arena(), text);    
-    box->text_style.font       = ui_get_font();       
-    box->text_style.font_size  = ui_get_font_size();  
-    box->text_style.text_color = ui_get_text_color(); 
-  }
+  // if (flags & UI_Box_flag__draw_text_contents)
+  // {
+  //   Str8 text = ui_get_text_part_from_str8(id_and_text);
+  //   box->text_style.text       = str8_copy_alloc(ui_build_arena(), text);    
+  //   box->text_style.font       = ui_get_font();       
+  //   box->text_style.font_size  = ui_get_font_size();  
+  //   box->text_style.text_color = ui_get_text_color(); 
+  // }
 
-  UI_Box* this_box_prev_frame = ui_get_box_prev_frame(id_and_text);
-  if (!ui_box_is_zero(this_box_prev_frame)) 
-  {
-    box->clip_offset = this_box_prev_frame->clip_offset;
-  }
+  // UI_Box* this_box_prev_frame = ui_get_box_prev_frame(id_and_text);
+  // if (!ui_box_is_zero(this_box_prev_frame)) 
+  // {
+  //   // box->clip_offset = this_box_prev_frame->clip_offset;
+  // }
 
   DllPushBack_Name(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling);
   box->parent = ui_get_parent();
@@ -231,12 +229,12 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
       root->final_on_screen_size.v[axis] = root->semantic_size[axis].value;
     } break;
 
-    case UI_Size_kind__text:
-    {
-      UI_text_measuring_ft* text_mesure_f = ui_get_text_measuring_function();
-      V2F32 dims = text_mesure_f(root->text_style.text, root->text_style.font, root->text_style.font_size);
-      root->final_on_screen_size.v[axis] = dims.v[axis];
-    } break;
+    // case UI_Size_kind__text:
+    // {
+    //   UI_text_measuring_ft* text_mesure_f = ui_get_text_measuring_function();
+    //   V2F32 dims = text_mesure_f(root->text_style.text, root->text_style.font, root->text_style.font_size);
+    //   root->final_on_screen_size.v[axis] = dims.v[axis];
+    // } break;
   }
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
@@ -319,7 +317,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
       for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
       {
         // note: Floating children dont attribute to the overall size of the parent
-        if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+        // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
      
         if (root->layout_axis == axis) {
           root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; 
@@ -334,7 +332,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
         F32 children_size_to_maybe_give_out = 0.0f;
         for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
         {
-          if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/  continue; }
+          // if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/  continue; }
 
           F32 child_size = child->final_on_screen_size.v[axis];
           F32 p_to_to_keep = child->semantic_size[axis].strictness;
@@ -355,7 +353,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
         F32 max_size_after_possible_fixing = 0.0f;
         for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
         {
-          if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/ continue; } 
+          // if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/ continue; } 
 
           F32 child_size = child->final_on_screen_size.v[axis];
           F32 p_to_to_keep = child->semantic_size[axis].strictness;
@@ -387,10 +385,10 @@ void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
   // todo: Floating elements are not a part of the childrens tree, 
   //       what do we do about their overflow ???
   F32 available_space = root->final_on_screen_size.v[axis];
-  if (root->flags & UI_Box_flag__floating_x<<axis)
-  {
-    available_space = root->parent->final_on_screen_size.v[axis];
-  }
+  // if (root->flags & UI_Box_flag__floating_x<<axis)
+  // {
+    // available_space = root->parent->final_on_screen_size.v[axis];
+  // }
 
   // if (str8_match(root->id, Str8FromC("Y stack id "), 0) && axis == 1)
   // {
@@ -404,7 +402,7 @@ void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
     F32 total_space_children_might_give_out = 0.0f;
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+      // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
 
       F32 child_space = child->final_on_screen_size.v[axis];
       space_used_by_children += child_space;
@@ -435,7 +433,7 @@ void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
   {
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+      // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
 
       F32 child_space = child->final_on_screen_size.v[axis];
       if (child_space > available_space)
@@ -470,11 +468,12 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
   F32 accumelated_offset = 0.0f;
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
+    /*
     if (child->flags & UI_Box_flag__floating_x<<axis) 
     {
       child->final_parent_offset.v[axis] = 0.0f; // note: If floating, we leave its start where the parent starts
     }
-    else if (root->layout_axis == axis)
+    else*/ if (root->layout_axis == axis)
     {
       child->final_parent_offset.v[axis] = accumelated_offset;
       accumelated_offset += child->final_on_screen_size.v[axis]; 
@@ -491,7 +490,7 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis)
 {
   static F32 total_offset[Axis2__COUNT];
 
-  if (vec4_f32_match(root->shape_style.color, { 0, 255, 255, 255 }))
+  if (v4f32_match(root->shape_style.color, { 0, 255, 255, 255 }))
   {
     U32 x = 0;
     // BreakPoint();
@@ -526,107 +525,6 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
 
   ui_do_relative_parent_offsets_for_box(root, axis);
   ui_do_final_rect_for_box(root, axis);
-}
-
-void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset)
-{
-  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
-  // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
-  Rectangle raylib_rect = { root->final_on_screen_rect.x, root->final_on_screen_rect.y, root->final_on_screen_rect.width, root->final_on_screen_rect.height };
-
-  // if (str8_match(root->id, Str8FromC("test id box"), 0)) { BreakPoint(); }
-
-  if (root->flags & UI_Box_flag__floating_x) { x_clip_offset = 0.0f; }
-  if (root->flags & UI_Box_flag__floating_y) { y_clip_offset = 0.0f; }
-
-  raylib_rect.x += x_clip_offset;
-  raylib_rect.y += y_clip_offset;
-
-  if (root->flags & UI_Box_flag__draw_background)
-  {
-    DrawRectangleRounded(raylib_rect, root->shape_style.corner_radius, 0, RAYLIB_COLOR_FROM_VEC(root->shape_style.color));
-  }
-
-  // todo/note: DrawRectangleRoundedLinesEx draws the line on the outside of the rect and not within
-  if (root->flags & UI_Box_flag__draw_borders)
-  {
-    // note: Might just draw a rect behind the rect which has borders
-    // DrawRectangleV();
-    // DrawRing();
-    DrawRectangleRoundedLinesEx(raylib_rect, root->shape_style.corner_radius, 0, root->shape_style.border.width, RAYLIB_COLOR_FROM_VEC(root->shape_style.border.color));
-  }
-
-  if (root->flags & UI_Box_flag__draw_text_contents)
-  {
-    Scratch scratch = get_scratch(0, 0);
-    Str8 text_nt = str8_copy_alloc(scratch.arena, root->text_style.text);
-    DrawTextEx(root->text_style.font, (char*)text_nt.data, Vector2{raylib_rect.x, raylib_rect.y}, (F32)root->text_style.font_size, 0, RAYLIB_COLOR_FROM_VEC(root->text_style.text_color));
-    end_scratch(&scratch);
-  }
-
-  if (root->texture_to_draw.id != 0)
-  {
-    Texture2D texture = root->texture_to_draw;
-    Rectangle source_rect = { 0.0f, 0.0f, (F32)texture.width, (F32)texture.height };
-    DrawTexturePro(root->texture_to_draw, source_rect, raylib_rect, Vector2{}, 0.0f, WHITE); 
-  }
-  
-  // todo: Scissor state might be broken if 1 scissor is actiev and another begins, so check for that
-  //       it might happen when there is a parent with overflowed child and some it its children 
-  //       have overflow as well anywhere deeper in that subtree.
-
-  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
-  if (root->flags & UI_Box_flag__dont_draw_overflow)
-  {
-    BeginScissorMode((int)raylib_rect.x, (int)raylib_rect.y, (int)raylib_rect.width, (int)raylib_rect.height);
-  }
-  else {
-    B32 is_on_x = root->flags & UI_Box_flag__dont_draw_overflow_x;
-    B32 is_on_y = root->flags & UI_Box_flag__dont_draw_overflow_y;
-    if (XOR(is_on_x, is_on_y)) {
-      // note: I did not bother implement this. 
-      //       To implement this just do something like scissor on on x and the whole ui size on y (screen y)
-      InvalidCodePath();
-    }
-  }
-
-  x_clip_offset += root->clip_offset.v[Axis2__x];
-  y_clip_offset += root->clip_offset.v[Axis2__y];
-
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
-    if (child->flags & UI_Box_flag__floating_x) {
-      x_clip_offset -= root->clip_offset.v[Axis2__x];    
-    } 
-    if (child->flags & UI_Box_flag__floating_y) {
-      y_clip_offset -= root->clip_offset.v[Axis2__y];    
-    }
-
-    ui_draw_box(child, x_clip_offset, y_clip_offset);
-
-    if (child->flags & UI_Box_flag__floating_x) {
-      x_clip_offset += root->clip_offset.v[Axis2__x];    
-    } 
-    if (child->flags & UI_Box_flag__floating_y) {
-      y_clip_offset += root->clip_offset.v[Axis2__y];    
-    }
-  }
-
-  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
-  if (root->flags & UI_Box_flag__dont_draw_overflow)
-  {
-    EndScissorMode();
-  }
-
-  x_clip_offset -= root->clip_offset.v[Axis2__x];
-  y_clip_offset -= root->clip_offset.v[Axis2__y];
-
-}
-
-void ui_draw()
-{
-  UI_Context* ctx = ui_get_context();
-  ui_draw_box(ctx->root_box, 0.0f, 0.0f);
 }
 
 // note: There might be weird thing going on with ids and text, dont forget about ##
@@ -665,43 +563,36 @@ UI_Box_data ui_get_box_data_prev_frame(Str8 id)
   if (!ui_box_is_zero(box)) 
   { 
     box_data.on_screen_rect = box->final_on_screen_rect; 
-    box_data.parent_box = box->parent;
     box_data.is_found = true; 
   }
   return box_data;
 }
 
-UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id)
-{
-  UI_Box_clip_data result_data = {};
-  result_data.clip_offset = &_ui_g_clip_offset_stub;
+// UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id)
+// {
+//   UI_Box_clip_data result_data = {};
+//   result_data.clip_offset = &_ui_g_clip_offset_stub;
   
-  UI_Box* box = ui_get_box_prev_frame(id);
-  result_data.is_found = !ui_box_is_zero(box);
-  if (result_data.is_found)
-  {
-    result_data.on_screen_dims = rect_dims(box->final_on_screen_rect);
+//   UI_Box* box = ui_get_box_prev_frame(id);
+//   result_data.is_found = !ui_box_is_zero(box);
+//   if (result_data.is_found)
+//   {
+//     result_data.on_screen_dims = rect_dims(box->final_on_screen_rect);
     
-    result_data.content_dims = {};
-    for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-    {
-      Axis2 axis = box->layout_axis;
-      V2F32 child_dims = rect_dims(child->final_on_screen_rect);
-      result_data.content_dims.v[axis] += child_dims.v[axis];
-      axis = axis2_other(axis);
-      result_data.content_dims.v[axis] = Max(result_data.content_dims.v[axis], child_dims.v[axis]);
-    }
+//     result_data.content_dims = {};
+//     for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+//     {
+//       Axis2 axis = box->layout_axis;
+//       V2F32 child_dims = rect_dims(child->final_on_screen_rect);
+//       result_data.content_dims.v[axis] += child_dims.v[axis];
+//       axis = axis2_other(axis);
+//       result_data.content_dims.v[axis] = Max(result_data.content_dims.v[axis], child_dims.v[axis]);
+//     }
 
-    result_data.clip_offset = &box->clip_offset;
-  }
-  return result_data;
-} 
-
-// struct UI_New_inputs {
-//   B32 is_hovered;
-//   B32 mouse_went_down;
-//   B32 mouse_went_up;
-// };
+//     result_data.clip_offset = &box->clip_offset;
+//   }
+//   return result_data;
+// } 
 
 B32 ui_is_no_active()
 {
@@ -745,6 +636,7 @@ void ui_set_active(Str8 box_id)
   ctx->currently_active_box_id = str8_copy_alloc(ui_build_arena(), box_id); 
 }
 
+/*
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_events)
 {
   // todo: I dont know how to make this be nicer in the api yet
@@ -881,6 +773,7 @@ UI_Actions ui_actions_from_id(Str8 id, RLI_Event_list* rli_events)
   if (!ui_box_is_zero(box)) { actions = ui_actions_from_box(box, rli_events); }
   return actions;
 }
+*/
 
 ///////////////////////////////////////////////////////////
 // - Style stacks
@@ -963,354 +856,240 @@ UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_Sty
 
 // -
 
-void ui_push_color_no_flag(Vec4_F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, color_stack, UI_Color_node, v) }
-void ui_set_next_color_no_flag(Vec4_F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, color_stack, UI_Color_node, v) }
+void ui_push_color_no_flag(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, color_stack, UI_Color_node, v) }
+void ui_set_next_color_no_flag(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, color_stack, UI_Color_node, v) }
 void ui_pop_color()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, color_stack, UI_Color_node) }
 void ui_auto_pop_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, color_stack, UI_Color_node) }
-Vec4_F32 ui_peek_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, color_stack, UI_Color_node) }
-Vec4_F32 ui_get_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, color_stack, UI_Color_node) }
-void ui_push_color(Vec4_F32 v) { ui_push_color_no_flag(v); ui_add_flags(UI_Box_flag__draw_background); }
-void ui_set_next_color(Vec4_F32 v) { ui_set_next_color_no_flag(v); ui_add_flags_to_next(UI_Box_flag__draw_background); }
+V4F32 ui_peek_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, color_stack, UI_Color_node) }
+V4F32 ui_get_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, color_stack, UI_Color_node) }
+void ui_push_color(V4F32 v) { ui_push_color_no_flag(v); ui_add_flags(UI_Box_flag__has_background); }
+void ui_set_next_b_color(V4F32 v) { ui_set_next_color_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_background); }
 
-void ui_push_corner_radius_no_flag(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-void ui_set_next_corner_radius_no_flag(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-void ui_pop_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-void ui_auto_pop_corner_radius_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-F32 ui_peek_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-F32 ui_get_corner_radius()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-void ui_push_corner_radius(F32 v) { ui_push_corner_radius_no_flag(v); ui_add_flags(UI_Box_flag__draw_corner_radius); }
-void ui_set_next_corner_radius(F32 v) { ui_set_next_corner_radius_no_flag(v); ui_add_flags_to_next(UI_Box_flag__draw_corner_radius); }
+// void ui_push_corner_radius_no_flag(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+// void ui_set_next_corner_radius_no_flag(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+// void ui_pop_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+// void ui_auto_pop_corner_radius_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+// F32 ui_peek_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+// F32 ui_get_corner_radius()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+// void ui_push_corner_radius(F32 v) { ui_push_corner_radius_no_flag(v); ui_add_flags(UI_Box_flag__draw_corner_radius); }
+// void ui_set_next_corner_radius(F32 v) { ui_set_next_corner_radius_no_flag(v); ui_add_flags_to_next(UI_Box_flag__draw_corner_radius); }
 
-void ui_push_border_no_flag(UI_Border_style v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_set_next_border_no_flag(UI_Border_style v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_pop_border()                       { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_auto_pop_border_stack()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
-UI_Border_style ui_peek_border()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, border_style_stack, UI_Border_style_node) }
-UI_Border_style ui_get_border()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_push_border(UI_Border_style v) { ui_push_border_no_flag(v); ui_add_flags(UI_Box_flag__draw_borders); }
-void ui_set_next_border(UI_Border_style v) { ui_set_next_border_no_flag(v); ui_add_flags_to_next(UI_Box_flag__draw_borders); }
-
-// --
-
-void ui_push_text_color(Vec4_F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-void ui_set_next_text_color(Vec4_F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-void ui_pop_text_color()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-void ui_auto_pop_text_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-Vec4_F32 ui_peek_text_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_color_stack, UI_Text_color_node) }
-Vec4_F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
-
-void ui_push_font(Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-void ui_set_next_font(Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-void ui_pop_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-void ui_auto_pop_font_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-Font ui_peek_font()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_stack, UI_Text_font_node) }
-Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
-
-void ui_push_font_size(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
-void ui_set_next_font_size(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
-void ui_pop_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-void ui_auto_pop_font_size_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-F32 ui_peek_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-F32 ui_get_font_size()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
+void ui_push_border_no_flag(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
+void ui_set_next_border_no_flag(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
+void ui_pop_border()                                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
+void ui_auto_pop_border_stack()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
+UI_Border_style ui_peek_border()                        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, border_style_stack, UI_Border_style_node) }
+UI_Border_style ui_get_border()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node) }
+void ui_push_border(F32 width, V4F32 color)             { ui_push_border_no_flag(width, color); ui_add_flags(UI_Box_flag__has_borders); }
+void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_flag(width, color); ui_add_flags_to_next(UI_Box_flag__has_borders); }
 
 // --
 
-void ui_set_next_id(Str8 id)
-{
-  UI_Context* ctx = ui_get_context();
-  UI_ID_node* node = ArenaPush(ui_build_arena(), UI_ID_node);
-  node->id = str8_copy_alloc(ui_build_arena(), id); // todo: Check is allocation in the middle of the arena
-  StackPush(&ctx->id_stack, node);
-  ctx->id_stack.count += 1;
-  ctx->id_stack.pop_after_first_use = true;
-}
+// void ui_push_text_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+// void ui_set_next_text_color(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+// void ui_pop_text_color()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
+// void ui_auto_pop_text_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
+// V4F32 ui_peek_text_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_color_stack, UI_Text_color_node) }
+// V4F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
 
-Str8 ui_get_next_id() // note: This id might be invalid next build, so be carefull
-{
-  Str8 id = {};
-  UI_Context* ctx = ui_get_context();
-  UI_ID_stack* stack = &ctx->id_stack;
-  Assert(stack->count > 0);
-  if (stack->count > 0)
-  {
-    id = stack->first->id;
-    if (stack->count > 1)
-    {
-      StackPop(stack);
-      stack->count -= 1;
-      stack->pop_after_first_use = false;
-    }
-  }
-  return id;
-}
+// void ui_push_font(Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+// void ui_set_next_font(Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+// void ui_pop_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
+// void ui_auto_pop_font_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
+// Font ui_peek_font()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_stack, UI_Text_font_node) }
+// Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
+
+// void ui_push_font_size(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
+// void ui_set_next_font_size(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
+// void ui_pop_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
+// void ui_auto_pop_font_size_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
+// F32 ui_peek_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
+// F32 ui_get_font_size()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
+
+// --
+
+// void ui_set_next_id(Str8 id)
+// {
+//   UI_Context* ctx = ui_get_context();
+//   UI_ID_node* node = ArenaPush(ui_build_arena(), UI_ID_node);
+//   node->id = str8_copy_alloc(ui_build_arena(), id); // todo: Check is allocation in the middle of the arena
+//   StackPush(&ctx->id_stack, node);
+//   ctx->id_stack.count += 1;
+//   ctx->id_stack.pop_after_first_use = true;
+// }
+
+// Str8 ui_get_next_id() // note: This id might be invalid next build, so be carefull
+// {
+//   Str8 id = {};
+//   UI_Context* ctx = ui_get_context();
+//   UI_ID_stack* stack = &ctx->id_stack;
+//   Assert(stack->count > 0);
+//   if (stack->count > 0)
+//   {
+//     id = stack->first->id;
+//     if (stack->count > 1)
+//     {
+//       StackPop(stack);
+//       stack->count -= 1;
+//       stack->pop_after_first_use = false;
+//     }
+//   }
+//   return id;
+// }
 
 // todo: What happends if i pop all the values and then try to get them, if fails, then we shoud protect agains the full pop case
 
 // ========
 
-
-// todo: Remove this
 ///////////////////////////////////////////////////////////
-// - Some deve time stuff 
+// - Draw stuff for the ui for the ui
 //
-
-// todo: `
-//  [ ] - A way to specify style for the thumb
-//  [ ] - A way to specify style for the scroll bar
-//  [ ] - Min\Max value
-//  [ ] - A way to specify text on top and in the middle of the slider
-
-// struct UI_Slider_set_up {
-//   UI_Size size_x;
-//   UI_Size size_y;
-//   F32 corner_r;
-//   F32 border_width;
-//   Vec4 back_color;
-//   Vec4 border_color;
-//   Vec4 hover_color;
-//   Vec4 spacer_color;
-// };
-
-// void ui_slider(RLI_Event_list* rli_events, Str8 slider_id, F32* current_value, F32 min_value, F32 max_value, UI_Slider_set_up set_up)
-// {
-//   Assert(min_value < max_value); // todo: Remove this
-
-//   UI_Actions slider_box_actions = ui_actions_from_id(slider_id, rli_events);
-
-//   if (slider_box_actions.is_hovered && !slider_box_actions.is_down) 
-//   {
-//     ui_set_next_color(set_up.hover_color);
-//     ui_add_flags_to_next(UI_Box_flag__draw_background);
-//   }
-
-//   InvalidCodePath(); // Some code in the ui system has been changed, so this is invalid, rewrite 
-
-//   ui_set_next_size_x(set_up.size_x);
-//   ui_set_next_size_y(set_up.size_y);
-//   ui_set_next_corner_radius(set_up.corner_r);
-//   // ui_set_next_border_width(set_up.border_width); ui_add_flags_to_next(UI_Box_flag__draw_borders);
-//   // ui_set_next_border_color(set_up.border_color);
-//   ui_set_next_color(set_up.back_color); ui_add_flags_to_next(UI_Box_flag__draw_background); 
-//   UI_Box* slider_box = ui_box_make(slider_id, 0);
-  
-//   UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_box->id);
-  
-//   if (slider_box_actions.is_down)
-//   {
-//     if (slider_box_data.is_found)
-//     {
-//       F32 mouse_x = ui_mouse_x();
-//       F32 x_offset = slider_box_data.on_screen_rect.x;
-//       F32 width = slider_box_data.on_screen_rect.width;
-//       F32 slider_new_pos = mouse_x - x_offset;
-//       F32 ratio = slider_new_pos / width;
-//       *current_value = lerp_f32(min_value, max_value, ratio);
-//       clamp_f32_inplace(current_value, min_value, max_value);
-//     }
-//   }
-
-//   F32 slider_taken_space = 0.0f;
-//   F32 slider_height = 0.0f;
-
-//   if (slider_box_data.is_found) 
-//   {
-//     F32 current_value_ration = *current_value / (max_value - min_value);
-//     slider_taken_space = lerp_f32(0.0f, slider_box_data.on_screen_rect.width, current_value_ration);
-//     slider_height = slider_box_data.on_screen_rect.height;
-//   } 
-
-//   UI_Parent(slider_box)
-//   {
-//     ui_set_next_size_x(ui_px(slider_taken_space));
-//     ui_set_next_size_y(ui_px(slider_height));
-//     ui_set_next_corner_radius(set_up.corner_r);
-//     ui_add_flags_to_next(UI_Box_flag__draw_borders);
-//     ui_set_next_color(set_up.spacer_color); ui_add_flags_to_next(UI_Box_flag__draw_background);
-//     (void)ui_box_make(Str8{}, 0);
-
-//     ui_add_flags_to_next(UI_Box_flag__floating);
-//     UI_YStack()
-//     {
-//       ui_spacer(ui_p_of_p(1.0f, 0.0f));
-//       UI_XStack()
-//       {
-//         ui_spacer(ui_p_of_p(1.0f, 0.0f));
-
-//         // Label
-//         // U8 buffer[256];
-//         // int res = sprintf((char*)buffer, "%.1f", *current_value);
-//         // Assert(res >= 0);
-//         // Str8 str = str8_manuall(buffer, (U64)res);
-//         // ui_label(str);
-
-//         ui_spacer(ui_p_of_p(1.0f, 0.0f));
-//       }
-//       ui_spacer(ui_p_of_p(1.0f, 0.0f));
-//     }
-//   }
-
-
-
-
-  // todo:
-  // slider box
-  // spacer with color that shows the current value
-  // floating labl in the middle
-
-
-
-// }
-
-/*
-void ui_scroll_bar(RLI_Event_list* rli_events)
+// note: This is a new, custom drawn thing for the ui, work in progress right now
+void ui_draw_command_from_ui_root(Arena* arena, UI_Box* root, UI_Draw_command_list* command_list)
 {
-  U64 list_of_data[256];
-  for EachArrElement(i, list_of_data) { list_of_data[i] = i; }
-  
-  Str8 scrollable_list_id = Str8FromC("scrollable_list_id");
-  Str8 scroll_bar_id = Str8FromC("scroll bar id");
-  Str8 thumb_id = Str8FromC("thumb id");
+  Assert(!ui_box_is_zero(root));
 
-  // todo: use this
-  B32 all_data_for_scroll_bar_present = true; 
+  U64 _arena_pos_before_allocating_draw_command = ArenaCurrentPosU64(arena);
+  UI_Draw_command* command                     = ArenaPush(arena, UI_Draw_command);
+  U64 _arena_pos_after_allocating_draw_command = ArenaCurrentPosU64(arena);
   
-  F32 scroll_bar_space = 0.0f;
+  B32 shoud_make_command = false;
+  Rect rect = root->final_on_screen_rect;
+
+  if (root->flags & UI_Box_flag__has_background)
   {
-    UI_Box_data scroll_bar_data = ui_get_box_data_prev_frame(scroll_bar_id);
-    all_data_for_scroll_bar_present &= scroll_bar_data.is_found;
-    if (scroll_bar_data.is_found)
-    {
-      scroll_bar_space = scroll_bar_data.on_screen_rect.height;
-    }
+    shoud_make_command = true;
+    command->rect = rect;
+    command->rect_color = root->shape_style.color;
   }
-  
-  F32 __vp_offset_stub = 0.0f;
-  F32 vp_size          = 0.0f;
-  F32 content_size     = 0.0f;
-  F32* vp_offset       = &__vp_offset_stub;
-  F32 vp_max_offset    = 0.0f;
+  if (root->flags & UI_Box_flag__has_borders)
   {
-    UI_Box_clip_data scrollable_list_clip_data = ui_get_box_clip_data_prev_frame(scrollable_list_id);
-    all_data_for_scroll_bar_present &= scrollable_list_clip_data.is_found;
-    if (scrollable_list_clip_data.is_found)
-    {
-      vp_size       = scrollable_list_clip_data.on_screen_dims.y;
-      content_size  = scrollable_list_clip_data.content_dims.y;
-      vp_max_offset = content_size - vp_size; 
-      vp_offset    = &scrollable_list_clip_data.clip_offset->y; // todo: Might be a null pointer
-    }
+    shoud_make_command = true;
+    command->rect = rect;
+    command->border_width = root->shape_style.border.width;
+    command->border_color = root->shape_style.border.color;
   }
 
-  F32 thumb_size       = 0.0f;
-  F32 thumb_max_offset = 0.0f;
-  F32 thumb_offset     = 0.0f;
-  if (all_data_for_scroll_bar_present)
-  {
-    thumb_size = vp_size * scroll_bar_space / content_size;
-    thumb_size = Max(thumb_size, 30.0f);
-  
-    thumb_max_offset = scroll_bar_space - thumb_size;
-    thumb_offset = thumb_max_offset * (*vp_offset * -1.0f) / vp_max_offset; 
-  
-    UI_Actions scroll_bar_actions = ui_actions_from_id(scroll_bar_id, rli_events);
-    if (scroll_bar_actions.is_down)
-    {
-      thumb_offset = ui_mouse_y();
-      clamp_f32_inplace(&thumb_offset, 0.0f, thumb_max_offset);
-    }
-  
-    *vp_offset = -1.0f * thumb_offset * vp_max_offset / thumb_max_offset;
-  
-    // F32 ratio = vp_size / content_size;
-    // printf("Ratio: %f \n", ratio);
-    // printf("Thumb size: %f \n", thumb_size);
-    // printf("Thumb offset: %f \n", thumb_offset);
+  // Testing the invariant
+  U64 _arena_pos_after_setting_the_command_data = ArenaCurrentPosU64(arena);
+  Assert(_arena_pos_after_setting_the_command_data - sizeof(UI_Draw_command) == _arena_pos_before_allocating_draw_command);
+
+  if (shoud_make_command) {
+    DllPushBack(command_list, command);
+    command_list->count += 1;
+  } else {
+    ArenaPopType(arena, UI_Draw_command);
   }
 
-  UI_XStack()
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    // The scroll bar
-    ui_set_next_layout_axis(Axis2__y);
-    ui_set_next_size_x(ui_px(50));
-    ui_set_next_size_y(ui_p_of_p(0.5));
-    ui_set_next_color({ 50, 0, 0, 255 });
-    ui_set_next_flags(UI_Box_flag__draw_background);
-    UI_Box* scroll_bar_box = ui_box_make(scroll_bar_id, 0);
-    UI_Parent(scroll_bar_box)
-    {
-      ui_pacer(ui_px(thumb_offset));
-      
-      ui_set_next_size_x(ui_px(50));
-      ui_set_next_size_y(ui_px(thumb_size));
-      ui_set_next_color({ 255, 0, 0, 255 });
-      ui_set_next_flags(UI_Box_flag__draw_background);
-      UI_Box* thumb_box = ui_box_make(thumb_id, 0);
-      // todo: Move the thumb
-    }
-
-    ui_spacer(ui_px(50));
-
-    // List of scrollable data
-    ui_set_next_layout_axis(Axis2__y);
-    ui_set_next_size_x(ui_children_sum());
-    ui_set_next_size_y(ui_px(500));
-    ui_set_next_color({ 0, 25, 0, 255 });
-    ui_set_next_flags(UI_Box_flag__clip_y|UI_Box_flag__draw_background);
-    UI_Box* scrollable_list_box = ui_box_make(scrollable_list_id, 0);
-
-    UI_Actions list_actions = ui_actions_from_box(scrollable_list_box, rli_events);
-    scrollable_list_box->clip_offset.v[Axis2__y] += list_actions.wheel_move * 30;
-    clamp_f32_inplace(&scrollable_list_box->clip_offset.v[Axis2__y], -vp_max_offset, 0.0f);
-
-    printf("%f \n", scrollable_list_box->clip_offset.v[Axis2__y]);
-
-    UI_Parent(scrollable_list_box)
-    {
-      // ui_set_next_flags(UI_Box_flag__floating_x|UI_Box_flag__floating_y);
-      // ui_label(Str8FromC("Floating label"));
-
-      for EachArrElement(i, list_of_data)
-      {
-        U64 data = list_of_data[i];
-  
-        if (i == 0)
-        {
-          ui_spacer(ui_px(15));
-        }
-
-        ui_set_next_size_x(ui_px(300));
-        ui_set_next_size_y(ui_px(50));
-        ui_set_next_layout_axis(Axis2__x);
-        ui_set_next_color({ 0, 0, 150, 255 });
-        UI_Box* data_row = ui_box_make(Str8{}, UI_Box_flag__draw_background);
-        UI_Parent(data_row)
-        { 
-          Scratch scratch = get_scratch(0, 0);
-          Str8 data_as_str = str8_from_fmt_dyn(scratch.arena, "#U64", data);
-          ui_spacer(ui_px(100));
-          ui_label(data_as_str);
-          end_scratch(&scratch);
-        }
-  
-        if (i != ArrayCount(list_of_data))
-        {
-          ui_spacer(ui_px(15));
-        }
-      }
-    }
-
-    ui_spacer(ui_px(50));
-
-    ui_set_next_size_x(ui_px(50));
-    ui_set_next_size_y(ui_px(50));
-    ui_set_next_color({ 0, 255, 0, 255 });
-    ui_box_make(Str8{}, UI_Box_flag__draw_background);
-
+    ui_draw_command_from_ui_root(arena, child, command_list);
   }
-
 
 }
+
+/* note: This is an old raylib version of this thing
+void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset)
+{
+  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
+  // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
+  
+  Rect rect = root->final_on_screen_rect;
+  
+  if (root->flags & UI_Box_flag__floating_x) { x_clip_offset = 0.0f; }
+  if (root->flags & UI_Box_flag__floating_y) { y_clip_offset = 0.0f; }
+
+  rect.x += x_clip_offset;
+  rect.y += y_clip_offset;
+
+  if (root->flags & UI_Box_flag__draw_background)
+  {
+    DrawRectangleRounded(raylib_rect, root->shape_style.corner_radius, 0, RAYLIB_COLOR_FROM_VEC(root->shape_style.color));
+  }
+
+  // todo/note: DrawRectangleRoundedLinesEx draws the line on the outside of the rect and not within
+  if (root->flags & UI_Box_flag__draw_borders)
+  {
+    // note: Might just draw a rect behind the rect which has borders
+    // DrawRectangleV();
+    // DrawRing();
+    DrawRectangleRoundedLinesEx(raylib_rect, root->shape_style.corner_radius, 0, root->shape_style.border.width, RAYLIB_COLOR_FROM_VEC(root->shape_style.border.color));
+  }
+
+  if (root->flags & UI_Box_flag__draw_text_contents)
+  {
+    Scratch scratch = get_scratch(0, 0);
+    Str8 text_nt = str8_copy_alloc(scratch.arena, root->text_style.text);
+    DrawTextEx(root->text_style.font, (char*)text_nt.data, Vector2{raylib_rect.x, raylib_rect.y}, (F32)root->text_style.font_size, 0, RAYLIB_COLOR_FROM_VEC(root->text_style.text_color));
+    end_scratch(&scratch);
+  }
+
+  if (root->texture_to_draw.id != 0)
+  {
+    Texture2D texture = root->texture_to_draw;
+    Rectangle source_rect = { 0.0f, 0.0f, (F32)texture.width, (F32)texture.height };
+    DrawTexturePro(root->texture_to_draw, source_rect, raylib_rect, Vector2{}, 0.0f, WHITE); 
+  }
+  
+  // todo: Scissor state might be broken if 1 scissor is actiev and another begins, so check for that
+  //       it might happen when there is a parent with overflowed child and some it its children 
+  //       have overflow as well anywhere deeper in that subtree.
+
+  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
+  if (root->flags & UI_Box_flag__dont_draw_overflow)
+  {
+    BeginScissorMode((int)raylib_rect.x, (int)raylib_rect.y, (int)raylib_rect.width, (int)raylib_rect.height);
+  }
+  else {
+    B32 is_on_x = root->flags & UI_Box_flag__dont_draw_overflow_x;
+    B32 is_on_y = root->flags & UI_Box_flag__dont_draw_overflow_y;
+    if (XOR(is_on_x, is_on_y)) {
+      // note: I did not bother implement this. 
+      //       To implement this just do something like scissor on on x and the whole ui size on y (screen y)
+      InvalidCodePath();
+    }
+  }
+
+  x_clip_offset += root->clip_offset.v[Axis2__x];
+  y_clip_offset += root->clip_offset.v[Axis2__y];
+
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    if (child->flags & UI_Box_flag__floating_x) {
+      x_clip_offset -= root->clip_offset.v[Axis2__x];    
+    } 
+    if (child->flags & UI_Box_flag__floating_y) {
+      y_clip_offset -= root->clip_offset.v[Axis2__y];    
+    }
+
+    ui_draw_box(child, x_clip_offset, y_clip_offset);
+
+    if (child->flags & UI_Box_flag__floating_x) {
+      x_clip_offset += root->clip_offset.v[Axis2__x];    
+    } 
+    if (child->flags & UI_Box_flag__floating_y) {
+      y_clip_offset += root->clip_offset.v[Axis2__y];    
+    }
+  }
+
+  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
+  if (root->flags & UI_Box_flag__dont_draw_overflow)
+  {
+    EndScissorMode();
+  }
+
+  x_clip_offset -= root->clip_offset.v[Axis2__x];
+  y_clip_offset -= root->clip_offset.v[Axis2__y];
+}
 */
+
+// void ui_draw()
+// {
+//   UI_Context* ctx = ui_get_context();
+//   ui_draw_box(ctx->root_box, 0.0f, 0.0f);
+// }
+
+
 
 #endif
 

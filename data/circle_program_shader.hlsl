@@ -41,8 +41,7 @@ PS_Input vs_main(uint id : SV_VertexID)
 
 float4 ps_main(PS_Input input) : SV_TARGET
 {
-  // note: In the pixel shader input.pos is not the ndc we gave it in the v shader, but rather the px on the screen 
-  input.circle_origin_in_px.y = u_window_height - input.circle_origin_in_px.y;
+  input.pos.y = u_window_height - input.pos.y;
   float d = distance(input.pos.xy, input.circle_origin_in_px);
   float4 color = input.color;
   if (d > input.circle_r_in_px) { discard; }

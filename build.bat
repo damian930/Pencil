@@ -81,8 +81,8 @@ if not exist build mkdir build
 :: Possible compilations targets
 pushd build
 
-if "%pencil%"=="1"  set build_succ=1 && %compile% ../src/main.cpp %linker% /OUT:"pencil.exe"
-@REM if "%d3d_1%"=="1"   set build_succ=1 && %compile% ../src/samples/d3d_learning/d3d_1.cpp %linker% /OUT:"d3d_1.exe" 
+if "%pencil%"=="1"         set build_succ=1 && %compile% ../src/main.cpp %linker% /OUT:"pencil.exe"
+if "%glfw_learning%"=="1"  set build_succ=1 && %compile% ../src/__samples/glfw_learning.cpp %linker% /OUT:"glfw_learning.exe"
 
 popd
 

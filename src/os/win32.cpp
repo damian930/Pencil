@@ -129,17 +129,29 @@ void os_frame_begin()
 
 }
 
-void os_frame_end();
+void os_frame_end() {}
 
 ///////////////////////////////////////////////////////////
 // - Windowing
 //
-V2S32 os_get_client_area_dims()
+V2F32 os_get_window_dims()
 {
   RECT rect = {};
-  BOOL succ = GetClientRect(__os_g_state.window_handle, &rect);
-  Assert(succ);
-  V2S32 result = v2s32(rect.right - rect.left, rect.bottom - rect.top);
+  BOOL succ = GetWindowRect(__os_g_state.window_handle, &rect); Assert(succ);
+  V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
+  return result;
+}
+
+V2F32 os_get_client_area_dims()
+{
+  // todo: Maybe this shoud be stored inside the fram thing to always return the same thing.
+  //       Look into this some time
+  // note: GetClientRect return RECT that has its right and bottom exclusive. 
+  //       Maning that those coordinates lie immediately after the last valid
+  //       client area position.
+  RECT rect = {};
+  BOOL succ = GetClientRect(__os_g_state.window_handle, &rect); Assert(succ);
+  V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
   return result;
 }
 
@@ -383,8 +395,6 @@ LRESULT win32_proc(
 ) { 
   OS_State* win32_state = os_get_state();
 
-  // OS_Event new_ev = {};
-
   LRESULT result = {};
   switch (message)
   {
@@ -399,13 +409,13 @@ LRESULT win32_proc(
       else {
         switch (w_param)
         {
-          default:         { InvalidCodePath();  } break;
+          default:         { /*InvalidCodePath();*/  } break;
           case VK_SHIFT:   { key = Key__Shift;   } break;
           case VK_CONTROL: { key = Key__Control; } break;
           case VK_DELETE:  { key = Key__Delete; } break;
         }
       }
-      Assert(key != Key__NONE);
+      // Assert(key != Key__NONE);
 
       // Unwrapping the message data
       B32 went_down = false;
@@ -468,12 +478,24 @@ LRESULT win32_proc(
       button_state->is_up   = went_up;
     } break;
 
+    case WM_NCCALCSIZE:
+    {
+      result = DefWindowProc(window_handle, message, w_param, l_param);
+      // todo: Get the caption size from the system and only remove the caption size on y.
+      //       This is needed to have the resize buttons and all that be present.
+    } break;
+
+    case WM_ACTIVATEAPP: // note: Message that out window is about to be activated or is not longer active
+    {
+      result = DefWindowProc(window_handle, message, w_param, l_param);
+    } break;
+
     case WM_SIZE: 
     {
 
     } break;
 
-    case WM_CLOSE: // This is when the close button for the windows default window is pressed 
+    case WM_CLOSE: // For regular windows this is send when the close button it pressed 
     {
       win32_state->os_should_close_window = true;
     } break;
@@ -481,6 +503,7 @@ LRESULT win32_proc(
     case WM_DESTROY: 
     {
       // todo: This might want to be a separate event or something for the window closing
+      // todo: This shoud be called inside something like close_window
     } break;
   }
 
@@ -494,9 +517,9 @@ LRESULT win32_proc(
 
 
 ///////////////////////////////////////////////////////////
-// - Grafics 
+// - D3D 
 //
-D3D_program grafics_create_program_from_file(
+D3D_Program d3d_program_from_file(
   ID3D11Device* d3d_device,
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,
@@ -564,20 +587,20 @@ D3D_program grafics_create_program_from_file(
 
   // // Creating a uniform buffer
   // D3D11_BUFFER_DESC uniform_desc = {};
-  // uniform_desc.ByteWidth      = sizeof(Grafics_rect_program_uniform_data);
+  // uniform_desc.ByteWidth      = sizeof(D3D_Rect_program_data);
   // uniform_desc.Usage          = D3D11_USAGE_DYNAMIC;
   // uniform_desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
   // uniform_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
   // d3d_device->CreateBuffer(&uniform_desc, NULL, &grafics.uniform_buffer_for_rect_program);
 
   if (out_opt_is_succ != 0) { *out_opt_is_succ = is_succ; }
-  D3D_program program = {};
+  D3D_Program program = {};
   program.v_shader     = v_shader;
   program.p_shader     = p_shader;
   return program;
 }
 
-ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d)
+ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d)
 {
   ID3D11RenderTargetView* frame_buffer_rtv = 0;
   ID3D11Texture2D* backbuffer;
@@ -587,7 +610,7 @@ ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d)
   return frame_buffer_rtv;
 }
 
-ID3D11RenderTargetView* d3d_make_rtv(D3D_state* d3d, U32 width, U32 height)
+ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height)
 {
   ID3D11Texture2D* texture = 0;
   {
@@ -633,7 +656,7 @@ D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
   return result;
 }
 
-Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* src_texture)
+Image_buffer d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture)
 {
   HRESULT hr = S_OK;
 

@@ -150,7 +150,8 @@ void os_frame_begin();
 void os_frame_end();
 
 // - Windowing
-V2S32 os_get_client_area_dims();
+V2F32 os_get_window_dims();
+V2F32 os_get_client_area_dims();
 V2F32 os_get_mouse_pos();         // note: This is relative to the signle window's client area we have right now in the app
 V2F32 os_get_prev_mouse_pos();    // note: This is relative to the signle window's client area we have right now in the app
 V2F32 os_get_mouse_delta();
@@ -194,22 +195,22 @@ void os_sleep(U64 ms);
 #pragma comment (lib, "dxguid.lib")    // This is for the ids for the all the interfaces
 #pragma comment (lib, "d3dcompiler.lib")
 
-struct Grafics_rect_program_uniform_data {
-  F32 rect_origin_x;
-  F32 rect_origin_y;
+struct D3D_Rect_program_data {
+  F32 window_width;
+  F32 window_height;
+
+  F32 rect_origin_x; 
+  F32 rect_origin_y; 
 
   F32 rect_width;
   F32 rect_height;
 
-  F32 window_width;
-  F32 window_height;
+  F32 u_border_thickness;
 
-  U32 red;
-  U32 green;
-  U32 blue;
-  U32 alpha;
-
-  F32 _padding[2];
+  F32 _padding[1]; // Padding to have the float4 (V4F32) be on the 16 byte boundary (sizeof(F32) * 4)
+  
+  V4F32 rect_color; 
+  V4F32 border_color; 
 };
 
 struct Grafics_circle_program_uniform_data {
@@ -226,14 +227,14 @@ struct Grafics_circle_program_uniform_data {
   F32 _padding[3];
 };
 
-struct D3D_program {
+struct D3D_Program {
   // ID3D11InputLayout* input_layout_for_rect_program;
   ID3D11VertexShader* v_shader;
   ID3D11PixelShader* p_shader;
   ID3D11Buffer* uniform_data;
 };
 
-struct D3D_state {
+struct D3D_State {
   IDXGIFactory2* dxgi_factory;
   IDXGIAdapter* dxgi_adapter;
 
@@ -241,6 +242,9 @@ struct D3D_state {
   ID3D11DeviceContext* context;
   
   IDXGISwapChain1* swap_chain;
+
+  // Some programs here for now, dont know where to put them
+  D3D_Program rect_program;
 };
 
 // todo:
@@ -261,7 +265,7 @@ struct Image_buffer {
   // U64 row_stride; // There are no images right now that might have extra padding
 };
 
-D3D_program grafics_create_program_from_file(
+D3D_Program d3d_program_from_file(
   ID3D11Device* d3d_device,
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,
@@ -269,10 +273,123 @@ D3D_program grafics_create_program_from_file(
   B32* out_opt_is_succ
 );
 
-ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_state* d3d);
-ID3D11RenderTargetView* d3d_make_rtv(D3D_state* d3d, U32 width, U32 height);
+ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d);
+ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height);
 
 D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv);
-Image_buffer d3d_export_texture(Arena* arena, D3D_state* d3d, ID3D11Texture2D* src_texture);
+Image_buffer d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture);
+
+// todo: This is testing for quick drawing calls with d3d
+void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)
+{
+  d3d->context->ClearState(); 
+
+  // Viewport fro this render pass
+  D3D11_VIEWPORT vp = {};
+  vp.TopLeftX = 0;
+  vp.TopLeftY = 0;
+  vp.Width    = viewport_width;
+  vp.Height   = viewport_height;
+  vp.MinDepth = 0;
+  vp.MaxDepth = 1;
+  d3d->context->RSSetViewports(1, &vp);
+}
+
+void d3d_render_end(D3D_State* d3d) {}
+
+// todo: Remove this from here
+void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
+
+void d3d_draw_rect(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
+{
+  d3d_draw_rect_pro(d3d, rtv, rect, color, 0.0f, V4F32{});
+}
+
+void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_thickness, V4F32 border_color)
+{ 
+  // note: Default blending is used for now, so no alpha blend
+  
+  /* note:
+    At first i wanted to rest all the state, 
+    there is an issue with that since sometimes i need the state to persist,
+    like with viewport. Most of the state for the rendering pipeline i dont understand.
+    I dont know what it is for and dont use in these calls. 
+    Not sure if clearing it would be better or not. So i guess for now i will
+    just only work with the sub set of the rendering pipeline that i know and am using.
+  */
+  HRESULT hr = S_OK;
+
+  // Input assempler stage
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    D3D_Rect_program_data u_data = {};
+    u_data.window_width       = (F32)os_get_client_area_dims().x;
+    u_data.window_height      = (F32)os_get_client_area_dims().y;
+    u_data.rect_origin_x      = rect.x;
+    u_data.rect_origin_y      = rect.y;
+    u_data.rect_width         = rect.width;
+    u_data.rect_height        = rect.height;
+    u_data.u_border_thickness = border_thickness;
+    u_data.rect_color         = rect_color;
+    u_data.border_color       = border_color;
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (hr == S_OK) {
+      memcpy(mapped.pData, &u_data, sizeof(u_data));
+      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+    } else {
+      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+    }
+  }
+
+  // Vertex shader stage 
+  d3d->context->VSSetShader(d3d->rect_program.v_shader, Null, Null);
+  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  // todo: Test this with culling off
+  ID3D11RasterizerState* rasterizer_state = 0;
+  {
+    // disable culling
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
+    Assert(hr == S_OK);
+  }
+  d3d->context->RSSetState(rasterizer_state);
+  
+  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+  { 
+    UINT n = 1;
+    D3D11_VIEWPORT vp = {}; 
+    d3d->context->RSGetViewports(&n, &vp);
+    Assert(!IsMemZero(vp));
+  }
+
+  d3d->context->PSSetShader(d3d->rect_program.p_shader, Null, Null);
+  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+  d3d->context->Draw(4, 0);
+
+  uniform_buffer->Release();
+  rasterizer_state->Release();
+
+  // todo: I dont know if we need to reset all the thing we set in this func 
+  // to the thing that were set before this func. 
+}
 
 #endif

@@ -43,6 +43,7 @@ tu_specific B32 arena_can_fit(Arena* arena, U64 size);
 
 tu_specific void arena_pop(Arena* arena, U64 bytes_to_pop);
 tu_specific void arena_clear(Arena* arena);
+#define ArenaPopType(arena_p, Type) arena_pop(arena_p, sizeof(Type))
 
 // - temp arena stuff
 tu_specific Temp_arena temp_arena_begin(Arena* arena);

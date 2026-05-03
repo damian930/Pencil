@@ -150,6 +150,16 @@ B32 range_u64_is_valid(RangeU64 range)
 	return result;
 }
 
+Rect rect_make(F32 x, F32 y, F32 width, F32 height)
+{
+	Rect rect = {};
+	rect.x = x;
+	rect.y = y;
+	rect.width = width;
+	rect.height = height;
+	return rect;
+}
+
 V2F32 rect_dims(Rect rect)
 {
 	V2F32 dims = {};

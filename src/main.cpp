@@ -17,8 +17,20 @@ abstract.
 #include "os/win32.h"
 #include "os/win32.cpp"
 
+#include "dwmapi.h"
+#include "dcomp.h"
+#pragma comment (lib, "dwmapi.lib")
+#pragma comment (lib, "gdi32.lib")
+#pragma comment (lib, "dcomp.lib")
+
+#include "ui/ui_core.h"
+#include "ui/ui_core.cpp"
+
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
+
 #include "pencil/pencil.h"
-#include "pencil/pencil.cpp"
+// #include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...)
 {
@@ -40,10 +52,10 @@ void OutputDebugStringF(const char* fmt, ...)
 #define _CRT_SECURE_NO_WARNINGS
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "third_party/stb/stb_image_write.h"
+#include "__third_party/stb/stb_image_write.h"
 #endif
 
-void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
+void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
 {
   // todo: I dont like the api for the D3D_Texture_result. 
   //       The way we have to get the texture out and it is 0 if the succ is false
@@ -112,11 +124,44 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_state* d3d)
   }
 }
 
-int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
-{
-  allocate_thread_context();
+// todo: Move this up to have a separate part with globals for win32 main
+B32 hot_key_activated = false;
 
+LRESULT custom_win_proc(
+  HWND window_handle,
+  UINT message,
+  WPARAM w_param,
+  LPARAM l_param
+) {
+  LRESULT result = {};
+  if (message == WM_HOTKEY)
+  {
+    hot_key_activated = true;
+    result = TRUE;
+  } 
+  else {
+    result = CallWindowProc(win32_proc, window_handle, message, w_param, l_param);
+  }
+  return result;
+}
+
+void draw_ui(UI_Draw_command_list command_list, D3D_State* d3d, ID3D11RenderTargetView* rtv)
+{
+  for (UI_Draw_command* command = command_list.first; command; command = command->next)
+  {
+    d3d_draw_rect_pro(d3d, rtv, command->rect, command->rect_color, command->border_width, command->border_color);
+  }
+}
+
+int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
+// int main()
+{
+  // HINSTANCE app_instance = GetModuleHandle(NULL);
+
+  // Layers we allocated for the runtime 
+  allocate_thread_context();
   os_init();
+  ui_init();
 
   OS_State* win32_state = os_get_state();
 
@@ -124,7 +169,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // - Window  
   //
   win32_state->window_class.cbSize        = sizeof(WNDCLASSEXA);
-  win32_state->window_class.style         = 0;
+  win32_state->window_class.style         = 0; // todo: Look into hredraw and vredraw
   win32_state->window_class.lpfnWndProc   = win32_proc;
   win32_state->window_class.hInstance     = app_instance;
   win32_state->window_class.hIcon         = Null;
@@ -138,10 +183,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   Assert(wc_atom != 0);
   
   win32_state->window_handle = CreateWindowExA(
-    0,
+    WS_EX_NOREDIRECTIONBITMAP,
     win32_state->window_class.lpszClassName,
     "Pencil",
-    WS_EX_LAYERED,
+    WS_OVERLAPPEDWINDOW,
     CW_USEDEFAULT, CW_USEDEFAULT,
     800, 600,
     Null,
@@ -150,20 +195,46 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     Null
   );
   Assert(win32_state->window_handle != 0);
-  
+
+  // note: This doesnt seem to do anything, might remove it later 
+  // Frame buffer transparency
+  // {
+  //   HRESULT hr       = {};
+  //   BOOL composition = {}; 
+  //   BOOL opaque      = {};
+  //   DWORD color      = {};
+
+  //   hr = DwmIsCompositionEnabled(&composition);
+  //   HandleLater(hr == S_OK);
+  //   HandleLater(composition);
+
+  //   if (DwmGetColorizationColor(&color, &opaque) == S_OK && !opaque)
+  //   {
+  //     HRGN region = CreateRectRgn(0, 0, -1, -1);
+  //     DWM_BLURBEHIND bb = {0};
+  //     bb.dwFlags  = DWM_BB_ENABLE | DWM_BB_BLURREGION;
+  //     bb.hRgnBlur = region;
+  //     bb.fEnable  = TRUE;
+
+  //     DwmEnableBlurBehindWindow(win32_state->window_handle, &bb);
+  //     DeleteObject(region);
+    // }
+  // }
+
+  // ShowWindow(win32_state->window_handle, SW_MAXIMIZE);
   ShowWindow(win32_state->window_handle, SW_SHOW);
 
   ///////////////////////////////////////////////////////////
   // - D3D 
   //
-  D3D_state d3d = {};
+  D3D_State d3d = {};
   {
     HRESULT hr = S_OK;
     #define HR(hr_value) HandleLater(hr == S_OK)
 
     // Factory
     {
-      hr = CreateDXGIFactory2(0, IID_IDXGIFactory2, (void**)&d3d.dxgi_factory);
+      hr = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_IDXGIFactory2, (void**)&d3d.dxgi_factory);
       HR(hr);
     }
     IDXGIFactory2* dxgi_factory = d3d.dxgi_factory;
@@ -203,7 +274,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
       // Debug for dxgi
       IDXGIInfoQueue* dxgi_debug = 0;
-      hr = DXGIGetDebugInterface1(0, IID_IDXGIInfoQueue, (void**)&dxgi_debug);
+      hr = DXGIGetDebugInterface1(Null, IID_IDXGIInfoQueue, (void**)&dxgi_debug);
       HR(hr);
       dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
       dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
@@ -213,111 +284,192 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     // Swap chain
     {
+      V2F32 dims = os_get_client_area_dims();
+      HandleLater(dims.x > 0.0f && dims.y > 0.0f);
       DXGI_SWAP_CHAIN_DESC1 desc = {};
-      desc.Width       = 0;
-      desc.Height      = 0;
+      desc.Width       = (UINT)dims.x;
+      desc.Height      = (UINT)dims.y;
       desc.Format      = DXGI_FORMAT_R8G8B8A8_UNORM;
       desc.Stereo      = FALSE;
       desc.SampleDesc  = { 1, 0 };
       desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
       desc.BufferCount = 2;
-      desc.Scaling     = DXGI_SCALING_NONE;
+      desc.Scaling     = DXGI_SCALING_STRETCH;//DXGI_SCALING_NONE; // todo: Learn what these do
       desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-      desc.AlphaMode   = DXGI_ALPHA_MODE_UNSPECIFIED;
+      desc.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;//DXGI_ALPHA_MODE_UNSPECIFIED;
       desc.Flags       = 0;
-      hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &d3d.swap_chain);
+      hr = dxgi_factory->CreateSwapChainForComposition(d3d_device, &desc, Null, &d3d.swap_chain);
+      // hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &d3d.swap_chain);
       HR(hr);
     }
     IDXGISwapChain1* d3d_swap_chain = d3d.swap_chain;
+  
+    // Rect program
+    {
+      B32 rect_program_suc = true;
+      d3d.rect_program = d3d_program_from_file(d3d.device, L"../data/rect_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
+      HandleLater(rect_program_suc);
+    }
+  }
+
+  ///////////////////////////////////////////////////////////
+  // - Draw mode system wide hot key
+  //
+  {
+    // Chaning the default winproc to be call withing a custom win proc for how keys
+    // LONG_PTR set_succ_proc = SetWindowLongPtrA(win32_state->window_handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
+    // Assert(set_succ_proc != 0);
+
+    // BOOL succ = RegisterHotKey(win32_state->window_handle, 0, MOD_SHIFT|MOD_ALT, 'S');
+    // HandleLater(succ);
   }
 
   ///////////////////////////////////////////////////////////
   // - App loop
   //
   Pencil_state P = {}; 
+  {
+    P.arena = arena_alloc(Megabytes(64));
+    P.frame_arena = arena_alloc(Megabytes(64));
+  
+    P.draw_texures_width  = (U32)os_get_client_area_dims().x; // todo: Handle the case when the area is negative
+    P.draw_texures_height = (U32)os_get_client_area_dims().y; // todo: Handle the case when the area is negative
+  
+    P.draw_texture_always_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_not_that_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
+  
+    B32 texture_to_screen_succ = true;
+    P.texture_to_screen_program = d3d_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
+    Assert(texture_to_screen_succ);
+  
+    B32 circle_program_succ = true;
+    P.circle_program = d3d_program_from_file(d3d.device, L"../data/circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
+    Assert(circle_program_succ);
+  }
 
-  P.arena = arena_alloc(Megabytes(64));
-  P.frame_arena = arena_alloc(Megabytes(64));
+  ID3D11BlendState* blendState;
+  {
+    D3D11_BLEND_DESC desc = {};
+    desc.RenderTarget[0].BlendEnable           = TRUE;
+    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    d3d.device->CreateBlendState(&desc, &blendState);
+  }
 
-  P.draw_texures_width = os_get_client_area_dims().x;
-  P.draw_texures_height = os_get_client_area_dims().y;
+  os_frame_begin();
+  d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
+  {
+    ID3D11RenderTargetView* frame_buffer = d3d_get_frame_buffer_rtv(&d3d);
+    F32 _color_[4] = { 1, 1, 1, 1 };
+    d3d.context->ClearRenderTargetView(frame_buffer, _color_);
+    frame_buffer->Release();
+  }
+  d3d.swap_chain->Present(1, 0);
+  // Submitting the thing to the dwm composer
+  {
+    HRESULT hr = {};
+    
+    IDXGIDevice* dxgi_device = 0;
+    hr = d3d.device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
+    HR(hr);
+    
+    IDCompositionDevice* comp_device = 0;
+    hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
+    HR(hr);
 
-  P.draw_texture_always_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
-  P.draw_texture_not_that_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
+    IDCompositionTarget* target = 0;
+    hr = comp_device->CreateTargetForHwnd(win32_state->window_handle, true, &target);
+    HR(hr);
 
-  B32 rect_program_suc = true;
-  P.rect_program = grafics_create_program_from_file(d3d.device, L"../data/rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
-  Assert(rect_program_suc);
+    IDCompositionVisual* visual = 0;
+    hr = comp_device->CreateVisual(&visual);
+    HR(hr);
+  
+    hr = visual->SetContent((IUnknown*)d3d.swap_chain);
+    HR(hr);
+    
+    hr = target->SetRoot(visual);
+    HR(hr);
 
-  B32 texture_to_screen_succ = true;
-  P.texture_to_screen_program = grafics_create_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
-  Assert(texture_to_screen_succ);
+    hr = comp_device->Commit();
+    HR(hr);
+  }
 
-  B32 circle_program_succ = true;
-  P.circle_program = grafics_create_program_from_file(d3d.device, L"../data/circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
-  Assert(circle_program_succ);
 
-  // U64 frame_rate = 60;
+  for (;;) { os_frame_begin(); }
+
   for (;!os_window_should_close();)
   {
-    // F64 wanted_frame_time = 1.0 / (F64)frame_rate;
-    F64 frame_start_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
+    os_frame_begin();
+    static B32 done = false;
+    if (!done)
+    {
+      done = true;
+      d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
+      {
+        ID3D11RenderTargetView* frame_buffer = d3d_get_frame_buffer_rtv(&d3d);
+        d3d.context->OMSetBlendState(blendState, 0, ~0U);
+        F32 _color_[4] = { 0, 0, 1, 1 };
+        d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
+        frame_buffer->Release();
+      }
+      d3d_render_end(&d3d);
+      d3d.swap_chain->Present(1, 0);
+      
+      
+    }
+
+    os_frame_end();
+
+    /*
+    // F64 frame_start_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
+    // OutputDebugStringF("============================================== \n");
+    // OutputDebugStringF("FRAME START \n");
     
     os_frame_begin();
-    OutputDebugStringF("============================================== \n");
-    OutputDebugStringF("FRAME START \n");
+    d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    // F32 _color_[4] = { 0, 0, 1, 1 };
-    // d3d.context->ClearRenderTargetView(P.draw_texture_always_fresh, _color_);
+    // pencil_update(&P, false, &d3d);
+    // pencil_render(&P, &d3d);
 
-    pencil_update(&P, false, &d3d);
-    pencil_render(&P, &d3d);
-    
-    // static U64 counter = 0;
-    // static B32 in = false;
-    // if (!in && os_key_down(Key__Control) && os_key_down(Key__Z))
-    // {
-    //   in = true;
-    //   counter += 1;
-    //   // OutputDebugStringF("SHORTCUT \n");
-    //   // BP;
-    // }
-    // else {
-    //   in = false;
-    // }
-    // OutputDebugStringF("COUNTER :: %lld \n", counter);
+    // Testing ui for now
+    // /*
+    UI_Draw_command_list ui_draw_commands = {};
+    {
+      ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+      {
+        UI_PaddedBox(ui_px(50), Axis2__x)
+        {
+          ui_set_next_size_x(ui_px(50));
+          ui_set_next_size_y(ui_px(50));
+          ui_set_next_b_color(red_f());
+          ui_set_next_border(-10, yellow_f());
+          UI_Box* box = ui_box_make(Str8{}, 0);
+        }
+     
+      }
+      ui_end_build();
 
-    // if (os_key_went_down(Key__Control))
-    // {
-    //   OutputDebugStringF("CONTROL went down \n");
-    // }
-    // if (os_key_down(Key__Control))
-    // {
-    //   OutputDebugStringF("CONTROL down \n");
-    // }
-    // if (os_key_went_up(Key__Control))
-    // {
-    //   OutputDebugStringF("CONTROL went_up \n");
-    // }
-
-    // if (os_key_went_down(Key__Z))
-    // {
-    //   OutputDebugStringF("Z went down \n");
-    // }
-    // if (os_key_down(Key__Z))
-    // {
-    //   OutputDebugStringF("Z down \n");
-    // }
-    // if (os_key_went_up(Key__Z))
-    // {
-    //   OutputDebugStringF("Z went_up \n");
-    // }
+      ui_draw_command_from_ui_root(P.frame_arena, ui_get_context()->root_box, &ui_draw_commands);
+      ID3D11RenderTargetView* frame_buffer = d3d_get_frame_buffer_rtv(&d3d);
+      draw_ui(ui_draw_commands, &d3d, frame_buffer);
+      frame_buffer->Release();
+    }
 
     d3d.swap_chain->Present(1, 0);
-    
-    F64 frame_end_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
-    F64 frame_time_in_sec = frame_end_time - frame_start_time;
-    
+
+    d3d_render_end(&d3d);
+    os_frame_end();
+    */
+
+    // F64 frame_end_time = (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec();
+    // F64 frame_time_in_sec = frame_end_time - frame_start_time;
+
     // #if DEBUG_MODE
     #if 0
     {
@@ -336,8 +488,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
     #endif
   
-    OutputDebugStringF("FRAME END \n");
-    OutputDebugStringF("============================================== \n\n");
+    // OutputDebugStringF("FRAME END \n");
+    // OutputDebugStringF("============================================== \n\n");
   }
 
   // note: Not releasing stuff here since who cares, the os will release it for us

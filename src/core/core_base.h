@@ -590,6 +590,7 @@ struct Rect {
 	F32 height;
 };
 
+tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
 tu_specific V2F32 rect_dims(Rect rect);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
@@ -698,11 +699,21 @@ tu_specific V2S32 v2s32(S32 x, S32 y) { V2S32 v = { x, y }; return v; }
 tu_specific B32 v2s32_match(V2S32 v1, V2S32 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
 
 // - Colors 
-V4U8 black()  { return v4u8(0, 0, 0, 0); }
-V4U8 white()  { return v4u8(255, 255, 255, 255); }
-V4U8 yellow() { return v4u8(255, 255, 0, 255); }
-V4U8 pink()   { return v4u8(255, 0, 255, 255); }
+V4U8 black_u()  { return v4u8(0, 0, 0, 255); }
+V4U8 white_u()  { return v4u8(255, 255, 255, 255); }
+V4U8 red_u()    { return v4u8(255, 0, 0, 255); }
+V4U8 yellow_u() { return v4u8(255, 255, 0, 255); }
+V4U8 pink_u()   { return v4u8(255, 0, 255, 255); }
+V4U8 teal_u()   { return v4u8(0, 128, 128, 255); }
 
+#define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.r/255.0f, (F32)uc.g/255.0f, (F32)uc.b/255.0f, (F32)uc.a/255.0f)
+
+V4F32 black_f()  { return _U_COLOR_TO_F_COLOR(black_u());  } 
+V4F32 white_f()  { return _U_COLOR_TO_F_COLOR(white_u());  } 
+V4F32 red_f()    { return _U_COLOR_TO_F_COLOR(red_u());    }
+V4F32 yellow_f() { return _U_COLOR_TO_F_COLOR(yellow_u()); } 
+V4F32 pink_f()   { return _U_COLOR_TO_F_COLOR(pink_u());   }  
+V4F32 teal_f()   { return _U_COLOR_TO_F_COLOR(teal_u());   }  
 
 #endif
 
