@@ -8,11 +8,13 @@
 [x] - Start having ctrl+shift+z 
 [x] - Draw in circles
 [x] - Draw a continuous line
-[ ] - Have a maximized transparent window
-[ ] - Have a hot key to go in and out of the draw mode
-[ ] - 
+[x] - Have a transparent widnow
+[x] - Have a maximize function for a window
+[x] - Have a minimize function for a window
+[x] - Have a hot key to go in and out of the draw mode
+[x] - Disallow resize for the window 
 [ ] - Remove the non-client arena for the window 
-[ ] - Finish with the little things about the drawing part you had in the demo
+[x] - Finish with the little things about the drawing part you had in the demo
 [ ] - Start doing the ui for the thing. Need text.
 [ ] - Get path to app_data for later use with files and logs
 [ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
@@ -23,10 +25,15 @@
 [ ] - 
 [ ] - Start getting a texture from the system each frame and drawing it into the frame buffer
 [ ] - 
-[ ] - Fix the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
+ the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
       and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
-      not_that_fresh texture at the end of draw, instead of the fresh texture at the start of draw.
+      not_that_fresh texture at the end of draw, instead of the fresh texture at the sta[ ] - Fixrt of draw.
 [ ] - Display the fps on the screen to have it be like in raylib  
+[ ] - There is a bug when i come out of the screen while holding the mouse down 
+      and then release it outside the screen and then come back to the screen,
+      it still has the mouse down state for some reason. 
+[ ] - Have ctrl+z when held remove the drawings instead of having to press it a bunch of times
+[ ] - Look into this https://web.archive.org/web/20190913214618/http://www.pjblewis.com/site/posts/2016-04-27-p2-efficient-alpha-blended-windows-directcomposition.html
 
 Feature ideas:
 - Screen shot with the back of the desktop

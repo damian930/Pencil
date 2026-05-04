@@ -8,10 +8,12 @@
 
 // todo: I dont like that P stored the shaders and all and we ahve to pss it in here like we do
 
-void draw_circle(
+// todo: Have a draw circle separate call in the d3d layer
+/*
+void pencil_draw_circle(
   const Pencil_state* P, 
   D3D_State* d3d, ID3D11RenderTargetView* render_target,
-  F32 x_origin, F32 y_origin, F32 r, V4U8 color
+  F32 x_origin, F32 y_origin, F32 r, V4F32 color
 ) {
   ID3D11DeviceContext* context = d3d->context;
   ID3D11Device* device = d3d->device;
@@ -22,13 +24,13 @@ void draw_circle(
   // Setting the uniform buffer
   ID3D11Buffer* uniform_buffer = 0;
   {
-    Grafics_circle_program_uniform_data u_data = {};
+    D3D_Circle_program_data u_data = {};
     u_data.origin_x      = x_origin; 
     u_data.origin_y      = y_origin; 
     u_data.radius        = r;
     u_data.window_width  = (F32)os_get_client_area_dims().x;
     u_data.window_height = (F32)os_get_client_area_dims().y;
-    u_data.color = v4f32((F32)color.r / (F32)u8_max, (F32)color.g / (F32)u8_max, (F32)color.b / (F32)u8_max, (F32)color.a / (F32)u8_max);
+    u_data.color         = color; 
 
     D3D11_BUFFER_DESC desc = {};
     desc.ByteWidth      = sizeof(u_data);
@@ -58,6 +60,7 @@ void draw_circle(
     device->CreateRasterizerState(&desc, &rasterizer_state);
   }
 
+  // todo: Dont do this any more, this is dont in the begin call for rendering
   D3D11_VIEWPORT vp = {};
   vp.TopLeftX = 0;
   vp.TopLeftY = 0;
@@ -79,6 +82,7 @@ void draw_circle(
   rasterizer_state->Release();
   uniform_buffer->Release();
 }
+*/
 
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 {
@@ -296,19 +300,19 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
       copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
     }
   }
-  /*
   else // User wants to start using the eraser pen 
-  if (!P->is_mid_drawing && IsKeyPressed(KEY_E))
+  if (!P->is_mid_drawing && os_key_went_up(Key__E))
   {
     dont_start_drawing_this_frame = true;
     P->is_erasing_mode = true;
   }
   else // User wants to start using the brush/pen
-  if (!P->is_mid_drawing && IsKeyPressed(KEY_B))
+  if (!P->is_mid_drawing && os_key_went_up(Key__B))
   {
     dont_start_drawing_this_frame = true;
     P->is_erasing_mode = false;
   } 
+  /*
   else
   if (IsKeyPressed(KEY_TAB))
   {
@@ -334,15 +338,15 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
     V2F32 new_pos = os_get_mouse_pos();
     V2F32 prev_pos = os_get_prev_mouse_pos();
     
-    // todo: This is not the best way to have this here like this, but for now thats how it is
-    // V4U8 color = { 0, 0, 0 ,0 };
-    // if (!P->is_erasing_mode) { color = P->pen_color; }
-    // U64 pen_size = P->eraser_size;
-    // if (!P->is_erasing_mode) { pen_size = P->pen_size; }
-    // draw_circle(P, d3d, P->draw_texture_always_fresh, new_pos.x, new_pos.y, 10, yellow());
-    
     // Drawing a continuos line based on delta
     {
+      V4F32 color  = P->pen_color;
+      F32 pen_size = (F32)P->pen_size;
+      if (P->is_erasing_mode) { 
+        color    = v4f32(0.0f, 0.0f, 0.0f, 0.0f); 
+        pen_size = (F32)P->eraser_size;
+      }
+
       F32 dx = new_pos.x - prev_pos.x;
       F32 dy = new_pos.y - prev_pos.y;
       F32 length = sqrtf(dx * dx + dy * dy);
@@ -352,8 +356,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
-        // draw_rect(P, d3d, P->draw_texture_always_fresh, x, y, 10, 10, yellow());
-        draw_circle(P, d3d, P->draw_texture_always_fresh, x, y, 15, yellow_u());
+        d3d_draw_circle(d3d, P->draw_texture_always_fresh, x, y, pen_size, color);
       }
     }
 
@@ -816,7 +819,75 @@ void pencil_render(const Pencil_state* P, D3D_State* d3d)
 
 }
 
+#if DEBUG_MODE
+void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
+{
+  // todo: I dont like the api for the D3D_Texture_result. 
+  //       The way we have to get the texture out and it is 0 if the succ is false
+  //       and then when we have to release it and then the pointer is the result is kind of 
+  //       also the same the one we released. Sucks. I would like there to just be a singe
+  //       poiner or whatever that i have to work with.
+  //       The less things to manage and think about, the better.
 
+  // Loading up always_fresh_texture
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_always_fresh);
+    if (fresh_texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
+      stbi_flip_vertically_on_write(true); 
+      int succ = stbi_write_png("always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
+      Assert(succ);
+      fresh_texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
 
+  // Loading up not_fresh_texture
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result not_fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_not_that_fresh);
+    if (not_fresh_texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
+      int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
+      Assert(succ);
+      not_fresh_texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+  
+  // Loading up current texture_after_we_affected
+  if (P->current_record != 0)
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_after_we_affected);
+    if (texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
+      Assert(succ);
+      texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+
+  // Loading up current texture_before_we_affected
+  if (P->current_record != 0)
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+  {
+    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_before_we_affected);
+    if (texture_res.succ)
+    {
+      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
+      Assert(succ);
+      texture_res.texture->Release();
+    } 
+    else { Assert(0); }
+  }
+}
+#endif
 
 #endif

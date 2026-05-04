@@ -17,10 +17,9 @@ struct Pencil_state {
   Arena* arena;
   Arena* frame_arena;
   
-  // U64 pen_size;
-  // V4U8 pen_color;
-
-  // U64 eraser_size;
+  U32 pen_size;
+  V4F32 pen_color;
+  U32 eraser_size;
 
   U32 draw_texures_width;
   U32 draw_texures_height;
@@ -30,7 +29,7 @@ struct Pencil_state {
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
   Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
-  U64 count_of_pool_draw_records_in_use; // This inludes if they are in the free list
+  U64 count_of_pool_draw_records_in_use; // This inсludes if they are in the free list
   Draw_record* first_free_draw_record;
   Draw_record* last_free_draw_record;
   
@@ -41,7 +40,7 @@ struct Pencil_state {
 
   // Stuff for while drawing
   B32 is_mid_drawing;
-  // B32 is_erasing_mode;
+  B32 is_erasing_mode;
 
   // Signals (These are just here like this right now)
   // B32 signal_new_pen_size;
@@ -61,7 +60,6 @@ struct Pencil_state {
 
   // Stuff for drawing that i dont yet have as a separate thing
   D3D_Program texture_to_screen_program;
-  D3D_Program circle_program;
 };
 
 struct Draw_record_registration_result {
@@ -81,5 +79,9 @@ void copy_from_texture_to_texture(D3D_State* d3d, ID3D11RenderTargetView* dest_r
 
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d);
 void pencil_render(const Pencil_state* P, D3D_State* d3d);
+
+#if DEBUG_MODE
+void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d);
+#endif
 
 #endif

@@ -11,6 +11,16 @@ struct OS_State;
 extern OS_State __os_g_state;
 
 ///////////////////////////////////////////////////////////
+// - Windowing
+//
+struct OS_Window {
+  WNDCLASSEXA window_class;
+  HWND handle;
+
+  B32 shoud_close;
+};
+
+///////////////////////////////////////////////////////////
 // - Events
 // 
 enum Key : U32 {
@@ -156,6 +166,9 @@ V2F32 os_get_mouse_pos();         // note: This is relative to the signle window
 V2F32 os_get_prev_mouse_pos();    // note: This is relative to the signle window's client area we have right now in the app
 V2F32 os_get_mouse_delta();
 B32 os_window_should_close();
+void os_window_maximize();
+void os_window_minimize();
+// void os_window_set_top_most(B32 b);
 
 // - Inputs for keyboard
 OS_Key_state os_get_key_state(Key key);
@@ -213,7 +226,7 @@ struct D3D_Rect_program_data {
   V4F32 border_color; 
 };
 
-struct Grafics_circle_program_uniform_data {
+struct D3D_Circle_program_data {
   V4F32 color;
 
   F32 origin_x; 
@@ -245,6 +258,7 @@ struct D3D_State {
 
   // Some programs here for now, dont know where to put them
   D3D_Program rect_program;
+  D3D_Program circle_program;
 };
 
 // todo:
@@ -297,9 +311,16 @@ void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)
 
 void d3d_render_end(D3D_State* d3d) 
 {
-  
 
 
+
+}
+
+void d3d_clear_frame_buffer(D3D_State* d3d, V4F32 color)
+{
+  ID3D11RenderTargetView* rtv = d3d_get_frame_buffer_rtv(d3d);
+  d3d->context->ClearRenderTargetView(rtv, color.v);
+  rtv->Release();
 }
 
 // todo: Remove this from here
@@ -315,7 +336,7 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
   // note: Default blending is used for now, so no alpha blend
   
   /* note:
-    At first i wanted to rest all the state, 
+    At first i wanted to reset all the state, 
     there is an issue with that since sometimes i need the state to persist,
     like with viewport. Most of the state for the rendering pipeline i dont understand.
     I dont know what it is for and dont use in these calls. 
@@ -395,6 +416,80 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
 
   // todo: I dont know if we need to reset all the thing we set in this func 
   // to the thing that were set before this func. 
+}
+
+void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color)
+{
+  HRESULT hr = S_OK;
+
+  // Input assempler stage
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    D3D_Circle_program_data u_data = {};
+    u_data.origin_x      = center_x; 
+    u_data.origin_y      = center_y; 
+    u_data.radius        = radius;
+    u_data.window_width  = (F32)os_get_client_area_dims().x;
+    u_data.window_height = (F32)os_get_client_area_dims().y;
+    u_data.color         = color; 
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC;
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    desc.MiscFlags      = {};
+    desc.StructureByteStride = {};
+    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (hr == S_OK) {
+      memcpy(mapped.pData, &u_data, sizeof(u_data));
+      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+    } else {
+      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+    }
+  }
+
+  // Vertex shader stage 
+  d3d->context->VSSetShader(d3d->circle_program.v_shader, Null, Null);
+  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  // todo: Test this with culling off
+  // todo: This seems to be reused in between the draw calls, might also be cashed
+  ID3D11RasterizerState* rasterizer_state = 0;
+  {
+    // disable culling
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
+    Assert(hr == S_OK);
+  }
+  d3d->context->RSSetState(rasterizer_state);
+  
+  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+  { 
+    UINT n = 1;
+    D3D11_VIEWPORT vp = {}; 
+    d3d->context->RSGetViewports(&n, &vp);
+    Assert(!IsMemZero(vp));
+  }
+
+  d3d->context->PSSetShader(d3d->circle_program.p_shader, Null, Null);
+  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+  d3d->context->Draw(4, 0);
+
+  uniform_buffer->Release();
+  rasterizer_state->Release();
 }
 
 #endif

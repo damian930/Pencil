@@ -3,7 +3,7 @@
 :: * To calculate the number of lines in the codebase:
 ::       cloc src --by-file 
 ::       OR 
-::       cloc src --exclude-dir=third_party --by-file 
+::       cloc src --exclude-dir=__third_party,__retired_code --by-file
 ::        (doesnt include the third party code)
 :: * In bat files, when creating variables using the 'set' command, the variables are just text, kind of.
 ::       Then when comparing var to a value later we use '==' operator. 

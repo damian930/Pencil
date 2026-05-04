@@ -111,7 +111,7 @@ typedef float  F32;
 typedef double F64;
 
 // #define static (reatined, persitent)
-#define global // note: This is just to be able to serach for globals quicly
+#define global // note: This is just to be able to search for globals quickly
 #define Null NULL 
 #define tu_specific static inline // tu -> translation unit  
 
@@ -151,7 +151,7 @@ typedef double F64;
 #define Gigabytes(n) 1024 * Megabytes(n)
 #define Terabytes(n) 1024 * Terabytes(n)
 
-#define ToggleBool(b) ((b) = !(b));
+#define ToggleBool(b) (!(b))
 #define XOR(a, b) ( ((a) && !(b)) || (!(a) && (b)) )
 #define NAND(a, b) ( !!(a) != 1 || !!(b) != 1)       // Nand == Not and
 
@@ -168,6 +168,7 @@ typedef double F64;
 	// #define AssertPrint(expr, note_fmt, ...) do { if (!(expr)) { printf(note_fmt, __VA_ARGS__); U32* p = 0; *p = 69; } } while (0)
 	#define HandleLater(expr, ...)           Assert(expr) 
 #endif
+#define Handle(expr, ...) HandleLater(expr) // Just to not type as much
 
 #define InvalidCodePath(...) do { Assert(false); } while (0)
 #define NotImplemented(...)  do { Assert(false); } while (0)
@@ -645,6 +646,7 @@ tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return 
 union V4F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
 	struct { F32 r; F32 g; F32 b; F32 a; };
+	F32 v[4];
 };
 typedef V4F32 Vec4;
 typedef V4F32 V4;
@@ -705,6 +707,7 @@ V4U8 red_u()    { return v4u8(255, 0, 0, 255); }
 V4U8 yellow_u() { return v4u8(255, 255, 0, 255); }
 V4U8 pink_u()   { return v4u8(255, 0, 255, 255); }
 V4U8 teal_u()   { return v4u8(0, 128, 128, 255); }
+V4U8 change_alpha_u(V4U8 color, U8 new_a) { color.a = new_a; return color; }
 
 #define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.r/255.0f, (F32)uc.g/255.0f, (F32)uc.b/255.0f, (F32)uc.a/255.0f)
 
@@ -714,6 +717,7 @@ V4F32 red_f()    { return _U_COLOR_TO_F_COLOR(red_u());    }
 V4F32 yellow_f() { return _U_COLOR_TO_F_COLOR(yellow_u()); } 
 V4F32 pink_f()   { return _U_COLOR_TO_F_COLOR(pink_u());   }  
 V4F32 teal_f()   { return _U_COLOR_TO_F_COLOR(teal_u());   }  
+V4F32 change_alpha_f(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
 #endif
 

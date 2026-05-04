@@ -1,6 +1,8 @@
 #ifndef OS_WIN32_CPP
 #define OS_WIN32_CPP 
 
+// todos: Check for 0 handles inside functions
+
 #include "os/win32.h"
 #pragma comment (lib, "user32.lib")
 
@@ -14,9 +16,7 @@ struct OS_State {
   U64 perf_freq_count_per_sec;
 
   // Single window data
-  WNDCLASSEXA window_class;
-  HWND window_handle;
-  B32 os_should_close_window;
+  OS_Window window;
 
   // Frame data
   // Arena* frame_events_arena;
@@ -112,7 +112,7 @@ void os_frame_begin()
     POINT p = {};
     BOOL succ = {};
     succ = GetCursorPos(&p); Assert(succ);
-    succ = ScreenToClient(os_get_state()->window_handle, &p); Assert(succ);
+    succ = ScreenToClient(os_get_state()->window.handle, &p); Assert(succ);
     // note: When window is closed we cant get relative to widnow,
     //       do i want to create a value for the invalid mosue pos that will have some like nan for the float
     os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
@@ -137,7 +137,7 @@ void os_frame_end() {}
 V2F32 os_get_window_dims()
 {
   RECT rect = {};
-  BOOL succ = GetWindowRect(__os_g_state.window_handle, &rect); Assert(succ);
+  BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
   V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
   return result;
 }
@@ -150,7 +150,7 @@ V2F32 os_get_client_area_dims()
   //       Maning that those coordinates lie immediately after the last valid
   //       client area position.
   RECT rect = {};
-  BOOL succ = GetClientRect(__os_g_state.window_handle, &rect); Assert(succ);
+  BOOL succ = GetClientRect(__os_g_state.window.handle, &rect); Assert(succ);
   V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
   return result;
 }
@@ -181,8 +181,69 @@ V2F32 os_get_mouse_delta()
 
 B32 os_window_should_close()
 {
-  return os_get_state()->os_should_close_window;
+  return os_get_state()->window.shoud_close;
 }
+
+void os_window_maximize()
+{
+  BOOL succ = ShowWindow(os_get_state()->window.handle, SW_MAXIMIZE);
+  Assert(succ);
+}
+
+void os_window_minimize()
+{
+  BOOL succ = ShowWindow(os_get_state()->window.handle, SW_MINIMIZE);
+  Assert(succ);
+}
+
+void os_window_set_mouse_passthrough(B32 enable)
+{
+  // This is taked from glfw, here is the link to how they do it:
+  // https://github.com/glfw/glfw/blob/b00e6a8a88ad1b60c0a045e696301deb92c9a13e/src/win32_window.c#L2007
+  // That function implements the win32 specific function that allows a window to pass through inputs.
+  // ---
+  // Here is documentation to win32 docs that specify what style of window shoud be used for the 
+  // mouse event passing through to take place:
+  // https://learn.microsoft.com/en-us/windows/win32/winmsg/window-features#layered-windows:~:text=Hit%20testing%20of,the%20layered%20window.
+
+  OS_State* os_state = os_get_state();
+
+  LONG_PTR styles = GetWindowLongPtr(os_state->window.handle, GWL_EXSTYLE);
+
+  if ((styles & WS_EX_LAYERED) && !(styles & WS_EX_TRANSPARENT)) { 
+    InvalidCodePath();
+    // Not yet implemented this case. 
+    // For now built in abstraction only allows for LAYERS to be applied here and removed here. 
+    // Its invalid here, since if the window is layers and might have some alpha aplied to it, 
+    // this function is not made to reset the alpha when removing TRANSPARENT.
+    // I could handle it here, but i would have to test stuff to see if it works,
+    // instead i just break here to see if i ever need this type of stuff.  
+  }
+
+  if (enable) {
+    styles |= (WS_EX_TRANSPARENT | WS_EX_LAYERED);
+  }
+  else {
+    styles &= ~(WS_EX_TRANSPARENT | WS_EX_LAYERED);
+  }
+
+  SetWindowLongPtrW(os_state->window.handle, GWL_EXSTYLE, styles);
+}
+
+B32 os_window_is_mouse_passthrough()
+{
+  OS_State* os_state = os_get_state();
+  LONG_PTR styles = GetWindowLongPtr(os_state->window.handle, GWL_EXSTYLE);
+  B32 result = !!(styles & (WS_EX_TRANSPARENT | WS_EX_LAYERED));
+  return result;
+}
+
+// void os_window_set_top_most(B32 b)
+// {
+//   const HWND after = enabled ? HWND_TOPMOST : HWND_NOTOPMOST;
+//     SetWindowPos(window->win32.handle, after, 0, 0, 0, 0,
+//                  SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+// }
 
 ///////////////////////////////////////////////////////////
 // - Inputs for keyboard
@@ -497,7 +558,7 @@ LRESULT win32_proc(
 
     case WM_CLOSE: // For regular windows this is send when the close button it pressed 
     {
-      win32_state->os_should_close_window = true;
+      win32_state->window.shoud_close = true;
     } break;
 
     case WM_DESTROY: 
