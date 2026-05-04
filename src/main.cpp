@@ -11,6 +11,8 @@ Will see if its bad on not. If it is, well i will learn about the platform more 
 abstract. 
 */
 
+/*test for git*/
+
 #define _CRT_SECURE_NO_WARNINGS
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
