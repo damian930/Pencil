@@ -11,8 +11,6 @@ Will see if its bad on not. If it is, well i will learn about the platform more 
 abstract. 
 */
 
-/*test for git*/
-
 #define _CRT_SECURE_NO_WARNINGS
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
@@ -25,11 +23,15 @@ abstract.
 #include "os/win32.h"
 #include "os/win32.cpp"
 
+// todo: Move this out
 #include "dwmapi.h"
 #include "dcomp.h"
 #pragma comment (lib, "dwmapi.lib")
 #pragma comment (lib, "gdi32.lib")
 #pragma comment (lib, "dcomp.lib")
+
+#include "font_provider/font_provider.h"
+#include "font_provider/font_provider.cpp"
 
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
@@ -60,6 +62,46 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   allocate_thread_context();
   os_init();
   ui_init();
+
+  // todo: Try to read a file that is longer than 4 gigs
+  // todo: Try to write a file that is longer than 4 gigs
+  // todo: Have these be working
+  /*
+  Arena* a = arena_alloc(Gigabytes(20));
+  OS_File file = os_file_open(String("../test_big_file.txt"), OS_File_access__write);
+  Assert(os_file_is_valid(file));
+
+  Data_buffer buffer = data_buffer_make(a, (U64)u32_max + 100);
+  Data_buffer buffer_out = data_buffer_make(a, (U64)u32_max + 100);
+  
+  for (U64 i = 0; i < buffer.count; i += 1)
+  {
+    buffer.data[i] = 'A';
+  }
+
+  B32 write_succ = os_file_write_end(file, buffer);
+  Assert(write_succ);
+
+  B32 read_succ = os_file_read(file, &buffer_out);
+  Assert(read_succ);
+
+  for (U64 i = 0; i < buffer.count; i += 1)
+  {
+    Assert(buffer.data[i] == buffer_out.data[i]);
+  }
+
+  os_file_close(&file);
+  BP;
+  return -1;
+  */
+
+  // Testing and working on font provider
+  { 
+    fp_test(String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
+
+  }
+
+  return -1;
 
   OS_State* win32_state = os_get_state();
 

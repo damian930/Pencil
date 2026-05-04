@@ -71,6 +71,182 @@ OS_State* os_get_state()
 }
 
 ///////////////////////////////////////////////////////////
+// - Files
+//
+OS_File os_file_handle_zero()
+{
+  OS_File file = {};
+  file.u64 = (U64)INVALID_HANDLE_VALUE;
+  return file;
+}
+
+B32 os_file_handle_match(OS_File handle, OS_File other)
+{
+  return handle.u64 == other.u64;
+}
+
+B32 os_file_is_valid(OS_File file)
+{
+  return !os_file_handle_match(file, os_file_handle_zero());
+}
+
+OS_File_props os_file_get_props(OS_File file)
+{
+  if (os_file_handle_match(file, OS_File{})) { return {}; }
+
+  OS_File_props result_properties = {};
+  BY_HANDLE_FILE_INFORMATION file_info = {};
+  result_properties.succ = GetFileInformationByHandle((HANDLE)file.u64, &file_info);
+  if (result_properties.succ)
+  {
+    result_properties.size = u64_from_2_u32(file_info.nFileSizeHigh, file_info.nFileSizeLow);
+  }
+  return result_properties;
+}
+
+OS_File os_file_open_ex(Str8 file_name, OS_File_access_flags acess_flags, OS_Error* out_error)
+{
+  /* todo:
+    - Max path for file path and its extention to 32000
+  */
+  Scratch scratch = get_scratch(0, 0);
+  Str8 fil_name_nt = str8_copy_alloc(scratch.arena, file_name);
+
+  // todo: See what happends if i dont have open existing as default, 
+  //       will i then just be able to check if file exists easily
+  
+  U32 desired_access = 0; 
+  U32 share_mode = 0; 
+  U32 creation_dispostion = OPEN_EXISTING; 
+
+  // This case would be fine, but just wouldnt make much sense, so asserting
+  if (acess_flags & OS_File_access__read) { desired_access |= GENERIC_READ; }
+  if (acess_flags & OS_File_access__write) { desired_access |= GENERIC_WRITE; }
+  if (acess_flags & OS_File_access__append) { desired_access |= GENERIC_WRITE; }
+
+  if (acess_flags & OS_File_access__read) { share_mode |= FILE_SHARE_READ; }
+  if (acess_flags & OS_File_access__share_read) { share_mode |= FILE_SHARE_READ; }
+  if (acess_flags & OS_File_access__share_write) { share_mode |= FILE_SHARE_WRITE; }
+
+  if (acess_flags & OS_File_access__read) { creation_dispostion = OPEN_EXISTING; }
+  if (acess_flags & OS_File_access__write) { creation_dispostion = CREATE_ALWAYS; }
+  if (acess_flags & OS_File_access__append) { creation_dispostion = OPEN_ALWAYS; }
+
+  HANDLE file_handle = CreateFileA(
+    (char*)fil_name_nt.data,
+    desired_access,
+    share_mode,
+    Null,
+    creation_dispostion,
+    Null, 
+    Null  // Some template file or something
+  );
+  U32 error_code = GetLastError();
+  if (error_code == ERROR_ACCESS_DENIED && out_error) {
+    *out_error = OS_Error__access_denied;
+  } else if (error_code == ERROR_FILE_NOT_FOUND && out_error) {
+    *out_error = OS_Error__no_such_path;
+  } else if (error_code == ERROR_ALREADY_EXISTS && out_error) {
+    *out_error = OS_Error__already_exists;
+  }
+
+  end_scratch(&scratch);
+
+  // note: We use 0 to be able to creata OS_File file = {}, instead of having to do this 
+  //       every time OS_File file = os_file_zero(). Win32 return INVALID_HANDLE on fail to open file,
+  //       but it also seems to never give out handles with value of 0. 
+  //       If at some point i realise that win32 does use 0 for valid handles, i will 
+  //       change the api.  
+
+  OS_File file = {};
+  file.u64 = (U64)file_handle; // note: file handle is INVALID_HANDLE_VALUE if we failed to open the file
+  return file;
+}
+
+OS_File os_file_open(Str8 file_name, OS_File_access_flags acess_flags)
+{
+  OS_File file = os_file_open_ex(file_name, acess_flags, 0);
+  return file;
+}
+
+void os_file_close(OS_File* file)
+{
+  if (os_file_handle_match(OS_File{}, *file)) { return; }
+  (void)CloseHandle((HANDLE)file->u64);
+  *file = OS_File{};
+}
+
+// todo: now its b32 here, cause i have no idea what i need to check, so just b32 this bitch
+B32 os_file_read(OS_File file, Data_buffer* out_buffer)
+{
+  if (!os_file_is_valid(file)) { return false; }
+
+  // note:
+  // I really dont have an idea for this api yet. Right now all i need is just
+  // regular reads into a buffer that is always the same size as the file, 
+  // i have never read a file otherwise, so for now just that. When i have a case
+  // where i need to read it another way i will see what i need and change the api,
+  // right now trying to come up with a better api i just wasting time. 
+  Assert(os_file_get_props(file).size == out_buffer->count);
+
+  LARGE_INTEGER new_pointer_pos = {};
+  LARGE_INTEGER distance_to_move = {};
+  distance_to_move.QuadPart = 0;
+  
+  B32 succ = false;
+
+  if (SetFilePointerEx((HANDLE)file.u64, distance_to_move, &new_pointer_pos, FILE_BEGIN))
+  {
+    succ = true;
+
+    U64 bytes_read = 0;
+    for (;bytes_read < out_buffer->count;)
+    {
+      // todo: This will just rewrite the data in the out buffer when we do the second loop, fix this
+      U32 bytes_read_this_time = 0;
+      BOOL read_succ = ReadFile(
+        (HANDLE)file.u64, 
+        (void*)(out_buffer->data + bytes_read), 
+        (U32)(out_buffer->count - bytes_read), 
+        (DWORD*)&bytes_read_this_time, 
+        Null
+      );
+      bytes_read += bytes_read_this_time;
+  
+      if (!read_succ) { succ = false; break; }
+    }
+  }
+
+  return succ; 
+}
+
+B32 os_file_write_end(OS_File file, Data_buffer buffer)
+{
+  if (!os_file_is_valid(file)) { return false; }
+  
+  B32 succ = true;
+  
+  LARGE_INTEGER new_pointer_pos = {};
+  if (SetFilePointerEx((HANDLE)file.u64, LARGE_INTEGER{}, &new_pointer_pos, FILE_END))
+  {
+    // todo: Make sure this doesnt fail of buffer longer then U32 holds
+    U64 bytes_written = 0;
+    for (;bytes_written < buffer.count;)
+    {
+      U32 bytes_written_this_time = 0;
+      U64 bytes_to_write = buffer.count - bytes_written;
+      BOOL write_succ = WriteFile((HANDLE)file.u64, buffer.data + bytes_written, 
+                                  (U32)bytes_to_write, 
+                                  (DWORD*)&bytes_written_this_time, Null);
+      if (!write_succ) { succ = false; break; }
+      bytes_written += (U64)bytes_written_this_time;
+    }
+  } else { succ = false; }
+
+  return succ;
+}
+
+///////////////////////////////////////////////////////////
 // - Frame
 //
 void os_frame_begin()

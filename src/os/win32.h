@@ -11,6 +11,24 @@ struct OS_State;
 extern OS_State __os_g_state;
 
 ///////////////////////////////////////////////////////////
+// - Files
+//
+enum OS_File_access : U32 {
+  OS_File_access__share_read     = (1 << 0),
+  OS_File_access__share_write    = (1 << 1),
+  OS_File_access__read           = (1 << 2),
+  OS_File_access__write          = (1 << 3),
+  OS_File_access__append         = (1 << 4),
+
+  OS_File_access__visible_read   = OS_File_access__read|OS_File_access__share_read,
+  OS_File_access__visible_write  = OS_File_access__write|OS_File_access__share_read,
+  OS_File_access__visible_append = OS_File_access__append|OS_File_access__share_read,
+};  
+typedef U32 OS_File_access_flags; 
+
+struct OS_File { U64 u64; };
+
+///////////////////////////////////////////////////////////
 // - Windowing
 //
 struct OS_Window {
@@ -154,6 +172,29 @@ struct OS_Mouse_button_state {
 void os_init();
 void os_release();
 OS_State* os_get_state();
+
+// - Files
+// todo: Remove this, i dont like this 
+// todo: Fix the file api here
+enum OS_Error : U32 {
+  OS_Error__NONE,
+  OS_Error__no_such_path,
+  OS_Error__access_denied,
+  OS_Error__already_exists,
+};
+struct OS_File_props {
+  B32 succ; // todo: I would like a better name for this
+  U64 size;
+};
+OS_File os_file_handle_zero();
+B32 os_file_handle_match(OS_File handle, OS_File other);
+B32 os_file_is_valid(OS_File file);
+OS_File_props os_file_get_props(OS_File file);
+OS_File os_file_open_ex(Str8 file_name, OS_File_access_flags acess_flags, OS_Error* out_error);
+OS_File os_file_open(Str8 file_name, OS_File_access_flags acess_flags);
+void os_file_close(OS_File* file);
+// U64 os_file_read(OS_File file, Data_buffer* buffer);
+#define OS_FileOpenClose(file_var_name, file_path, access_flags) DeferInitReleaseLoop(OS_File file_var_name = os_file_open(file_path, access_flags), os_file_close(&file_var_name))
 
 // - Frame
 void os_frame_begin();

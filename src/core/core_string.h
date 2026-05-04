@@ -52,7 +52,7 @@ tu_specific Data_buffer data_buffer_make(Arena* arena, U64 count);
 #define CStrCount(clit) ArrayCount(clit) - 1
 #define MakeSureClit(clit) "" clit "" 
 #define Str8FromC(clit) Str8 { (U8*)MakeSureClit(clit), ArrayCount(clit) - 1 }
-#define String8(clit) Str8FromC(clit) // note: Testing a faster macro
+#define String(clit) Str8FromC(clit) // note: Testing a faster macro
 tu_specific Str8 str8_manuall(U8* buffer, U64 count);
 tu_specific Str8 str8_from_cstr_len(Arena* arena, U8* str, U64 len);
 tu_specific Str8 str8_from_cstr(Arena* arena, U8* str);
