@@ -97,10 +97,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // Testing and working on font provider
   { 
-    fp_test(String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
+    Scratch scratch = get_scratch(0, 0);
+    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
+    end_scratch(&scratch);
 
+    stbi_write_png("test_png_atlas.png", image.width_in_px, image.height_in_px, 4, image.data, image.width_in_px * 4);
   }
-
+  
   return -1;
 
   OS_State* win32_state = os_get_state();

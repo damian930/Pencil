@@ -312,7 +312,12 @@ struct D3D_Texture_result {
   ID3D11Texture2D* texture;
 };
 
-struct Image_buffer {
+enum Image_pixel_format : U32 {
+  // Image_pixel_format__R8B8G8A8_0_to_255, // Regular 4 channel rgba color with a byte per channel
+  // Image_pixel_format__F8, // Regular 4 channel rgba color with a byte per channel
+};
+
+struct Image {
   U8* data;
   U64 width_in_px;
   U64 height_in_px;
@@ -332,7 +337,7 @@ ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d);
 ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height);
 
 D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv);
-Image_buffer d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture);
+Image d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture);
 
 // todo: This is testing for quick drawing calls with d3d
 void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)

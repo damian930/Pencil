@@ -893,7 +893,7 @@ D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
   return result;
 }
 
-Image_buffer d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture)
+Image d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture)
 {
   HRESULT hr = S_OK;
 
@@ -924,7 +924,7 @@ Image_buffer d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* s
   HandleLater(format == DXGI_FORMAT_R8G8B8A8_UNORM);
   U64 bytes_per_pixel = 4;
 
-  Image_buffer image = {};
+  Image image = {};
   {
     D3D11_MAPPED_SUBRESOURCE mapped = {};
     hr = d3d->context->Map((ID3D11Resource*)copy_texture, 0, D3D11_MAP_READ, 0, &mapped);

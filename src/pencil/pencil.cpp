@@ -835,7 +835,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
     D3D_Texture_result fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_always_fresh);
     if (fresh_texture_res.succ)
     {
-      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
+      Image image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
       stbi_flip_vertically_on_write(true); 
       int succ = stbi_write_png("always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
@@ -850,7 +850,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
     D3D_Texture_result not_fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_not_that_fresh);
     if (not_fresh_texture_res.succ)
     {
-      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
+      Image image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
       int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       not_fresh_texture_res.texture->Release();
@@ -865,7 +865,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
     D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_after_we_affected);
     if (texture_res.succ)
     {
-      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      Image image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
       int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       texture_res.texture->Release();
@@ -880,7 +880,7 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
     D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_before_we_affected);
     if (texture_res.succ)
     {
-      Image_buffer image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
+      Image image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
       int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
       Assert(succ);
       texture_res.texture->Release();
