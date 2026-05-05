@@ -27,11 +27,113 @@ D3D_State* r_get_state()
   return &__d3d_g_state;
 }
 
+void r_init()
+{
+  D3D_State* d3d = r_get_state();
+
+  HRESULT hr = S_OK;
+  #define HR(hr_value) HandleLater(hr == S_OK) // todo: Remove this 
+
+  // Factory
+  {
+    hr = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
+    HR(hr);
+  }
+  IDXGIFactory2* dxgi_factory = d3d->dxgi_factory;
+
+  // Adapter
+  {
+    hr = dxgi_factory->EnumAdapters(0, &d3d->dxgi_adapter);
+    HR(hr);
+  }
+  IDXGIAdapter* dxgi_adapter = d3d->dxgi_adapter;
+
+  // Device, Context
+  {
+    D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_1 };
+    hr = D3D11CreateDevice(
+      dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null, 
+      D3D11_CREATE_DEVICE_DEBUG, levels, ArrayCount(levels),
+      D3D11_SDK_VERSION, &d3d->device, Null, &d3d->context
+    );
+    HR(hr);
+  }
+  ID3D11Device* d3d_device = d3d->device;
+  ID3D11DeviceContext* d3d_context = d3d->context;   
+
+  // todo on release: Only use this for the debug version
+  // Debug
+  {
+    // Debug for device
+    ID3D11InfoQueue* debug_q = 0;
+    hr = d3d->device->QueryInterface(IID_ID3D11InfoQueue, (void**)&debug_q);
+    HR(hr);
+
+    debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
+    debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
+    // debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, true);
+    debug_q->Release();
+
+    // Debug for dxgi
+    IDXGIInfoQueue* dxgi_debug = 0;
+    hr = DXGIGetDebugInterface1(Null, IID_IDXGIInfoQueue, (void**)&dxgi_debug);
+    HR(hr);
+    dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
+    dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
+    // dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, true);
+    dxgi_debug->Release();
+  }
+
+  // Swap chain
+  {
+    DXGI_SWAP_CHAIN_DESC1 desc = {};
+    desc.Width       = 69;
+    desc.Height      = 69;
+    desc.Format      = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.Stereo      = FALSE;
+    desc.SampleDesc  = { 1, 0 };
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    desc.BufferCount = 2;
+    desc.Scaling     = DXGI_SCALING_STRETCH;//DXGI_SCALING_NONE; // todo: Learn what these do
+    desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    desc.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;//DXGI_ALPHA_MODE_UNSPECIFIED;
+    desc.Flags       = 0;
+    hr = dxgi_factory->CreateSwapChainForComposition(d3d_device, &desc, Null, &d3d->swap_chain);
+    // hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &d3d->swap_chain);
+    HR(hr);
+  }
+  IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
+
+  // Rect program
+  {
+    B32 rect_program_suc = true;
+    d3d->draw_rect_program = r_program_from_file(L"../data/shaders/draw_rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
+    Handle(rect_program_suc);
+  
+    B32 circle_program_succ = true;
+    d3d->draw_circle_program = r_program_from_file(L"../data/shaders/draw_circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
+    Handle(circle_program_succ);
+
+    B32 texture_program_succ = true;
+    d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
+    Handle(texture_program_succ);
+  }
+}
+
+void r_relesase()
+{
+  // todo:
+}
+
 ///////////////////////////////////////////////////////////
 // - Render pass
 //
-void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)
+void r_render_begin(F32 viewport_width, F32 viewport_height)
 {
+  Handle(viewport_width != 0.0f && viewport_height != 0.0f);
+
+  D3D_State* d3d = r_get_state();
+
   d3d->context->ClearState(); 
 
   // Viewport fro this render pass
@@ -45,29 +147,32 @@ void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height)
   d3d->context->RSSetViewports(1, &vp);
 }
 
-void d3d_render_end(D3D_State* d3d) {}
+void r_render_end() {}
 
 ///////////////////////////////////////////////////////////
 // - Drawing
 //
-void d3d_clear_frame_buffer(D3D_State* d3d, V4F32 color)
+void r_clear_frame_buffer(V4F32 color)
 {
-  ID3D11RenderTargetView* rtv = d3d_get_frame_buffer_rtv(d3d);
+  D3D_State* d3d = r_get_state();
+  ID3D11RenderTargetView* rtv = r_get_frame_buffer_rtv();
   d3d->context->ClearRenderTargetView(rtv, color.v);
   rtv->Release();
 }
 
-void d3d_clear_rtv(D3D_State* d3d, ID3D11RenderTargetView* rtv, V4F32 color)
+void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
 {
+  D3D_State* d3d = r_get_state();
   d3d->context->ClearRenderTargetView(rtv, color.v);
 }
 
-void d3d_draw_rect(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
+void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
 {
-  d3d_draw_rect_pro(d3d, rtv, rect, color, 0.0f, V4F32{});
+  D3D_State* d3d = r_get_state();
+  r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
 }
 
-void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
+void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
 {
   // note: Default blending is used for now, so no alpha blend
   
@@ -79,6 +184,7 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
     Not sure if clearing it would be better or not. So i guess for now i will
     just only work with the sub set of the rendering pipeline that i know and am using.
   */
+  D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
   // Input assempler stage
@@ -154,8 +260,9 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
   // to the thing that were set before this func. 
 }
 
-void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color)
+void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color)
 {
+  D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
   // Input assempler stage
@@ -228,8 +335,9 @@ void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, 
   rasterizer_state->Release();
 }
 
-void d3d_draw_texture(D3D_State* d3d, ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin)
+void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin)
 {
+  D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
   // Setting the uniform buffer
@@ -318,8 +426,9 @@ void d3d_draw_texture(D3D_State* d3d, ID3D11RenderTargetView* target_rtv, ID3D11
 ///////////////////////////////////////////////////////////
 // - Other
 //
-ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d)
+ID3D11RenderTargetView* r_get_frame_buffer_rtv()
 {
+  D3D_State* d3d = r_get_state();
   ID3D11RenderTargetView* frame_buffer_rtv = 0;
   ID3D11Texture2D* backbuffer;
   d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backbuffer);
@@ -328,8 +437,10 @@ ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d)
   return frame_buffer_rtv;
 }
 
-ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height)
+ID3D11RenderTargetView* r_make_rtv(U32 width, U32 height)
 {
+  D3D_State* d3d = r_get_state();
+
   ID3D11Texture2D* texture = 0;
   {
     D3D11_TEXTURE2D_DESC desc = {};
@@ -356,7 +467,7 @@ ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height)
   return rtv;
 }
 
-D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
+D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv)
 {
   HRESULT hr = S_OK;
   
@@ -374,13 +485,14 @@ D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv)
   return result;
 }
 
-D3D_Program d3d_program_from_file(
-  ID3D11Device* d3d_device,
+D3D_Program r_program_from_file(
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,
   const char* p_shader_main_f_name,
   B32* out_opt_is_succ
 ) {
+  D3D_State* d3d = r_get_state();
+
   B32 is_succ = true;
 
   // Getting v shader compiled
@@ -427,9 +539,9 @@ D3D_Program d3d_program_from_file(
   if (is_succ)
   {
     HRESULT hr = S_OK;
-    hr = d3d_device->CreateVertexShader(v_blob->GetBufferPointer(), v_blob->GetBufferSize(), Null, &v_shader);
+    hr = d3d->device->CreateVertexShader(v_blob->GetBufferPointer(), v_blob->GetBufferSize(), Null, &v_shader);
     if (hr != S_OK) { is_succ = false; }
-    hr = d3d_device->CreatePixelShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), Null, &p_shader);
+    hr = d3d->device->CreatePixelShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), Null, &p_shader);
     if (hr != S_OK) { is_succ = false; }
     
     // D3D11_INPUT_ELEMENT_DESC layout_decs = {};
@@ -458,8 +570,9 @@ D3D_Program d3d_program_from_file(
 ///////////////////////////////////////////////////////////
 // - Misc
 //
-Image d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture)
+Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture)
 {
+  D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
   Scratch scratch = get_scratch(0, 0);

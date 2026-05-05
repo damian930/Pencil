@@ -78,7 +78,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d);
 void pencil_render(const Pencil_state* P, D3D_State* d3d);
 
 #if DEBUG_MODE
-void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d);
+void __debug_export_current_record_images(const Pencil_state* P);
 #endif
 
 #endif

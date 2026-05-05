@@ -95,7 +95,7 @@ struct D3D_State {
   IDXGISwapChain1* swap_chain;
 
   // These are maintained, so there is no need to pass these all the time
-  ID3D11RenderTargetView* current_render_target;
+  //todo: // ID3D11RenderTargetView* current_render_target;
 
   // Draw programs
   D3D_Program draw_rect_program;
@@ -107,25 +107,26 @@ extern global D3D_State __d3d_g_state;
 
 // - State
 D3D_State* r_get_state();
+void r_init();
+void r_relesase();
 
 // - Render pass
-void d3d_render_begin(D3D_State* d3d, F32 viewport_width, F32 viewport_height);
-void d3d_render_end();
+void r_render_begin(F32 viewport_width, F32 viewport_height);
+void r_render_end();
 
 // - Drawing
-void d3d_clear_frame_buffer(D3D_State* d3d, V4F32 color);
-void d3d_clear_rtv(D3D_State* d3d, ID3D11RenderTargetView* rtv, V4F32 color);
-void d3d_draw_rect(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 color);
-void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
-void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color);
-void d3d_draw_texture(D3D_State* d3d, ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin);
+void r_clear_frame_buffer(V4F32 color);
+void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color);
+void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color);
+void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
+void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color);
+void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin);
 
 // - Other
-ID3D11RenderTargetView* d3d_get_frame_buffer_rtv(D3D_State* d3d);
-ID3D11RenderTargetView* d3d_make_rtv(D3D_State* d3d, U32 width, U32 height);
-D3D_Texture_result d3d_texture_from_rtv(ID3D11RenderTargetView* rtv);
-D3D_Program d3d_program_from_file(
-  ID3D11Device* d3d_device,
+ID3D11RenderTargetView* r_get_frame_buffer_rtv();
+ID3D11RenderTargetView* r_make_rtv(U32 width, U32 height);
+D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
+D3D_Program r_program_from_file(
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,
   const char* p_shader_main_f_name,
@@ -133,7 +134,7 @@ D3D_Program d3d_program_from_file(
 );
 
 // - Misc
-Image d3d_export_texture(Arena* arena, D3D_State* d3d, ID3D11Texture2D* src_texture);
+Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture);
 
 
 

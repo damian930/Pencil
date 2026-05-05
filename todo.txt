@@ -1,4 +1,4 @@
-[x] - Fix the source and dest issue (The issue was that was using the worng case for the RTV in d3d. To get the resource out of an rtv you have to use ->GetResouce and not just a cast to the resource like with textures. This is the case bacause the textures inherit the Resource interface, so the cast is fine, but rtvs dont, therefore a call to ->GetResource)
+[x] - Fix the source and dest issue (The issue was that was using the worng case for the RTV in d3d-> To get the resource out of an rtv you have to use ->GetResouce and not just a cast to the resource like with textures. This is the case bacause the textures inherit the Resource interface, so the cast is fine, but rtvs dont, therefore a call to ->GetResource)
 [x] - Have a way to export a texture view and then compare on 
       the cpu if they are identicall
 [x] - Split the cpp and the header file for os, its getting hard to see the code
