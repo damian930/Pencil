@@ -223,6 +223,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
   // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
 
+  stb_
+
   for (;!os_window_should_close();)
   {
     os_frame_begin(); 
