@@ -95,17 +95,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   return -1;
   */
 
-  // Testing and working on font provider
-  { 
-    Scratch scratch = get_scratch(0, 0);
-    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
-    end_scratch(&scratch);
-
-    stbi_write_png("test_png_atlas.png", image.width_in_px, image.height_in_px, 4, image.data, image.width_in_px * 4);
-  }
-  
-  return -1;
-
   OS_State* win32_state = os_get_state();
 
   ///////////////////////////////////////////////////////////
@@ -192,7 +181,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
       debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
       debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
-      debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, true);
+      // debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, true);
       debug_q->Release();
 
       // Debug for dxgi
@@ -201,13 +190,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       HR(hr);
       dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
       dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-      dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, true);
+      // dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, true);
       dxgi_debug->Release();
     }
 
     // Swap chain
     {
-      V2F32 dims = os_get_client_area_dims();
+      V2F32 dims = os_get_client_area_dims__unsynched();
       HandleLater(dims.x > 0.0f && dims.y > 0.0f);
       DXGI_SWAP_CHAIN_DESC1 desc = {};
       desc.Width       = (UINT)dims.x;
@@ -230,12 +219,16 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // Rect program
     {
       B32 rect_program_suc = true;
-      d3d.rect_program = d3d_program_from_file(d3d.device, L"../data/rect_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
+      d3d.draw_rect_program = d3d_program_from_file(d3d.device, L"../data/shaders/draw_rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
       Handle(rect_program_suc);
     
       B32 circle_program_succ = true;
-      d3d.circle_program = d3d_program_from_file(d3d.device, L"../data/circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
+      d3d.draw_circle_program = d3d_program_from_file(d3d.device, L"../data/shaders/draw_circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
       Handle(circle_program_succ);
+
+      B32 texture_program_succ = true;
+      d3d.draw_texture_program = d3d_program_from_file(d3d.device, L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
+      Handle(texture_program_succ);
     }
   }
 
@@ -263,15 +256,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.pen_color   = yellow_f();
     P.eraser_size = 20;
 
-    P.draw_texures_width  = (U32)os_get_client_area_dims().x; // todo: Handle the case when the area is negative
-    P.draw_texures_height = (U32)os_get_client_area_dims().y; // todo: Handle the case when the area is negative
+    P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
+    P.draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
   
     P.draw_texture_always_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
     P.draw_texture_not_that_fresh = d3d_make_rtv(&d3d, P.draw_texures_width, P.draw_texures_height);
-  
-    B32 texture_to_screen_succ = true;
-    P.texture_to_screen_program = d3d_program_from_file(d3d.device, L"../data/texture_to_screen_program_shader.hlsl", "vs_main", "ps_main", &texture_to_screen_succ);
-    Assert(texture_to_screen_succ);
   }
 
   ID3D11BlendState* blendState;
@@ -329,6 +318,42 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // dxgi_device->Release();
     // visual->Release();
     // target->Release();
+  }
+
+  // Fake for loop for testing
+  SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
+  d3d_clear_rtv(&d3d, P.draw_texture_always_fresh, yellow_f());
+
+  for (;!os_window_should_close();)
+  {
+    os_frame_begin(); 
+    d3d_render_begin(&d3d, os_get_client_area_dims().x, os_get_client_area_dims().y);
+
+    d3d_clear_frame_buffer(&d3d, black_f());
+
+    ID3D11RenderTargetView* frame_buffer = d3d_get_frame_buffer_rtv(&d3d);
+    d3d_draw_texture(&d3d, frame_buffer, P.draw_texture_always_fresh, v2f32(os_get_client_area_dims().x - 5, os_get_client_area_dims().y - 5));//, v2f32(0, 0));
+
+    d3d_render_end(&d3d);
+    os_frame_end();
+
+    d3d.swap_chain->Present(1, 0);
+    HRESULT commit_hr = comp_device->Commit(); 
+    Handle(commit_hr == S_OK);
+    BP;
+  }
+
+  // Testing and working on font provider
+  { 
+    Scratch scratch = get_scratch(0, 0);
+
+    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
+    
+    // todo: This has to get loaded onto the texture to then be able to reference it via offsets from stb_truetype
+    
+    end_scratch(&scratch);
+
+    // int res = stbi_write_png("test_png_atlas.png", image.width_in_px, image.height_in_px, 4, image.data, image.width_in_px * 4);
   }
 
   os_window_set_mouse_passthrough(true);

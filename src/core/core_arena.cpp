@@ -69,12 +69,21 @@ B32 arena_can_fit(Arena* arena, U64 size)
   return result; 
 }
 
-U64 arena_get_bytes_used(Arena* arena)
+// todo: Make sure indexes here are fine and dont f up on edge cases
+U64 arena_get_pos(Arena* arena)
 {
   return arena->bytes_used;
 }
 
-// todo: Make sure indexes here are fine and dont f up on edge cases
+// todo: Test this 
+void arena_pop_to_pos(Arena* arena, U64 new_arena_pos)
+{
+  if (new_arena_pos > arena->bytes_used) { Assert(false); return; }
+
+  if (new_arena_pos < arena->metadata_size) { new_arena_pos = arena->metadata_size; }
+  arena->bytes_used = new_arena_pos;
+}
+
 void arena_pop(Arena* arena, U64 bytes_to_pop)
 {
   if (bytes_to_pop > arena->bytes_used - arena->metadata_size)
@@ -82,15 +91,6 @@ void arena_pop(Arena* arena, U64 bytes_to_pop)
     bytes_to_pop = arena->bytes_used - arena->metadata_size;
   }
   arena->bytes_used -= bytes_to_pop;
-}
-
-// todo: Test this 
-void arena_pop_to(Arena* arena, U64 new_arena_pos)
-{
-  if (new_arena_pos > arena->bytes_used) { Assert(false); return; }
-
-  if (new_arena_pos < arena->metadata_size) { new_arena_pos = arena->metadata_size; }
-  arena->bytes_used = new_arena_pos;
 }
 
 void arena_clear(Arena* arena)

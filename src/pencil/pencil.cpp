@@ -47,7 +47,7 @@ void pencil_draw_circle(
     context->Unmap((ID3D11Resource*)uniform_buffer, 0);
   }
 
-  context->VSSetShader(P->circle_program.v_shader, 0, 0);
+  context->VSSetShader(P->draw_circle_program.v_shader, 0, 0);
   context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
   ID3D11RasterizerState* rasterizer_state = 0;
@@ -71,7 +71,7 @@ void pencil_draw_circle(
   context->RSSetState(rasterizer_state);
   context->RSSetViewports(1, &vp);
   
-  context->PSSetShader(P->circle_program.p_shader, 0, 0);
+  context->PSSetShader(P->draw_circle_program.p_shader, 0, 0);
   context->PSSetConstantBuffers(0, 1, &uniform_buffer);
   
   // todo: This shoud be a separate call to the draw thing that picks the render target
@@ -743,80 +743,7 @@ void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
 
 void pencil_render(const Pencil_state* P, D3D_State* d3d)
 {
-  // Drawing the texture into the frame buffer
-  {
-    ID3D11DeviceContext* context = d3d->context;
-    ID3D11Device*        device  = d3d->device;
-    
-    context->ClearState();
-
-    ID3D11RenderTargetView* frame_buffer_rtv = d3d_get_frame_buffer_rtv(d3d);
-
-    F32 color[4] = { 0, 0, 0, 0 };
-    context->ClearRenderTargetView(frame_buffer_rtv, color);
-
-    // Alpha blend state
-    // ID3D11BlendState* blend_state = 0;
-    // {
-    //   // enable alpha blending
-    //   D3D11_BLEND_DESC desc = {};
-    //   desc.RenderTarget[0].BlendEnable           = TRUE;
-    //   desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-    //   desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
-    //   desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
-    //   desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
-    //   desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
-    //   desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-    //   desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    //   device->CreateBlendState(&desc, &blend_state);
-    // }
-
-    context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-    context->VSSetShader(P->texture_to_screen_program.v_shader, 0, 0);
-
-    V2F32 dims = os_get_client_area_dims();
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    vp.Width    = dims.x;
-    vp.Height   = dims.y;
-    vp.MinDepth = 0;
-    vp.MaxDepth = 1;
-    context->RSSetViewports(1, &vp);
-    
-    // todo: See if this sampler need to be removed later
-    ID3D11SamplerState* sampler;
-    {
-      D3D11_SAMPLER_DESC desc = {};
-      desc.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-      desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
-      desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
-      desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
-      desc.MipLODBias = 0;
-      desc.MaxAnisotropy = 1;
-      desc.MinLOD = 0;
-      desc.MaxLOD = D3D11_FLOAT32_MAX;
-      device->CreateSamplerState(&desc, &sampler);
-    }
-
-    ID3D11Resource* resource = 0;
-    P->draw_texture_always_fresh->GetResource(&resource);
-    ID3D11ShaderResourceView* view = 0;
-    device->CreateShaderResourceView(resource, NULL, &view);
-    context->PSSetShader(P->texture_to_screen_program.p_shader, 0, 0);
-    context->PSSetSamplers(0, 1, &sampler);
-    context->PSSetShaderResources(0, 1, &view);
-    resource->Release();
-
-    // context->OMSetBlendState(blend_state, NULL, ~0U);
-    context->OMSetRenderTargets(1, &frame_buffer_rtv, 0);
-
-    context->Draw(4, 0);
-
-    frame_buffer_rtv->Release();
-  }
-
+  InvalidCodePath();
 }
 
 #if DEBUG_MODE

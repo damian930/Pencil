@@ -41,9 +41,9 @@ tu_specific B32 arena_is_consumed(Arena* arena);
 tu_specific B32 arena_can_fit(Arena* arena, U64 size);
 #define ArenaCanFit(arena_p, Type) arena_can_fit(arena_p, sizeof(Type))
 
-tu_specific U64 arena_get_bytes_used(Arena* arena);
+tu_specific U64 arena_get_pos(Arena* arena);
+tu_specific void arena_pop_to_pos(Arena* arena, U64 new_arena_pos);
 tu_specific void arena_pop(Arena* arena, U64 bytes_to_pop);
-tu_specific void arena_pop_to(Arena* arena, U64 new_arena_pos);
 tu_specific void arena_clear(Arena* arena);
 #define ArenaPopType(arena_p, Type) arena_pop(arena_p, sizeof(Type))
 

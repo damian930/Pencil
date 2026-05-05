@@ -7,7 +7,11 @@
 
 #include "core/core_include.h"
 
+// Predefines 
+struct OS_Window;
 struct OS_State;
+
+// Global state for the layer
 extern OS_State __os_g_state;
 
 ///////////////////////////////////////////////////////////
@@ -31,12 +35,7 @@ struct OS_File { U64 u64; };
 ///////////////////////////////////////////////////////////
 // - Windowing
 //
-struct OS_Window {
-  WNDCLASSEXA window_class;
-  HWND handle;
-
-  B32 shoud_close;
-};
+// ....
 
 ///////////////////////////////////////////////////////////
 // - Events
@@ -196,6 +195,8 @@ void os_file_close(OS_File* file);
 // U64 os_file_read(OS_File file, Data_buffer* buffer);
 #define OS_FileOpenClose(file_var_name, file_path, access_flags) DeferInitReleaseLoop(OS_File file_var_name = os_file_open(file_path, access_flags), os_file_close(&file_var_name))
 
+void os_get_current_dir_path();
+
 // - Frame
 void os_frame_begin();
 void os_frame_end();
@@ -249,6 +250,7 @@ void os_sleep(U64 ms);
 #pragma comment (lib, "dxguid.lib")    // This is for the ids for the all the interfaces
 #pragma comment (lib, "d3dcompiler.lib")
 
+// For uniforms
 struct D3D_Rect_program_data {
   F32 window_width;
   F32 window_height;
@@ -267,6 +269,7 @@ struct D3D_Rect_program_data {
   V4F32 border_color; 
 };
 
+// For uniforms
 struct D3D_Circle_program_data {
   V4F32 color;
 
@@ -280,6 +283,18 @@ struct D3D_Circle_program_data {
 
   F32 _padding[3];
 };
+
+// For uniforms
+struct D3D_Texture_program_data {
+  F32 vp_width;
+  F32 vp_height;
+ 
+  V2F32 origin; // I dont like this name that much, origin means the top left, in this case of a texture
+  // V2F32 size; 
+
+  // F32 _padding[2];
+};
+
 
 struct D3D_Program {
   // ID3D11InputLayout* input_layout_for_rect_program;
@@ -298,8 +313,9 @@ struct D3D_State {
   IDXGISwapChain1* swap_chain;
 
   // Some programs here for now, dont know where to put them
-  D3D_Program rect_program;
-  D3D_Program circle_program;
+  D3D_Program draw_rect_program;
+  D3D_Program draw_circle_program;
+  D3D_Program draw_texture_program;
 };
 
 // todo:
@@ -312,11 +328,7 @@ struct D3D_Texture_result {
   ID3D11Texture2D* texture;
 };
 
-enum Image_pixel_format : U32 {
-  // Image_pixel_format__R8B8G8A8_0_to_255, // Regular 4 channel rgba color with a byte per channel
-  // Image_pixel_format__F8, // Regular 4 channel rgba color with a byte per channel
-};
-
+// note: Right now in the codebase this is only for R8B8G8A8 pixel format
 struct Image {
   U8* data;
   U64 width_in_px;
@@ -367,6 +379,11 @@ void d3d_clear_frame_buffer(D3D_State* d3d, V4F32 color)
   ID3D11RenderTargetView* rtv = d3d_get_frame_buffer_rtv(d3d);
   d3d->context->ClearRenderTargetView(rtv, color.v);
   rtv->Release();
+}
+
+void d3d_clear_rtv(D3D_State* d3d, ID3D11RenderTargetView* rtv, V4F32 color)
+{
+  d3d->context->ClearRenderTargetView(rtv, color.v);
 }
 
 // todo: Remove this from here
@@ -426,7 +443,7 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
   }
 
   // Vertex shader stage 
-  d3d->context->VSSetShader(d3d->rect_program.v_shader, Null, Null);
+  d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
   // todo: Test this with culling off
@@ -450,7 +467,7 @@ void d3d_draw_rect_pro(D3D_State* d3d, ID3D11RenderTargetView* rtv, Rect rect, V
     Assert(!IsMemZero(vp));
   }
 
-  d3d->context->PSSetShader(d3d->rect_program.p_shader, Null, Null);
+  d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
 
   d3d->context->OMSetRenderTargets(1, &rtv, Null);
@@ -502,7 +519,7 @@ void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, 
   }
 
   // Vertex shader stage 
-  d3d->context->VSSetShader(d3d->circle_program.v_shader, Null, Null);
+  d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
   // todo: Test this with culling off
@@ -527,7 +544,7 @@ void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, 
     Assert(!IsMemZero(vp));
   }
 
-  d3d->context->PSSetShader(d3d->circle_program.p_shader, Null, Null);
+  d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
 
   d3d->context->OMSetRenderTargets(1, &rtv, Null);
@@ -536,6 +553,93 @@ void d3d_draw_circle(D3D_State* d3d, ID3D11RenderTargetView* rtv, F32 center_x, 
 
   uniform_buffer->Release();
   rasterizer_state->Release();
+}
+
+void d3d_draw_texture(D3D_State* d3d, ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin)//, V2F32 size)
+{
+  HRESULT hr = S_OK;
+
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    D3D_Texture_program_data u_data = {};
+    u_data.vp_width                   = os_get_client_area_dims().x;
+    u_data.vp_height                  = os_get_client_area_dims().y;
+    u_data.origin = origin; 
+    // u_data.size   = size;
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (hr == S_OK) {
+      memcpy(mapped.pData, &u_data, sizeof(u_data));
+      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+    } else {
+      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+    }
+  }
+
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+  d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
+  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  ID3D11RasterizerState* rasterizer_state = 0;
+  {
+    // disable culling
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode = D3D11_FILL_SOLID;
+    desc.CullMode = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
+    Assert(hr == S_OK);
+  }
+  d3d->context->RSSetState(rasterizer_state);
+  
+  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+  { 
+    UINT n = 1;
+    D3D11_VIEWPORT vp = {}; 
+    d3d->context->RSGetViewports(&n, &vp);
+    Assert(!IsMemZero(vp));
+  }
+
+  // todo: See if this sampler need to be removed later
+  ID3D11SamplerState* sampler;
+  {
+    D3D11_SAMPLER_DESC desc = {};
+    desc.Filter        = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    desc.AddressU      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.AddressV      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.AddressW      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.MipLODBias    = 0;
+    desc.MaxAnisotropy = 1;
+    desc.MinLOD        = 0;
+    desc.MaxLOD        = D3D11_FLOAT32_MAX;
+    d3d->device->CreateSamplerState(&desc, &sampler);
+  }
+
+  ID3D11Resource* resource = 0;
+  source_rtv->GetResource(&resource);
+  ID3D11ShaderResourceView* view = 0;
+  d3d->device->CreateShaderResourceView(resource, NULL, &view);
+  d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
+  d3d->context->PSSetSamplers(0, 1, &sampler);
+  d3d->context->PSSetShaderResources(0, 1, &view);
+  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+  resource->Release();
+
+  d3d->context->OMSetRenderTargets(1, &target_rtv, 0);
+
+  d3d->context->Draw(4, 0);
+
+  uniform_buffer->Release();
 }
 
 #endif

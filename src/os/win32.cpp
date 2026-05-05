@@ -11,6 +11,17 @@
 // #pragma comment (lib, "dxguid.lib")    // This is for the ids for the all the interfaces
 // #pragma comment (lib, "d3dcompiler.lib")
 
+struct OS_Window {
+  WNDCLASSEXA window_class;
+  HWND handle;
+
+  B32 should_close;
+
+  // Per frame data
+  V2F32 dims;
+  V2F32 client_area_dims;
+};
+
 struct OS_State {
   HINSTANCE app_instance;
   U64 perf_freq_count_per_sec;
@@ -176,6 +187,33 @@ void os_file_close(OS_File* file)
   *file = OS_File{};
 }
 
+// note: Returns Str8{} if fails, though i shoud not fail unless there is a bug in the implementation
+Str8 os_get_current_dir_path(Arena* arena)
+{
+  U64 arena_pos_before_allocations = arena_get_pos(arena);
+
+  B32 failed = false;
+  Str8 result_path = {};
+  do {
+    U32 path_buffer_size_with_nt = GetCurrentDirectoryA(0, 0);
+    if (path_buffer_size_with_nt == 0) { failed = true; break; }
+    
+    Data_buffer path_buffer = data_buffer_make(arena, path_buffer_size_with_nt);
+    U32 bytes_written_no_nt = GetCurrentDirectoryA(path_buffer_size_with_nt, (char*)path_buffer.data);
+    if (bytes_written_no_nt != path_buffer_size_with_nt - 1) { failed = true; break; }
+    
+    result_path = str8_front(path_buffer, bytes_written_no_nt);
+    if (result_path.data[result_path.count] != '\0') { failed = true; break; }
+    arena_pop(arena, 1); // Popping '\0;
+  } while (0);
+  
+  if (failed) {
+    result_path = Str8{};
+    arena_pop_to_pos(arena, arena_pos_before_allocations);
+  }
+  return result_path;
+}
+
 // todo: now its b32 here, cause i have no idea what i need to check, so just b32 this bitch
 B32 os_file_read(OS_File file, Data_buffer* out_buffer)
 {
@@ -253,7 +291,7 @@ void os_frame_begin()
 {
   OS_State* os_state = os_get_state();
   
-  // Setting the prev frame to the old input data 
+  // Setting prev frame's input data to the new frame's fresh input data
   {
     StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
     for (U64 i = 0; i < Key__COUNT; i += 1) 
@@ -279,56 +317,58 @@ void os_frame_begin()
     TranslateMessage(&msg);
     DispatchMessageA(&msg);
   }
-
+  
   // Mouse positions
   os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
   {
-    // todo:
-    // os_state->this_frame_mouse_pos = v2s32(f32_is_nan);
     POINT p = {};
     BOOL succ = {};
     succ = GetCursorPos(&p); Assert(succ);
     succ = ScreenToClient(os_get_state()->window.handle, &p); Assert(succ);
-    // note: When window is closed we cant get relative to widnow,
-    //       do i want to create a value for the invalid mosue pos that will have some like nan for the float
+    Handle(succ); 
     os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
   }
 
-  // // Key states
-  // StaticAssert(ArrayCount(os_state->key_states) == OS_Key__COUNT);
-  // // for (os_state->frame_events;)
-  // // for (U64 i = 0; i < OS_Key__COUNT; i += 1) 
-  // // {
+  // Window dims
+  {
+    RECT rect = {};
+    BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
+    V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
+    os_state->window.dims = dims;
+  }
 
-
-  // // }
-
+  // Window client arena dims
+  {
+    RECT rect = {};
+    BOOL succ = GetClientRect(__os_g_state.window.handle, &rect); Assert(succ);
+    V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
+    os_state->window.client_area_dims = dims;
+  }
 }
 
 void os_frame_end() {}
 
 ///////////////////////////////////////////////////////////
 // - Windowing
-//
 V2F32 os_get_window_dims()
 {
-  RECT rect = {};
-  BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
-  V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
-  return result;
+  OS_State* os_state = os_get_state();
+  return os_state->window.dims;
 }
 
 V2F32 os_get_client_area_dims()
 {
-  // todo: Maybe this shoud be stored inside the fram thing to always return the same thing.
-  //       Look into this some time
-  // note: GetClientRect return RECT that has its right and bottom exclusive. 
-  //       Maning that those coordinates lie immediately after the last valid
-  //       client area position.
+  OS_State* os_state = os_get_state();
+  return os_state->window.client_area_dims;
+}
+
+V2F32 os_get_client_area_dims__unsynched()
+{
+  Handle(true); // todo: I just dont like this func here. I only added it to be able to create a swap chain before i start a frame, maybe i shoud create a swap chain inside the first ever call to render_begin instead of having to have it in the init call ???
   RECT rect = {};
-  BOOL succ = GetClientRect(__os_g_state.window.handle, &rect); Assert(succ);
-  V2F32 result = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
-  return result;
+  BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
+  V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
+  return dims;
 }
 
 V2F32 os_get_mouse_pos()
@@ -357,7 +397,7 @@ V2F32 os_get_mouse_delta()
 
 B32 os_window_should_close()
 {
-  return os_get_state()->window.shoud_close;
+  return os_get_state()->window.should_close;
 }
 
 void os_window_maximize()
@@ -734,7 +774,7 @@ LRESULT win32_proc(
 
     case WM_CLOSE: // For regular windows this is send when the close button it pressed 
     {
-      win32_state->window.shoud_close = true;
+      win32_state->window.should_close = true;
     } break;
 
     case WM_DESTROY: 

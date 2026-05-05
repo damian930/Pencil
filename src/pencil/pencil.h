@@ -57,9 +57,6 @@ struct Pencil_state {
   // V2U64 last_screen_dims;
   // B32 show_brush_ui_menu;
   // Str8 brush_menu_ui_id;
-
-  // Stuff for drawing that i dont yet have as a separate thing
-  D3D_Program texture_to_screen_program;
 };
 
 struct Draw_record_registration_result {
