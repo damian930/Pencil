@@ -63,7 +63,7 @@ Str8 str8_from_list(Arena* arena, Str8_list* list)
 
 Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_before, Str8 str_to_put_between, Str8 str_to_put_after)
 {
-  Str8 str = str8_manuall(ArenaCurrentPosP(arena, U8), 0);
+  Str8 str = str8_manuall(ArenaCurrentAddressP(arena, U8), 0);
   U64 node_index = 0;
 
   if (str_to_put_before.count > 0)

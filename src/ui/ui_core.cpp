@@ -949,9 +949,9 @@ void ui_draw_command_from_ui_root(Arena* arena, UI_Box* root, UI_Draw_command_li
 {
   Assert(!ui_box_is_zero(root));
 
-  U64 _arena_pos_before_allocating_draw_command = ArenaCurrentPosU64(arena);
+  U64 _arena_pos_before_allocating_draw_command = ArenaCurrentAddressU64(arena);
   UI_Draw_command* command                     = ArenaPush(arena, UI_Draw_command);
-  U64 _arena_pos_after_allocating_draw_command = ArenaCurrentPosU64(arena);
+  U64 _arena_pos_after_allocating_draw_command = ArenaCurrentAddressU64(arena);
   
   B32 shoud_make_command = false;
   Rect rect = root->final_on_screen_rect;
@@ -971,7 +971,7 @@ void ui_draw_command_from_ui_root(Arena* arena, UI_Box* root, UI_Draw_command_li
   }
 
   // Testing the invariant
-  U64 _arena_pos_after_setting_the_command_data = ArenaCurrentPosU64(arena);
+  U64 _arena_pos_after_setting_the_command_data = ArenaCurrentAddressU64(arena);
   Assert(_arena_pos_after_setting_the_command_data - sizeof(UI_Draw_command) == _arena_pos_before_allocating_draw_command);
 
   if (shoud_make_command) {
