@@ -23,12 +23,8 @@ abstract.
 #include "os/win32.h"
 #include "os/win32.cpp"
 
-// todo: Move this out
-#include "dwmapi.h"
-#include "dcomp.h"
-#pragma comment (lib, "dwmapi.lib")
-#pragma comment (lib, "gdi32.lib")
-#pragma comment (lib, "dcomp.lib")
+#include "renderer/renderer.h"
+#include "renderer/renderer.cpp"
 
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
@@ -340,7 +336,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     d3d.swap_chain->Present(1, 0);
     HRESULT commit_hr = comp_device->Commit(); 
     Handle(commit_hr == S_OK);
-    BP;
   }
 
   // Testing and working on font provider
