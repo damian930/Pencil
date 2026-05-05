@@ -115,7 +115,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
       "Pencil",
-      WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME),
+      WS_OVERLAPPEDWINDOW,
+      // WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME),
       // WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
       CW_USEDEFAULT, CW_USEDEFAULT,
       800, 600,
@@ -220,17 +221,19 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // Fake for loop for testing
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
-  r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
+  // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
 
   for (;!os_window_should_close();)
   {
     os_frame_begin(); 
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    r_clear_frame_buffer(black_f());
+    r_clear_frame_buffer(blue_f());
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-    r_draw_texture(frame_buffer, P.draw_texture_always_fresh, v2f32(os_get_client_area_dims().x - 5, os_get_client_area_dims().y - 5));//, v2f32(0, 0));
+    r_draw_rect(frame_buffer, rect_make(10, 50, 100, 200), orange_f());
+    frame_buffer->Release();
+    // r_draw_texture(frame_buffer, P.draw_texture_always_fresh, v2f32(os_get_client_area_dims().x - 5, os_get_client_area_dims().y - 5));//, v2f32(0, 0));
 
     r_render_end();
     os_frame_end();

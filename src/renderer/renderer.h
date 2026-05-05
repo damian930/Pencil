@@ -93,14 +93,15 @@ struct D3D_State {
   ID3D11Device* device;
   ID3D11DeviceContext* context;
   IDXGISwapChain1* swap_chain;
-
-  // These are maintained, so there is no need to pass these all the time
-  //todo: // ID3D11RenderTargetView* current_render_target;
-
+  
   // Draw programs
   D3D_Program draw_rect_program;
   D3D_Program draw_circle_program;
   D3D_Program draw_texture_program;
+
+  // Per render pass data
+  F32 render_viewport_width;
+  F32 render_viewport_height;
 };
 
 extern global D3D_State __d3d_g_state;

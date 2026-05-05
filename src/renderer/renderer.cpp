@@ -136,15 +136,40 @@ void r_render_begin(F32 viewport_width, F32 viewport_height)
 
   d3d->context->ClearState(); 
 
-  // Viewport fro this render pass
-  D3D11_VIEWPORT vp = {};
-  vp.TopLeftX = 0;
-  vp.TopLeftY = 0;
-  vp.Width    = viewport_width;
-  vp.Height   = viewport_height;
-  vp.MinDepth = 0;
-  vp.MaxDepth = 1;
-  d3d->context->RSSetViewports(1, &vp);
+  // todo: I dont like conversion from F32 to UINT here just implicitrly like this 
+  // Resizing the swap chain (the frame buffer)
+  HRESULT hr = d3d->swap_chain->ResizeBuffers(0, (UINT)viewport_width, (UINT)viewport_height, DXGI_FORMAT_UNKNOWN, 0);
+  Handle(hr == S_OK);
+
+  // Resizing the viewport for valid on screen px mapping
+  d3d->render_viewport_width  = viewport_width;
+  d3d->render_viewport_height = viewport_height;
+
+  {
+    D3D11_VIEWPORT vp = {};
+    vp.TopLeftX = 0;
+    vp.TopLeftY = 0;
+    vp.Width    = viewport_width;
+    vp.Height   = viewport_height;
+    vp.MinDepth = 0;
+    vp.MaxDepth = 1;
+    d3d->context->RSSetViewports(1, &vp);
+  }
+
+  {
+    ID3D11RasterizerState* rasterizer_state = 0;
+    {
+      // disable culling
+      D3D11_RASTERIZER_DESC desc = {};
+      desc.FillMode = D3D11_FILL_SOLID;
+      desc.CullMode = D3D11_CULL_NONE;
+      desc.DepthClipEnable = true;
+      hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
+      Assert(hr == S_OK);
+    }
+    d3d->context->RSSetState(rasterizer_state);
+    rasterizer_state->Release();
+  }
 }
 
 void r_render_end() {}
@@ -168,7 +193,6 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
 
 void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
 {
-  D3D_State* d3d = r_get_state();
   r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
 }
 
@@ -194,8 +218,8 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
   ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Rect_program_data u_data = {};
-    u_data.window_width       = (F32)os_get_client_area_dims().x;
-    u_data.window_height      = (F32)os_get_client_area_dims().y;
+    u_data.window_width       = d3d->render_viewport_width;//(F32)os_get_client_area_dims().x;
+    u_data.window_height      = d3d->render_viewport_height;//(F32)os_get_client_area_dims().y;
     u_data.rect_origin_x      = rect.x;
     u_data.rect_origin_y      = rect.y;
     u_data.rect_width         = rect.width;
@@ -225,25 +249,12 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
   d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
-  // todo: Test this with culling off
-  ID3D11RasterizerState* rasterizer_state = 0;
-  {
-    // disable culling
-    D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_NONE;
-    desc.DepthClipEnable = true;
-    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
-    Assert(hr == S_OK);
-  }
-  d3d->context->RSSetState(rasterizer_state);
-  
   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
   { 
     UINT n = 1;
     D3D11_VIEWPORT vp = {}; 
     d3d->context->RSGetViewports(&n, &vp);
-    Assert(!IsMemZero(vp));
+    InvariantCheck(!IsMemZero(vp));
   }
 
   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
@@ -254,10 +265,6 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
   d3d->context->Draw(4, 0);
 
   uniform_buffer->Release();
-  rasterizer_state->Release();
-
-  // todo: I dont know if we need to reset all the thing we set in this func 
-  // to the thing that were set before this func. 
 }
 
 void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color)
@@ -275,8 +282,8 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
     u_data.origin_x      = center_x; 
     u_data.origin_y      = center_y; 
     u_data.radius        = radius;
-    u_data.window_width  = (F32)os_get_client_area_dims().x;
-    u_data.window_height = (F32)os_get_client_area_dims().y;
+    u_data.window_width  = d3d->render_viewport_width;
+    u_data.window_height = d3d->render_viewport_height;
     u_data.color         = color; 
 
     D3D11_BUFFER_DESC desc = {};
@@ -302,26 +309,12 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
-  // todo: Test this with culling off
-  // todo: This seems to be reused in between the draw calls, might also be cashed
-  ID3D11RasterizerState* rasterizer_state = 0;
-  {
-    // disable culling
-    D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_NONE;
-    desc.DepthClipEnable = true;
-    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
-    Assert(hr == S_OK);
-  }
-  d3d->context->RSSetState(rasterizer_state);
-  
   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
   { 
     UINT n = 1;
     D3D11_VIEWPORT vp = {}; 
     d3d->context->RSGetViewports(&n, &vp);
-    Assert(!IsMemZero(vp));
+    InvariantCheck(!IsMemZero(vp));
   }
 
   d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
@@ -332,7 +325,6 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   d3d->context->Draw(4, 0);
 
   uniform_buffer->Release();
-  rasterizer_state->Release();
 }
 
 void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin)
@@ -344,9 +336,9 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
   ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Texture_program_data u_data = {};
-    u_data.vp_width                   = os_get_client_area_dims().x;
-    u_data.vp_height                  = os_get_client_area_dims().y;
-    u_data.origin = origin; 
+    u_data.vp_width  = d3d->render_viewport_width;
+    u_data.vp_height = d3d->render_viewport_height;
+    u_data.origin    = origin; 
     // u_data.size   = size;
 
     D3D11_BUFFER_DESC desc = {};
@@ -371,24 +363,12 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
   d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
 
-  ID3D11RasterizerState* rasterizer_state = 0;
-  {
-    // disable culling
-    D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_NONE;
-    desc.DepthClipEnable = true;
-    hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
-    Assert(hr == S_OK);
-  }
-  d3d->context->RSSetState(rasterizer_state);
-  
   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
   { 
     UINT n = 1;
     D3D11_VIEWPORT vp = {}; 
     d3d->context->RSGetViewports(&n, &vp);
-    Assert(!IsMemZero(vp));
+    InvariantCheck(!IsMemZero(vp));
   }
 
   // todo: See if this sampler need to be removed later
@@ -405,22 +385,26 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
     desc.MaxLOD        = D3D11_FLOAT32_MAX;
     d3d->device->CreateSamplerState(&desc, &sampler);
   }
-
-  ID3D11Resource* resource = 0;
-  source_rtv->GetResource(&resource);
-  ID3D11ShaderResourceView* view = 0;
-  d3d->device->CreateShaderResourceView(resource, NULL, &view);
-  d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
   d3d->context->PSSetSamplers(0, 1, &sampler);
-  d3d->context->PSSetShaderResources(0, 1, &view);
-  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-  resource->Release();
+  d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
+  {
+    ID3D11Resource* resource = 0;
+    source_rtv->GetResource(&resource);
+
+    ID3D11ShaderResourceView* view = 0;
+    d3d->device->CreateShaderResourceView(resource, NULL, &view);
+    d3d->context->PSSetShaderResources(0, 1, &view);
+    d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+    resource->Release();
+    view->Release();
+  }
 
   d3d->context->OMSetRenderTargets(1, &target_rtv, 0);
 
   d3d->context->Draw(4, 0);
 
   uniform_buffer->Release();
+  sampler->Release();
 }
 
 ///////////////////////////////////////////////////////////
