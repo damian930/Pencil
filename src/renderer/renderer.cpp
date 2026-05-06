@@ -575,7 +575,7 @@ D3D_Program r_program_from_file(
 ///////////////////////////////////////////////////////////
 // - Misc
 //
-Image r_export_texture(Arena* arena, ID3D11RenderTargetView* rtv)
+Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv)
 {
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
@@ -648,6 +648,17 @@ Image r_export_texture(Arena* arena, ID3D11RenderTargetView* rtv)
   end_scratch(&scratch);
 
   return image;
+}
+
+void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path)
+{
+  Scratch scratch = get_scratch(0, 0);
+  Image image = r_image_from_texture(scratch.arena, rtv);
+
+  Str8 file_path_nt = str8_copy_alloc(scratch.arena, file_path);
+  int succ = stbi_write_png((char*)file_path_nt.data, image.width_in_px, image.height_in_px, image.bytes_per_pixel, image.data, image.width_in_px * image.bytes_per_pixel);
+  Handle(succ);
+  end_scratch(&scratch);
 }
 
 ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name)

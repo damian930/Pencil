@@ -726,5 +726,9 @@ V4F32 teal_f()   { return _U_COLOR_TO_F_COLOR(teal_u());   }
 V4F32 orange_f() { return _U_COLOR_TO_F_COLOR(orange_u()); }  
 V4F32 change_alpha_f(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
+F32 f32_round(F32 f) { return roundf(f); }
+F32 f32_floor(F32 f) { return floorf(f); }
+
+
 #endif
 

@@ -141,7 +141,8 @@ D3D_Program r_program_from_file(
 );
 
 // - Misc
-Image r_export_texture(Arena* arena, ID3D11RenderTargetView* rtv);
+Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv);
+void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
 ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name);
 ID3D11RenderTargetView* r_load_texture_from_image(Image image);
 

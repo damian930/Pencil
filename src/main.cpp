@@ -43,11 +43,70 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-void draw_ui(UI_Draw_command_list command_list, ID3D11RenderTargetView* rtv)
+void ui_draw_box(ID3D11RenderTargetView* rtv, UI_Box* root)
 {
-  for (UI_Draw_command* command = command_list.first; command; command = command->next)
+  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
+  // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
+  Rect rect = root->final_on_screen_rect;
+
+  if (root->flags & UI_Box_flag__has_background)
   {
-    r_draw_rect_pro(rtv, command->rect, command->rect_color, command->border_width, command->border_color);
+    r_draw_rect_pro(rtv, rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
+  }
+
+  if (root->flags & UI_Box_flag__has_text_contents)
+  {
+    r_draw_text(rtv, root->text_style.text, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color);
+  }
+
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    ui_draw_box(rtv, child);
+  }
+}
+
+void ui_draw(ID3D11RenderTargetView* rtv)
+{
+  UI_Context* ctx = ui_get_context();
+  ui_draw_box(rtv, ctx->root_box);
+}
+
+void test_draw_text(FP_Font font, Str8 text, ID3D11RenderTargetView* dest, V2F32 pos)
+{  
+  r_draw_rect(dest, rect_make(pos.x, pos.y, 100, 1), green_f());
+  r_draw_rect(dest, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+
+  F32 origin_y = pos.y + font.ascent;
+  F32 x_offset = 0.0f;
+
+  r_draw_rect(dest, rect_make(pos.x, origin_y, 100, 1), green_f());
+
+  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
+  {
+    U8 ch = text.data[ch_index];
+    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+    F32 origin_x = pos.x + x_offset;
+
+    // Just puttin them 1 next to another
+    Rect dest_rect = {};
+    dest_rect.x      = origin_x + glyph_data.bearing_x;
+    dest_rect.y      = origin_y - glyph_data.bearing_y;
+    dest_rect.width  = glyph_data.rect_on_atlas.width;
+    dest_rect.height = glyph_data.rect_on_atlas.height;
+    
+    r_draw_texture(
+      dest, dest_rect,
+      font.atlas_texture, glyph_data.rect_on_atlas
+    );
+
+    F32 advance = glyph_data.advance;
+    if (ch_index < text.count - 1)
+    {
+      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
+      if (!IsMemZero(entry)) { advance += entry.advance; }
+    } 
+    x_offset += advance; 
   }
 }
 
@@ -57,6 +116,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   allocate_thread_context();
   os_init();
   r_init();
+  fp_init();
   ui_init();
 
   // todo: Try to read a file that is longer than 4 gigs
@@ -224,14 +284,24 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
 
   // Testing and working on font provider
-  ID3D11RenderTargetView* atlas_texture = 0;
-  { 
+  FP_Font font = {};
+  {
     Scratch scratch = get_scratch(0, 0);
-    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
-    atlas_texture = r_load_texture_from_image(image); 
-    Image image_copy = r_export_texture(scratch.arena, atlas_texture);
+    Str8 path_to_fonts = os_get_path_to_system_fonts();
+    Str8_list path_parts = {};
+    str8_list_append_copy(scratch.arena, &path_parts, os_get_path_to_system_fonts());
+    if (!str8_match(Str8FromC("\\"), str8_back(path_to_fonts, 1), Str8_match__normalise_slash)) { 
+      str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("\\"));
+    }
+    str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("Arial.ttf"));
+    Str8 path_to_font = str8_from_list(scratch.arena, &path_parts);
+    font = fp_load_font(path_to_font, 86, range_u64_make(0, (U64)u8_max + 1));
     end_scratch(&scratch);
   }
+  
+  // r_export_texture(font.atlas_texture, Str8FromC("Font_atlas.png"));
+
+  /*
   for (;!os_window_should_close();)
   {
     os_frame_begin(); 
@@ -240,15 +310,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_clear_frame_buffer(blue_f());
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+    
+    test_draw_text(font, Str8FromC("This is here cause we nee to you while grabbing"), frame_buffer, v2f32(50, 50));
 
-    r_draw_texture(
-      frame_buffer, 
-      rect_make(0, 0, r_get_texture_dims(atlas_texture).x, r_get_texture_dims(atlas_texture).y),
-      // rect_make(0, 0, r_get_texture_dims(frame_buffer).x, r_get_texture_dims(frame_buffer).y), 
-      // rect_make(0, 0, 900, 900),
-      atlas_texture, 
-      rect_make(0, 0, r_get_texture_dims(atlas_texture).x, r_get_texture_dims(atlas_texture).y)
-    );
     frame_buffer->Release();
     
     r_render_end();
@@ -258,17 +322,16 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     HRESULT commit_hr = comp_device->Commit(); 
     Handle(commit_hr == S_OK);
   }
+  */
 
-  
-
-  os_window_set_mouse_passthrough(true);
+  // os_window_set_mouse_passthrough(true);
 
   for (;!os_window_should_close();)
   {
     os_frame_begin();
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    // d3d_clear_frame_buffer(&d3d, black_f());
+    r_clear_frame_buffer(black_f());
 
     if (hot_key_activated && !P.is_mid_drawing)
     {
@@ -280,28 +343,29 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // pencil_render(&P, &d3d);
 
     // Testing ui for now
-    // /*
-    if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
-    UI_Draw_command_list ui_draw_commands = {};
+    // if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
+    ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     {
-      ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
-      {
-        UI_PaddedBox(ui_px(50), Axis2__x)
-        {
-          ui_set_next_size_x(ui_px(50));
-          ui_set_next_size_y(ui_px(50));
-          ui_set_next_b_color(red_f());
-          ui_set_next_border(-10, yellow_f());
-          UI_Box* box = ui_box_make(Str8{}, 0);
-        }
-      }
-      ui_end_build();
+      ui_push_font(font);
 
-      ui_draw_command_from_ui_root(P.frame_arena, ui_get_context()->root_box, &ui_draw_commands);
-      ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-      draw_ui(ui_draw_commands, frame_buffer);
-      frame_buffer->Release();
+      UI_PaddedBox(ui_px(50), Axis2__x)
+      {
+        ui_set_next_size_x(ui_px(50));
+        ui_set_next_size_y(ui_px(50));
+        ui_set_next_b_color(red_f());
+        ui_set_next_border(-10, yellow_f());
+        UI_Box* box = ui_box_make(Str8{}, 0);
+
+        ui_spacer(ui_px(50));
+
+        ui_label(Str8FromC("Here we go"));
+      }
     }
+    ui_end_build();
+
+    ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+    ui_draw(frame_buffer);
+    frame_buffer->Release();
 
     r_render_end();
     os_frame_end();

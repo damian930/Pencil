@@ -13,11 +13,11 @@
 //   ui_label(str);
 // }
 
-// void ui_label(Str8 str)
-// {
-//   ui_set_next_size_x(ui_text_size()); ui_set_next_size_y(ui_text_size());
-//   UI_Box* box = ui_box_make(str, UI_Box_flag__draw_text_contents);
-// }
+void ui_label(Str8 str)
+{
+  ui_set_next_size_x(ui_text_size()); ui_set_next_size_y(ui_text_size());
+  UI_Box* box = ui_box_make(str, UI_Box_flag__has_text_contents);
+}
 
 // void ui_label_fmt(const char* fmt, ...)
 // {
@@ -48,7 +48,7 @@ void ui_spacer(UI_Size size)
 // {
 //   ui_push_size_x(ui_text_size());
 //   ui_push_size_y(ui_text_size());
-//   UI_Box* box = ui_box_make(str, UI_Box_flag__draw_background|UI_Box_flag__draw_text_contents);
+//   UI_Box* box = ui_box_make(str, UI_Box_flag__draw_background|UI_Box_flag__has_text_contents);
 //   UI_Actions actions = ui_actions_from_box(box, rli_events);
 //   if (actions.is_down) { ui_set_active(box->id); }
 //   else if (!actions.is_down) { ui_reset_active_match(box->id); }

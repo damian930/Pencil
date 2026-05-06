@@ -4,6 +4,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include "windows.h"
 #include "windowsx.h"
+#include "shlobj_core.h"
 
 #include "core/core_include.h"
 
@@ -12,7 +13,7 @@ struct OS_Window;
 struct OS_State;
 
 // Global state for the layer
-extern global OS_State __os_g_state;
+extern global OS_State* __os_g_state;
 
 ///////////////////////////////////////////////////////////
 // - Files
@@ -236,5 +237,11 @@ void os_sleep(U64 ms);
 // U64 os_get_mouse_double_click_max_time_ms();
 // U64 os_get_keyboard_initial_repeat_delay();
 // U64 os_get_keyboard_subsequent_repeat_delay();
+
+// - Misc
+Str8 os_get_path_to_system_fonts();
+Str8 str8_from_wstr(Arena* arena, WCHAR* wstr);
+
+
 
 #endif

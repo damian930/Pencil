@@ -36,6 +36,7 @@
       it still has the mouse down state for some reason. 
 [ ] - Have ctrl+z when held remove the drawings instead of having to press it a bunch of times
 [ ] - Look into this https://web.archive.org/web/20190913214618/http://www.pjblewis.com/site/posts/2016-04-27-p2-efficient-alpha-blended-windows-directcomposition.html
+[ ] - Start using V memory instead of malloc
 
 Feature ideas:
 - Screen shot with the back of the desktop

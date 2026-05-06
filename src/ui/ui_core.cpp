@@ -1,7 +1,12 @@
 #ifndef __UI_CPP
 #define __UI_CPP
 
+#include "core/core_include.h"
 #include "core/core_include.cpp"
+
+#include "font_provider/font_provider.h"
+#include "font_provider/font_provider.cpp"
+
 #include "ui/ui_core.h"
 
 // todo: Struture this file based on the structure of the .h ui file
@@ -21,12 +26,12 @@ UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 }
 UI_Size ui_px(F32 value)                     { return ui_size_make(UI_Size_kind__px, value, 1.0f); }
 UI_Size ui_children_sum()                    { return ui_size_make(UI_Size_kind__children_sum, 0.0f, 0.0f); } // note: value is 0.0f there cause it is actually not used by the implementation
-// UI_Size ui_text_size()                       { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
+UI_Size ui_text_size()                       { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
 UI_Size ui_p_of_p(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__percent_of_parent, value, strictness); }
 
 // Just in case if i need these
-UI_Size ui_px_ex(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__px, value, strictness); }
-UI_Size ui_children_sum_ex(F32 strictness)  { return ui_size_make(UI_Size_kind__children_sum, 0.0f, strictness); } // note: value is 0.0f there cause it is actually not used by the implementation
+// UI_Size ui_px_ex(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__px, value, strictness); }
+// UI_Size ui_children_sum_ex(F32 strictness)  { return ui_size_make(UI_Size_kind__children_sum, 0.0f, strictness); } // note: value is 0.0f there cause it is actually not used by the implementation
 // UI_Size ui_text_size_ex(F32 strictness)     { return ui_size_make(UI_Size_kind__text, 0.0f, strictness); }         // note: value is 0.0f there cause it is actually not used by the implementation
 
 UI_Context* ui_get_context()
@@ -134,14 +139,14 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
     box->shape_style.border = ui_get_border();
   }
 
-  // if (flags & UI_Box_flag__draw_text_contents)
-  // {
-  //   Str8 text = ui_get_text_part_from_str8(id_and_text);
-  //   box->text_style.text       = str8_copy_alloc(ui_build_arena(), text);    
-  //   box->text_style.font       = ui_get_font();       
-  //   box->text_style.font_size  = ui_get_font_size();  
-  //   box->text_style.text_color = ui_get_text_color(); 
-  // }
+  if (flags & UI_Box_flag__has_text_contents)
+  {
+    Str8 text = ui_get_text_part_from_str8(id_and_text);
+    box->text_style.text       = str8_copy_alloc(ui_build_arena(), text);    
+    box->text_style.font       = ui_get_font();       
+    // box->text_style.font_size  = ui_get_font_size();  
+    box->text_style.text_color = ui_get_text_color(); 
+  }
 
   // UI_Box* this_box_prev_frame = ui_get_box_prev_frame(id_and_text);
   // if (!ui_box_is_zero(this_box_prev_frame)) 
@@ -885,19 +890,19 @@ void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_
 
 // --
 
-// void ui_push_text_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-// void ui_set_next_text_color(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-// void ui_pop_text_color()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-// void ui_auto_pop_text_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-// V4F32 ui_peek_text_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_color_stack, UI_Text_color_node) }
-// V4F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
+void ui_push_text_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+void ui_set_next_text_color(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+void ui_pop_text_color()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
+void ui_auto_pop_text_color_stack()  { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
+V4F32 ui_peek_text_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_color_stack, UI_Text_color_node) }
+V4F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
 
-// void ui_push_font(Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-// void ui_set_next_font(Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-// void ui_pop_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-// void ui_auto_pop_font_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-// Font ui_peek_font()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_stack, UI_Text_font_node) }
-// Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
+void ui_push_font(FP_Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+void ui_set_next_font(FP_Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+void ui_pop_font()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
+void ui_auto_pop_font_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
+FP_Font ui_peek_font()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_stack, UI_Text_font_node) }
+FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
 
 // void ui_push_font_size(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
 // void ui_set_next_font_size(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
@@ -940,155 +945,6 @@ void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_
 // todo: What happends if i pop all the values and then try to get them, if fails, then we shoud protect agains the full pop case
 
 // ========
-
-///////////////////////////////////////////////////////////
-// - Draw stuff for the ui for the ui
-//
-// note: This is a new, custom drawn thing for the ui, work in progress right now
-void ui_draw_command_from_ui_root(Arena* arena, UI_Box* root, UI_Draw_command_list* command_list)
-{
-  Assert(!ui_box_is_zero(root));
-
-  U64 _arena_pos_before_allocating_draw_command = ArenaCurrentAddressU64(arena);
-  UI_Draw_command* command                     = ArenaPush(arena, UI_Draw_command);
-  U64 _arena_pos_after_allocating_draw_command = ArenaCurrentAddressU64(arena);
-  
-  B32 shoud_make_command = false;
-  Rect rect = root->final_on_screen_rect;
-
-  if (root->flags & UI_Box_flag__has_background)
-  {
-    shoud_make_command = true;
-    command->rect = rect;
-    command->rect_color = root->shape_style.color;
-  }
-  if (root->flags & UI_Box_flag__has_borders)
-  {
-    shoud_make_command = true;
-    command->rect = rect;
-    command->border_width = root->shape_style.border.width;
-    command->border_color = root->shape_style.border.color;
-  }
-
-  // Testing the invariant
-  U64 _arena_pos_after_setting_the_command_data = ArenaCurrentAddressU64(arena);
-  Assert(_arena_pos_after_setting_the_command_data - sizeof(UI_Draw_command) == _arena_pos_before_allocating_draw_command);
-
-  if (shoud_make_command) {
-    DllPushBack(command_list, command);
-    command_list->count += 1;
-  } else {
-    ArenaPopType(arena, UI_Draw_command);
-  }
-
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
-    ui_draw_command_from_ui_root(arena, child, command_list);
-  }
-
-}
-
-/* note: This is an old raylib version of this thing
-void ui_draw_box(UI_Box* root, F32 x_clip_offset, F32 y_clip_offset)
-{
-  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
-  // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
-  
-  Rect rect = root->final_on_screen_rect;
-  
-  if (root->flags & UI_Box_flag__floating_x) { x_clip_offset = 0.0f; }
-  if (root->flags & UI_Box_flag__floating_y) { y_clip_offset = 0.0f; }
-
-  rect.x += x_clip_offset;
-  rect.y += y_clip_offset;
-
-  if (root->flags & UI_Box_flag__draw_background)
-  {
-    DrawRectangleRounded(raylib_rect, root->shape_style.corner_radius, 0, RAYLIB_COLOR_FROM_VEC(root->shape_style.color));
-  }
-
-  // todo/note: DrawRectangleRoundedLinesEx draws the line on the outside of the rect and not within
-  if (root->flags & UI_Box_flag__draw_borders)
-  {
-    // note: Might just draw a rect behind the rect which has borders
-    // DrawRectangleV();
-    // DrawRing();
-    DrawRectangleRoundedLinesEx(raylib_rect, root->shape_style.corner_radius, 0, root->shape_style.border.width, RAYLIB_COLOR_FROM_VEC(root->shape_style.border.color));
-  }
-
-  if (root->flags & UI_Box_flag__draw_text_contents)
-  {
-    Scratch scratch = get_scratch(0, 0);
-    Str8 text_nt = str8_copy_alloc(scratch.arena, root->text_style.text);
-    DrawTextEx(root->text_style.font, (char*)text_nt.data, Vector2{raylib_rect.x, raylib_rect.y}, (F32)root->text_style.font_size, 0, RAYLIB_COLOR_FROM_VEC(root->text_style.text_color));
-    end_scratch(&scratch);
-  }
-
-  if (root->texture_to_draw.id != 0)
-  {
-    Texture2D texture = root->texture_to_draw;
-    Rectangle source_rect = { 0.0f, 0.0f, (F32)texture.width, (F32)texture.height };
-    DrawTexturePro(root->texture_to_draw, source_rect, raylib_rect, Vector2{}, 0.0f, WHITE); 
-  }
-  
-  // todo: Scissor state might be broken if 1 scissor is actiev and another begins, so check for that
-  //       it might happen when there is a parent with overflowed child and some it its children 
-  //       have overflow as well anywhere deeper in that subtree.
-
-  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
-  if (root->flags & UI_Box_flag__dont_draw_overflow)
-  {
-    BeginScissorMode((int)raylib_rect.x, (int)raylib_rect.y, (int)raylib_rect.width, (int)raylib_rect.height);
-  }
-  else {
-    B32 is_on_x = root->flags & UI_Box_flag__dont_draw_overflow_x;
-    B32 is_on_y = root->flags & UI_Box_flag__dont_draw_overflow_y;
-    if (XOR(is_on_x, is_on_y)) {
-      // note: I did not bother implement this. 
-      //       To implement this just do something like scissor on on x and the whole ui size on y (screen y)
-      InvalidCodePath();
-    }
-  }
-
-  x_clip_offset += root->clip_offset.v[Axis2__x];
-  y_clip_offset += root->clip_offset.v[Axis2__y];
-
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
-    if (child->flags & UI_Box_flag__floating_x) {
-      x_clip_offset -= root->clip_offset.v[Axis2__x];    
-    } 
-    if (child->flags & UI_Box_flag__floating_y) {
-      y_clip_offset -= root->clip_offset.v[Axis2__y];    
-    }
-
-    ui_draw_box(child, x_clip_offset, y_clip_offset);
-
-    if (child->flags & UI_Box_flag__floating_x) {
-      x_clip_offset += root->clip_offset.v[Axis2__x];    
-    } 
-    if (child->flags & UI_Box_flag__floating_y) {
-      y_clip_offset += root->clip_offset.v[Axis2__y];    
-    }
-  }
-
-  // This is here to not draw overflow, if need to draw it at some point, will make this a flag
-  if (root->flags & UI_Box_flag__dont_draw_overflow)
-  {
-    EndScissorMode();
-  }
-
-  x_clip_offset -= root->clip_offset.v[Axis2__x];
-  y_clip_offset -= root->clip_offset.v[Axis2__y];
-}
-*/
-
-// void ui_draw()
-// {
-//   UI_Context* ctx = ui_get_context();
-//   ui_draw_box(ctx->root_box, 0.0f, 0.0f);
-// }
-
 
 
 #endif

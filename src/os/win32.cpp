@@ -3,6 +3,7 @@
 
 #include "os/win32.h"
 #pragma comment (lib, "user32.lib")
+#pragma comment (lib, "oneCore.lib")
 
 struct OS_Window {
   WNDCLASSEXA window_class;
@@ -16,8 +17,11 @@ struct OS_Window {
 };
 
 struct OS_State {
+  Arena* state_arena;
+  
   HINSTANCE app_instance;
   U64 perf_freq_count_per_sec;
+  Str8 path_to_system_fonts;
 
   // Single window data
   OS_Window window;
@@ -33,34 +37,47 @@ struct OS_State {
   OS_Mouse_button_state mouse_button_states[Mouse_button__COUNT];
 };
 
-global OS_State __os_g_state = {};
+global OS_State* __os_g_state = 0;
 
 ///////////////////////////////////////////////////////////
 // - State
 //
 void os_init()
 {
+  Arena* arena = arena_alloc(Megabytes(64));
+  __os_g_state = ArenaPush(arena, OS_State);
+  __os_g_state->state_arena = arena; 
+
   // Performance frequency
   LARGE_INTEGER freq_lr = {};
   BOOL succ = QueryPerformanceFrequency(&freq_lr); Assert(succ);
-  __os_g_state.perf_freq_count_per_sec = freq_lr.QuadPart;
+  __os_g_state->perf_freq_count_per_sec = freq_lr.QuadPart;
 
   // Setting keys
-  StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
+  StaticAssert(ArrayCount(__os_g_state->key_states) == Key__COUNT);
   for (U64 i = 0; i < Key__COUNT; i += 1) 
   {
-    OS_Key_state* key_state = __os_g_state.key_states + i;
+    OS_Key_state* key_state = __os_g_state->key_states + i;
     key_state->key = (Key)((U32)Key__NONE + i);
     key_state->is_up = true;
   }
 
   // Setting mouse buttons
-  StaticAssert(ArrayCount(__os_g_state.mouse_button_states) == Mouse_button__COUNT);
+  StaticAssert(ArrayCount(__os_g_state->mouse_button_states) == Mouse_button__COUNT);
   for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
   {
-    OS_Mouse_button_state* button_state = __os_g_state.mouse_button_states + i;
+    OS_Mouse_button_state* button_state = __os_g_state->mouse_button_states + i;
     button_state->button = (Mouse_button)((U32)Mouse_button__NONE + i);
     button_state->is_up = true;
+  }
+
+  // Getting the folder path in win32
+  {
+    WCHAR* wstr = 0;
+    HRESULT hr = SHGetKnownFolderPath(FOLDERID_Fonts, 0, 0, &wstr);
+    Handle(hr == S_OK);
+    Str8 str = str8_from_wstr(__os_g_state->state_arena, wstr);
+    __os_g_state->path_to_system_fonts = str;
   }
 }
 
@@ -71,7 +88,7 @@ void os_release()
 
 OS_State* os_get_state()
 {
-  return &__os_g_state;
+  return __os_g_state;
 }
 
 ///////////////////////////////////////////////////////////
@@ -286,19 +303,19 @@ void os_frame_begin()
   
   // Setting prev frame's input data to the new frame's fresh input data
   {
-    StaticAssert(ArrayCount(__os_g_state.key_states) == Key__COUNT);
+    StaticAssert(ArrayCount(os_state->key_states) == Key__COUNT);
     for (U64 i = 0; i < Key__COUNT; i += 1) 
     {
-      OS_Key_state* key_state = __os_g_state.key_states + i;
+      OS_Key_state* key_state = __os_g_state->key_states + i;
       key_state->was_down = key_state->is_down;
       key_state->was_up = key_state->is_up;
     }
 
     // Setting mouse buttons
-    StaticAssert(ArrayCount(__os_g_state.mouse_button_states) == Mouse_button__COUNT);
+    StaticAssert(ArrayCount(os_state->mouse_button_states) == Mouse_button__COUNT);
     for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
     {
-      OS_Mouse_button_state* button_state = __os_g_state.mouse_button_states + i;
+      OS_Mouse_button_state* button_state = os_state->mouse_button_states + i;
       button_state->was_down = button_state->is_down;
       button_state->was_up = button_state->is_up;
     }
@@ -325,7 +342,7 @@ void os_frame_begin()
   // Window dims
   {
     RECT rect = {};
-    BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
+    BOOL succ = GetWindowRect(os_state->window.handle, &rect); Assert(succ);
     V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
     os_state->window.dims = dims;
   }
@@ -333,7 +350,7 @@ void os_frame_begin()
   // Window client arena dims
   {
     RECT rect = {};
-    BOOL succ = GetClientRect(__os_g_state.window.handle, &rect); Assert(succ);
+    BOOL succ = GetClientRect(os_state->window.handle, &rect); Assert(succ);
     V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
     os_state->window.client_area_dims = dims;
   }
@@ -359,7 +376,7 @@ V2F32 os_get_client_area_dims__unsynched()
 {
   Handle(true); // todo: I just dont like this func here. I only added it to be able to create a swap chain before i start a frame, maybe i shoud create a swap chain inside the first ever call to render_begin instead of having to have it in the init call ???
   RECT rect = {};
-  BOOL succ = GetWindowRect(__os_g_state.window.handle, &rect); Assert(succ);
+  BOOL succ = GetWindowRect(os_get_state()->window.handle, &rect); Assert(succ);
   V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
   return dims;
 }
@@ -784,5 +801,22 @@ LRESULT win32_proc(
 
   return result;
 }
+
+Str8 os_get_path_to_system_fonts()
+{
+  return os_get_state()->path_to_system_fonts;
+}
+
+Str8 str8_from_wstr(Arena* arena, WCHAR* wstr)
+{
+  U64 str8_len_with_nt = WideCharToMultiByte(CP_UTF8, Null, wstr, -1, 0, 0, Null, Null);
+  Str8 str = data_buffer_make(arena, str8_len_with_nt);
+  U64 succ = WideCharToMultiByte(CP_UTF8, Null, wstr, -1, (char*)str.data, (int)str.count, Null, Null);
+  InvariantCheck(succ); 
+  InvariantCheck(str.data[str.count - 1] == '\0');
+  str = str8_chop_back_if_match(str, Str8FromC("\0"), 0);
+  return str;
+}
+
 
 #endif

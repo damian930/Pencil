@@ -3,6 +3,8 @@
 
 #include "core/core_include.h"
 
+#include "font_provider/font_provider.h"
+
 /* todos:
   - If ther is a parent box and it has a single child and child fills the whole parent, 
     if we get actions for both of them, only parent will produce interacted with events.
@@ -15,7 +17,7 @@
 enum UI_Size_kind {
   UI_Size_kind__px,
   UI_Size_kind__children_sum,
-  // UI_Size_kind__text,
+  UI_Size_kind__text,
   UI_Size_kind__percent_of_parent,
   // UI_Size_kind__em,
 };
@@ -34,7 +36,7 @@ enum UI_Box_flag : U32 {
   // UI_Box_flag__draw_corner_radius = (1 << 2),
   UI_Box_flag__has_borders       = (1 << 3),
 
-  // UI_Box_flag__draw_text_contents = (1 << 4),
+  UI_Box_flag__has_text_contents = (1 << 4),
 
   // UI_Box_flag__floating_x         = (1 << 5), // note: Right now if floating is inside clip and overflows, it gets clipped,
   // UI_Box_flag__floating_y         = (1 << 6), //       and there is no way to turn it off.
@@ -81,11 +83,11 @@ struct UI_Border_style_node { UI_Border_style v; UI_Border_style_node* next; };
 struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to text
-// struct UI_Text_color_node { V4F32 v; UI_Text_color_node* next; };
-// struct UI_Text_color_stack { UI_Text_color_node* first; U64 count; B32 pop_after_first_use; }; 
+struct UI_Text_color_node { V4F32 v; UI_Text_color_node* next; };
+struct UI_Text_color_stack { UI_Text_color_node* first; U64 count; B32 pop_after_first_use; }; 
 
-// struct UI_Text_font_node { Font v; UI_Text_font_node* next; };
-// struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_use; }; 
+struct UI_Text_font_node { FP_Font v; UI_Text_font_node* next; };
+struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_use; }; 
 
 // struct UI_Text_font_size_node { F32 v; UI_Text_font_size_node* next; };
 // struct UI_Text_font_size_stack { UI_Text_font_size_node* first; U64 count; B32 pop_after_first_use; }; 
@@ -127,12 +129,12 @@ struct UI_Box {
     UI_Border_style border;
   } shape_style;
 
-  // struct {
-  //   Str8 text;
-  //   Font font;
-  //   F32 font_size;      
-  //   V4F32 text_color;
-  // } text_style;
+  struct {
+    Str8 text;
+    FP_Font font;
+    F32 font_size;      
+    V4F32 text_color;
+  } text_style;
 
   // Some more extensions
   // Texture2D texture_to_draw;
@@ -198,8 +200,8 @@ struct UI_Context {
   UI_Border_style_stack border_style_stack;
 
   // Text style stacks
-  // UI_Text_color_stack text_color_stack;
-  // UI_Text_font_stack text_font_stack;
+  UI_Text_color_stack text_color_stack;
+  UI_Text_font_stack text_font_stack;
   // UI_Text_font_size_stack text_font_size_stack;
 
   // Speciall stacks
@@ -218,9 +220,9 @@ UI_Size ui_children_sum();
 UI_Size ui_text_size();                       
 UI_Size ui_p_of_p(F32 value, F32 strictness); 
 // Just in case if i need these
-UI_Size ui_px_ex(F32 value, F32 strictness); 
-UI_Size ui_children_sum_ex(F32 strictness);  
-UI_Size ui_text_size_ex(F32 strictness);     
+// UI_Size ui_px_ex(F32 value, F32 strictness); 
+// UI_Size ui_children_sum_ex(F32 strictness);  
+// UI_Size ui_text_size_ex(F32 strictness);     
 
 // - Context 
 UI_Context* ui_get_context();
@@ -331,19 +333,19 @@ void ui_set_next_border(F32 width, V4F32 color);
 // #define UI_Border_color(v)     DeferLoop(ui_push_border_color(v),  ui_pop_border_color())
 
 // - Style stack operations for text
-// void ui_push_text_color(V4F32 v);
-// void ui_set_next_text_color(V4F32 v);
-// void ui_pop_text_color();
-// void ui_auto_pop_text_color_stack();
-// V4F32 ui_peek_text_color();
-// V4F32 ui_get_text_color();
+void ui_push_text_color(V4F32 v);
+void ui_set_next_text_color(V4F32 v);
+void ui_pop_text_color();
+void ui_auto_pop_text_color_stack();
+V4F32 ui_peek_text_color();
+V4F32 ui_get_text_color();
 
-// void ui_push_font(Font v);
-// void ui_set_next_font(Font v);
-// void ui_pop_font();
-// void ui_auto_pop_font_stack();
-// Font ui_peek_font();
-// Font ui_get_font();
+void ui_push_font(FP_Font v);
+void ui_set_next_font(FP_Font v);
+void ui_pop_font();
+void ui_auto_pop_font_stack();
+FP_Font ui_peek_font();
+FP_Font ui_get_font();
 
 // void ui_push_font_size(F32 v);
 // void ui_set_next_font_size(F32 v);
@@ -375,8 +377,8 @@ void __ui_clear_style_stacks()
   // ctx->corner_radius_stack = {};
   ctx->border_style_stack = {};
 
-  // ctx->text_color_stack = {};
-  // ctx->text_font_stack  = {};
+  ctx->text_color_stack = {};
+  ctx->text_font_stack  = {};
   // ctx->text_font_size_stack  = {};
 
   // ctx->id_stack = {};
@@ -392,11 +394,13 @@ void __ui_push_defaults_onto_stacks()
   ui_push_size_x(ui_children_sum()); 
   ui_push_size_y(ui_children_sum());
 
-  ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
+  // todo: Change this to be transparent or settable by the outiside on build
+  // ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
+  ui_push_color(black_f()); 
   // ui_push_corner_radius(0.0f);
   // ui_push_border({ 0.0f, V4F32{0.0f, 0.0f, 0.0f, 0.0f} });
 
-  // ui_push_text_color(vec4_f32_make(255.0f, 255.0f, 255.0f, 255.0f));
+  ui_push_text_color(white_f());
   // ui_push_font(GetFontDefault()); // todo: Not the biggest fan of this line here
   // ui_push_font_size(32.0f);
 
@@ -503,28 +507,29 @@ void __ui_push_defaults_onto_stacks()
 //       I dont know how to just draw like ryan since i dont have 
 //       a separated layer for drawing like i had before with raylib 
 //       or how ryan has it with "D_" layer.
-///////////////////////////////////////////////////////////
-// - Draw stuff for the ui for the ui
-//
-struct UI_Draw_command {
-  Rect rect;
+// ///////////////////////////////////////////////////////////
+// // - Draw stuff for the ui for the ui
+// //
+// struct UI_Draw_command {
+//   Rect rect;
 
-  V4F32 rect_color;
-  F32 border_width;
-  V4F32 border_color;
+//   V4F32 rect_color;
+//   F32 border_width;
+//   V4F32 border_color;
 
-  UI_Draw_command* prev;
-  UI_Draw_command* next;
-};
+//   Str8 text;
 
-struct UI_Draw_command_list {
-  UI_Draw_command* first;
-  UI_Draw_command* last;
-  U64 count;
-};
+//   UI_Draw_command* prev;
+//   UI_Draw_command* next;
+// };
+
+// struct UI_Draw_command_list {
+//   UI_Draw_command* first;
+//   UI_Draw_command* last;
+//   U64 count;
+// };
 
 // void ui_draw_command_from_ui_root(UI_Box* root);
-
 
 
 #endif
