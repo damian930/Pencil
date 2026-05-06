@@ -6,6 +6,10 @@
 
 #include "renderer.h"
 
+// todo: Remove this from this layer
+#include "font_provider/font_provider.h"
+#include "font_provider/font_provider.cpp"
+
 // D3D
 #pragma comment (lib, "d3d11.lib")
 #pragma comment (lib, "dxgi.lib")
@@ -174,6 +178,23 @@ void r_render_begin(F32 viewport_width, F32 viewport_height)
     }
     d3d->context->RSSetState(rasterizer_state);
     rasterizer_state->Release();
+  }
+
+  // Alpha blending
+  {
+    ID3D11BlendState* blend_state = 0;
+    D3D11_BLEND_DESC desc = {};
+    desc.RenderTarget[0].BlendEnable           = TRUE;
+    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    d3d->device->CreateBlendState(&desc, &blend_state);
+    d3d->context->OMSetBlendState(blend_state, Null, ~0U);
+    blend_state->Release();
   }
 }
 
@@ -412,6 +433,45 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
 
   uniform_buffer->Release();
   sampler->Release();
+}
+
+void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font font, V4F32 color)
+{
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+
+  F32 origin_y = pos.y + font.ascent;
+  F32 x_offset = 0.0f;
+
+  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
+
+  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
+  {
+    U8 ch = text.data[ch_index];
+    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+    F32 origin_x = pos.x + x_offset;
+
+    // Just puttin them 1 next to another
+    Rect dest_rect = {};
+    dest_rect.x      = origin_x + glyph_data.bearing_x;
+    dest_rect.y      = origin_y - glyph_data.bearing_y;
+    dest_rect.width  = glyph_data.rect_on_atlas.width;
+    dest_rect.height = glyph_data.rect_on_atlas.height;
+    
+    r_draw_texture(
+      dest_rtv, dest_rect,
+      font.atlas_texture, glyph_data.rect_on_atlas
+    );
+
+    F32 advance = glyph_data.advance;
+    if (ch_index < text.count - 1)
+    {
+      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
+      if (!IsMemZero(entry)) { advance += entry.advance; }
+    } 
+    x_offset += advance; 
+  }
 }
 
 ///////////////////////////////////////////////////////////

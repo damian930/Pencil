@@ -45,8 +45,10 @@ global B32 hot_key_activated = false;
 
 void ui_draw_box(ID3D11RenderTargetView* rtv, UI_Box* root)
 {
-  // todo: When having corner radius, dont draw the stuff on the outside of the corners for the box, since that would make no sense
-  // todo: There is a bug in how we end scissor mode. Sometimes we dont end it.
+  #if DEBUG_MODe
+  // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
+  #endif
+  
   Rect rect = root->final_on_screen_rect;
 
   if (root->flags & UI_Box_flag__has_background)
@@ -69,45 +71,6 @@ void ui_draw(ID3D11RenderTargetView* rtv)
 {
   UI_Context* ctx = ui_get_context();
   ui_draw_box(rtv, ctx->root_box);
-}
-
-void test_draw_text(FP_Font font, Str8 text, ID3D11RenderTargetView* dest, V2F32 pos)
-{  
-  r_draw_rect(dest, rect_make(pos.x, pos.y, 100, 1), green_f());
-  r_draw_rect(dest, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-
-  F32 origin_y = pos.y + font.ascent;
-  F32 x_offset = 0.0f;
-
-  r_draw_rect(dest, rect_make(pos.x, origin_y, 100, 1), green_f());
-
-  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-  {
-    U8 ch = text.data[ch_index];
-    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-    F32 origin_x = pos.x + x_offset;
-
-    // Just puttin them 1 next to another
-    Rect dest_rect = {};
-    dest_rect.x      = origin_x + glyph_data.bearing_x;
-    dest_rect.y      = origin_y - glyph_data.bearing_y;
-    dest_rect.width  = glyph_data.rect_on_atlas.width;
-    dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-    r_draw_texture(
-      dest, dest_rect,
-      font.atlas_texture, glyph_data.rect_on_atlas
-    );
-
-    F32 advance = glyph_data.advance;
-    if (ch_index < text.count - 1)
-    {
-      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
-    } 
-    x_offset += advance; 
-  }
 }
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
@@ -331,7 +294,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     os_frame_begin();
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    r_clear_frame_buffer(black_f());
+    r_clear_frame_buffer(change_alpha_f(black_f(), 1));
 
     if (hot_key_activated && !P.is_mid_drawing)
     {
@@ -358,7 +321,15 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
         ui_spacer(ui_px(50));
 
-        ui_label(Str8FromC("Here we go"));
+        ui_set_next_size_x(ui_children_sum());
+        ui_set_next_size_y(ui_children_sum());
+        ui_set_next_layout_axis(Axis2__y);
+        ui_set_next_b_color(red_f());
+        UI_Box* wrapper = ui_box_make(Str8FromC("wrapper"), 0);
+        UI_Parent(wrapper)
+        {
+          ui_label(Str8FromC("Here we go"));
+        }
       }
     }
     ui_end_build();

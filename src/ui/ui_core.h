@@ -395,8 +395,7 @@ void __ui_push_defaults_onto_stacks()
   ui_push_size_y(ui_children_sum());
 
   // todo: Change this to be transparent or settable by the outiside on build
-  // ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
-  ui_push_color(black_f()); 
+  ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
   // ui_push_corner_radius(0.0f);
   // ui_push_border({ 0.0f, V4F32{0.0f, 0.0f, 0.0f, 0.0f} });
 

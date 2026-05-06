@@ -202,10 +202,10 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
       U32* image_pixel         = image_bytes + (y_byte_index * font_atlas_width + x_byte_index);
 
       // todo: I am not sure if its supposed to be intensity,intensity,intensity,255 or 255,255,255,intensity 
-      ((U8*)(image_pixel))[0] = intensity_pixel_value;
-      ((U8*)(image_pixel))[1] = intensity_pixel_value;
-      ((U8*)(image_pixel))[2] = intensity_pixel_value;
-      ((U8*)(image_pixel))[3] = 255;
+      ((U8*)(image_pixel))[0] = 255;
+      ((U8*)(image_pixel))[1] = 255;
+      ((U8*)(image_pixel))[2] = 255;
+      ((U8*)(image_pixel))[3] = intensity_pixel_value;
     }
   }
 
@@ -319,6 +319,26 @@ FP_Kerning_entry fp_get_kerning(FP_Font font, U64 unicode_codepoint_1, U64 unico
   return result_entry;
 }
 
+// todo: This shoud be in synch with the draw text function
+V2F32 fp_measure_text(Str8 str, FP_Font font)
+{
+  V2F32 dims = {};
+  dims.y = font.ascent + font.descent;
+  for (U64 ch_index = 0; ch_index < str.count; ch_index += 1)
+  {
+    U8 ch = str.data[ch_index];
+    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+    F32 advance = glyph_data.advance;
+    if (ch_index < str.count - 1)
+    {
+      FP_Kerning_entry entry = fp_get_kerning(font, ch, str.data[ch_index + 1]);
+      if (!IsMemZero(entry)) { advance += entry.advance; }
+    } 
+    dims.x += advance;
+  }
+  return dims;
+}
 
 
 

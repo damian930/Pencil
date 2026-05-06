@@ -234,12 +234,11 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
       root->final_on_screen_size.v[axis] = root->semantic_size[axis].value;
     } break;
 
-    // case UI_Size_kind__text:
-    // {
-    //   UI_text_measuring_ft* text_mesure_f = ui_get_text_measuring_function();
-    //   V2F32 dims = text_mesure_f(root->text_style.text, root->text_style.font, root->text_style.font_size);
-    //   root->final_on_screen_size.v[axis] = dims.v[axis];
-    // } break;
+    case UI_Size_kind__text:
+    {
+      V2F32 dims = fp_measure_text(root->text_style.text, root->text_style.font);
+      root->final_on_screen_size.v[axis] = dims.v[axis];
+    } break;
   }
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
@@ -867,7 +866,7 @@ void ui_pop_color()                { UI_Context* ctx = ui_get_context(); _UI_Sty
 void ui_auto_pop_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, color_stack, UI_Color_node) }
 V4F32 ui_peek_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, color_stack, UI_Color_node) }
 V4F32 ui_get_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, color_stack, UI_Color_node) }
-void ui_push_color(V4F32 v) { ui_push_color_no_flag(v); ui_add_flags(UI_Box_flag__has_background); }
+void ui_push_color(V4F32 v) { ui_push_color_no_flag(v);  }
 void ui_set_next_b_color(V4F32 v) { ui_set_next_color_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_background); }
 
 // void ui_push_corner_radius_no_flag(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
@@ -885,7 +884,7 @@ void ui_pop_border()                                    { UI_Context* ctx = ui_g
 void ui_auto_pop_border_stack()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
 UI_Border_style ui_peek_border()                        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, border_style_stack, UI_Border_style_node) }
 UI_Border_style ui_get_border()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_push_border(F32 width, V4F32 color)             { ui_push_border_no_flag(width, color); ui_add_flags(UI_Box_flag__has_borders); }
+void ui_push_border(F32 width, V4F32 color)             { ui_push_border_no_flag(width, color); }
 void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_flag(width, color); ui_add_flags_to_next(UI_Box_flag__has_borders); }
 
 // --
