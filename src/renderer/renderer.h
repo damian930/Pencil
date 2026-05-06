@@ -14,6 +14,8 @@
 #include "dwmapi.h"
 #include "dcomp.h"
 
+#include "__third_party/stb/stb_image.h"
+
 // Misc structs here
 
 // todo:
@@ -125,7 +127,7 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
 
 // - Other
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
-ID3D11RenderTargetView* r_make_rtv(U32 width, U32 height);
+ID3D11RenderTargetView* r_make_texture(U32 width, U32 height);
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
 D3D_Program r_program_from_file(
   const WCHAR* shader_program_file, 
@@ -136,6 +138,7 @@ D3D_Program r_program_from_file(
 
 // - Misc
 Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture);
+ID3D11RenderTargetView* r_load_texture(Str8 file_name);
 
 
 

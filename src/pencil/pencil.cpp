@@ -143,10 +143,10 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_St
   // Adding the new draw record to the draw record queue
   DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev);  Assert(P->last_record == new_draw_record);
 
-  new_draw_record->texture_before_we_affected = r_make_rtv(d3d, P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_before_we_affected = r_make_texture(d3d, P->draw_texures_width, P->draw_texures_height);
   HandleLater(new_draw_record->texture_before_we_affected != 0);
 
-  new_draw_record->texture_after_we_affected = r_make_rtv(d3d, P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_after_we_affected = r_make_texture(d3d, P->draw_texures_width, P->draw_texures_height);
   HandleLater(new_draw_record->texture_after_we_affected != 0);
 
   P->current_record = new_draw_record;

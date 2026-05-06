@@ -17,6 +17,11 @@
 #pragma comment (lib, "gdi32.lib")
 #pragma comment (lib, "dcomp.lib")
 
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#include "__third_party/stb/stb_image.h"
+#endif
+
 global D3D_State __d3d_g_state = {};
 
 ///////////////////////////////////////////////////////////
@@ -421,7 +426,7 @@ ID3D11RenderTargetView* r_get_frame_buffer_rtv()
   return frame_buffer_rtv;
 }
 
-ID3D11RenderTargetView* r_make_rtv(U32 width, U32 height)
+ID3D11RenderTargetView* r_make_texture(U32 width, U32 height)
 {
   D3D_State* d3d = r_get_state();
 
@@ -620,6 +625,48 @@ Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture)
   return image;
 }
 
+ID3D11RenderTargetView* r_load_texture(Str8 file_name)
+{
+  Scratch scratch = get_scratch(0, 0);
+  D3D_State* d3d = r_get_state();
+  ID3D11RenderTargetView* result_rtv = 0;
 
+  Str8 file_name_nt = str8_copy_alloc(scratch.arena, file_name);
+
+  int width = 0;
+  int height = 0;
+  int n_channels = 0;
+  U8* image_bytes = stbi_load((char*)file_name_nt.data, &width, &height, &n_channels, 4);
+  
+  if (image_bytes)
+  {
+    D3D11_TEXTURE2D_DESC desc = {};
+    desc.Width      = width;
+    desc.Height     = height;
+    desc.MipLevels  = 1;
+    desc.ArraySize  = 1;
+    desc.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.SampleDesc = { 1, 0 };
+    desc.Usage      = D3D11_USAGE_DEFAULT;
+    desc.BindFlags  = D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
+
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem     = image_bytes;
+    data.SysMemPitch = width * n_channels;
+
+    ID3D11Texture2D* texture = 0;
+    HRESULT create_succ = d3d->device->CreateTexture2D(&desc, &data, &texture);
+    
+    if (create_succ == S_OK)
+    {
+      HRESULT rtv_succ = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, NULL, &result_rtv);
+      Handle(rtv_succ == S_OK);
+      texture->Release();
+    }
+  }
+
+  end_scratch(&scratch);
+  return result_rtv;
+}
 
 #endif

@@ -162,8 +162,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
     P.draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
   
-    P.draw_texture_always_fresh   = r_make_rtv(P.draw_texures_width, P.draw_texures_height);
-    P.draw_texture_not_that_fresh = r_make_rtv(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_always_fresh   = r_make_texture(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_not_that_fresh = r_make_texture(P.draw_texures_width, P.draw_texures_height);
   }
 
   /*
@@ -223,8 +223,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
   // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
 
-  stb_
-
+  ID3D11RenderTargetView* logo_texture = r_load_texture(Str8FromC("../data/logo.png"));
   for (;!os_window_should_close();)
   {
     os_frame_begin(); 
@@ -236,6 +235,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_draw_rect(frame_buffer, rect_make(10, 50, 100, 200), orange_f());
     frame_buffer->Release();
     // r_draw_texture(frame_buffer, P.draw_texture_always_fresh, v2f32(os_get_client_area_dims().x - 5, os_get_client_area_dims().y - 5));//, v2f32(0, 0));
+
+    r_draw_texture(frame_buffer, logo_texture, v2f32(0, 0));
 
     r_render_end();
     os_frame_end();
