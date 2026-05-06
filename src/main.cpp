@@ -32,8 +32,8 @@ abstract.
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
-#include "ui/widgets/ui_widgets.h"
-#include "ui/widgets/ui_widgets.cpp"
+// #include "ui/widgets/ui_widgets.h"
+// #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
 #include "pencil/pencil.cpp"
@@ -43,9 +43,11 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-void ui_draw_box(ID3D11RenderTargetView* rtv, UI_Box* root)
-{
-  #if DEBUG_MODe
+void ui_draw_box(
+  ID3D11RenderTargetView* rtv, UI_Box* root, 
+  Rect parent_scissor_rect
+) {
+  #if DEBUG_MODE
   // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
   #endif
   
@@ -61,16 +63,55 @@ void ui_draw_box(ID3D11RenderTargetView* rtv, UI_Box* root)
     r_draw_text(rtv, root->text_style.text, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color);
   }
 
+  // Have to scissor ______ (THATS WHAT SHE SAID !!!)
+  Rect scissor_rect = parent_scissor_rect;
+  if (root->flags & UI_Box_flag__dont_draw_overflow_x)
+  {
+    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x) 
+    {
+      // Have to make sure that the child scissor is contained within the parent scissor, 
+      // so a child cant make a scissor larger than the parent and then have its children
+      // but drawn though the parent is trying to dis allow the drawing of the overflow.
+
+      F32 min_x = rect.x;
+      F32 min_y = rect.y;
+      F32 max_x = rect.x + rect.width;
+      F32 max_y = rect.y + rect.height;
+
+      if (min_x < parent_scissor_rect.x) { min_x = parent_scissor_rect.x; }
+      if (min_y < parent_scissor_rect.y) { min_y = parent_scissor_rect.y; }
+      if (max_x > parent_scissor_rect.x + parent_scissor_rect.width) { max_x = parent_scissor_rect.x + parent_scissor_rect.width; }
+      if (max_y > parent_scissor_rect.y + parent_scissor_rect.height) { max_y = parent_scissor_rect.y + parent_scissor_rect.height; }
+
+      scissor_rect = rect_make(min_x, min_y, max_x - min_x, max_y - min_y);
+    } 
+    else {
+      scissor_rect = rect;
+    }
+
+    r_scissoring_begin(scissor_rect);
+  }
+
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    ui_draw_box(rtv, child);
+    ui_draw_box(rtv, child, scissor_rect);
   }
+
+  // No longer scissoring
+  if (root->flags & UI_Box_flag__dont_draw_overflow_x)
+  {
+    r_scissoring_end();
+    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x) { 
+      r_scissoring_begin(parent_scissor_rect); 
+    }
+  }
+
 }
 
 void ui_draw(ID3D11RenderTargetView* rtv)
 {
   UI_Context* ctx = ui_get_context();
-  ui_draw_box(rtv, ctx->root_box);
+  ui_draw_box(rtv, ctx->root_box, Rect{});
 }
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
@@ -258,7 +299,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
     str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("Arial.ttf"));
     Str8 path_to_font = str8_from_list(scratch.arena, &path_parts);
-    font = fp_load_font(path_to_font, 86, range_u64_make(0, (U64)u8_max + 1));
+    font = fp_load_font(path_to_font, 18, range_u64_make(0, (U64)u8_max + 1));
     end_scratch(&scratch);
   }
   
@@ -300,43 +341,69 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
 
-    pencil_update(&P, false);
-    pencil_render(&P);
-
+    // pencil_do_ui(&P, font);
+    // pencil_update(&P, !ui_is_no_active());
+    // pencil_render(&P);
+    
+    // {
+    //   ID3D11RenderTargetView* buffer = r_get_frame_buffer_rtv();
+    //   ui_draw(buffer);
+    //   buffer->Release();
+    // }
     // Testing ui for now
     // if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
-    /*
     ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     {
       ui_push_font(font);
 
-      UI_PaddedBox(ui_px(50), Axis2__x)
+      ui_set_next_flags(UI_Box_flag__dont_draw_overflow_x);
+      ui_set_next_size_x(ui_px(100));
+      ui_set_next_size_y(ui_px(100));
+      ui_set_next_b_color(red_f());
+      UI_Box* box = ui_box_make(Str8{}, 0);
+      ui_push_parent(box);
       {
-        ui_set_next_size_x(ui_px(50));
-        ui_set_next_size_y(ui_px(50));
-        ui_set_next_b_color(red_f());
-        ui_set_next_border(-10, yellow_f());
-        UI_Box* box = ui_box_make(Str8{}, 0);
-
-        ui_spacer(ui_px(50));
-
-        ui_set_next_size_x(ui_children_sum());
-        ui_set_next_size_y(ui_children_sum());
-        ui_set_next_layout_axis(Axis2__y);
-        ui_set_next_b_color(red_f());
-        UI_Box* wrapper = ui_box_make(Str8FromC("wrapper"), 0);
-        UI_Parent(wrapper)
+        ui_set_next_flags(UI_Box_flag__dont_draw_overflow_x);
+        ui_set_next_size_x(ui_px(200));
+        ui_set_next_size_y(ui_px(120));
+        ui_set_next_b_color(blue_f());
+        UI_Box* box2 = ui_box_make(Str8{}, 0);
+        ui_push_parent(box2);
         {
-          ui_label(Str8FromC("Here we go"));
+          ui_set_next_size_x(ui_px(150));
+          ui_set_next_size_y(ui_px(40));
+          ui_set_next_b_color(green_f());
+          UI_Box* box3 = ui_box_make(Str8{}, 0);
         }
       }
+
+
+      // UI_PaddedBox(ui_px(50), Axis2__x)
+      // {
+      //   ui_set_next_size_x(ui_px(50));
+      //   ui_set_next_size_y(ui_px(50));
+      //   ui_set_next_b_color(red_f());
+      //   ui_set_next_border(-10, yellow_f());
+      //   UI_Box* box = ui_box_make(Str8{}, 0);
+
+      //   ui_spacer(ui_px(50));
+
+      //   ui_set_next_size_x(ui_children_sum());
+      //   ui_set_next_size_y(ui_children_sum());
+      //   ui_set_next_layout_axis(Axis2__y);
+      //   ui_set_next_b_color(red_f());
+      //   UI_Box* wrapper = ui_box_make(Str8FromC("wrapper"), 0);
+      //   UI_Parent(wrapper)
+      //   {
+      //     ui_label(Str8FromC("Here we go"));
+      //   }
+      // }
     }
     ui_end_build();
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
     ui_draw(frame_buffer);
     frame_buffer->Release();
-    */
 
     r_render_end();
     os_frame_end();

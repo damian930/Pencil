@@ -44,16 +44,16 @@ void ui_spacer(UI_Size size)
   ui_box_make(Str8{}, 0);
 }
 
-// UI_Actions ui_button(Str8 str, RLI_Event_list* rli_events) // todo: Remove the fucking rli events from there dude
-// {
-//   ui_push_size_x(ui_text_size());
-//   ui_push_size_y(ui_text_size());
-//   UI_Box* box = ui_box_make(str, UI_Box_flag__draw_background|UI_Box_flag__has_text_contents);
-//   UI_Actions actions = ui_actions_from_box(box, rli_events);
-//   if (actions.is_down) { ui_set_active(box->id); }
-//   else if (!actions.is_down) { ui_reset_active_match(box->id); }
-//   return actions;
-// }
+UI_Actions ui_button(Str8 str) // todo: Remove the fucking rli events from there dude
+{
+  ui_push_size_x(ui_text_size());
+  ui_push_size_y(ui_text_size());
+  UI_Box* box = ui_box_make(str, UI_Box_flag__has_background|UI_Box_flag__has_text_contents);
+  UI_Actions actions = ui_actions_from_box(box);
+  if (actions.is_down) { ui_set_active(box->id); }
+  else if (!actions.is_down) { ui_reset_active_match(box->id); } // todo: This shoud also check if it is active, cause then if we just down on the button it will reset the global active state
+  return actions;
+}
 
 ///////////////////////////////////////////////////////////
 // - Layout stacks

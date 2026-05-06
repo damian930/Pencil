@@ -27,96 +27,96 @@ void ui_wrapper_end();
 #define UI_Wrapper(axis) DeferLoop(ui_wrapper_begin(axis), ui_wrapper_end())
 
 // - Slider
-// struct UI_Slider_style {
-//   F32 width;
-//   F32 height;
-//   F32 corner_r;
-//   const char* fmt_str;
+struct UI_Slider_style {
+  F32 width;
+  F32 height;
+  // F32 corner_r;
+  const char* fmt_str;
   
-//   V4 hover_color;
-//   V4 no_hover_color;
-//   V4 slided_part_color;
+  V4 hover_color;
+  V4 no_hover_color;
+  V4 slided_part_color;
   
-//   V4 text_color;
-//   F32 font_size;
-// };
-// F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, RLI_Event_list* rli_event_list)
-// {
-//   UI_Actions slider_actions = ui_actions_from_id(slider_id, rli_event_list);
+  V4 text_color;
+  F32 font_size;
+};
+F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max)
+{
+  UI_Actions slider_actions = ui_actions_from_id(slider_id);
 
-//   if (slider_actions.is_hovered) {
-//     ui_set_next_color(slider_style->hover_color);
-//   } else {
-//     ui_set_next_color(slider_style->no_hover_color);
-//   }
-//   ui_set_next_size_x(ui_px(slider_style->width));
-//   ui_set_next_size_y(ui_px(slider_style->height));
-//   ui_set_next_corner_radius(slider_style->corner_r);
-//   ui_set_next_layout_axis(Axis2__x);
-//   UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow);
+  if (slider_actions.is_hovered) {
+    ui_set_next_b_color(slider_style->hover_color);
+  } else {
+    ui_set_next_b_color(slider_style->no_hover_color);
+  }
+  ui_set_next_size_x(ui_px(slider_style->width));
+  ui_set_next_size_y(ui_px(slider_style->height));
+  // ui_set_next_corner_radius(slider_style->corner_r);
+  ui_set_next_layout_axis(Axis2__x);
+  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow);
 
-//   B32 is_data_present = true;
+  B32 is_data_present = true;
 
-//   Rect slider_box_rect = {};
-//   {
-//     UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_id);
-//     is_data_present &= slider_box_data.is_found;
-//     slider_box_rect = slider_box_data.on_screen_rect;
-//   }
+  Rect slider_box_rect = {};
+  {
+    UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_id);
+    is_data_present &= slider_box_data.is_found;
+    slider_box_rect = slider_box_data.on_screen_rect;
+  }
 
-//   if (slider_actions.is_hovered)
-//   {
-//     current_value += slider_actions.wheel_move;
-//     clamp_f32_inplace(&current_value, min, max);
-//   }
+  if (slider_actions.is_hovered)
+  {
+    current_value += slider_actions.wheel_move;
+    clamp_f32_inplace(&current_value, min, max);
+  }
   
-//   F32 thumb_container_width = slider_box_rect.width;
-//   F32 max_thumb_offset = thumb_container_width;
-//   F32 value_ratio = current_value / (max - min);
-//   clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
-//   F32 thumb_offset = max_thumb_offset * value_ratio;
+  F32 thumb_container_width = slider_box_rect.width;
+  F32 max_thumb_offset = thumb_container_width;
+  F32 value_ratio = current_value / (max - min);
+  clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
+  F32 thumb_offset = max_thumb_offset * value_ratio;
 
-//   B32 moved_slider = false;
-//   if (slider_actions.is_down)
-//   {
-//     V2 mouse_pos = ui_get_mouse();
-//     thumb_offset = mouse_pos.x - slider_box_rect.x;
-//     moved_slider = true;
-//     ui_set_active(slider_box->id);
-//   }
-//   else 
-//   {
-//     ui_reset_active_match(slider_box->id);
-//   }
-//   clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
+  B32 moved_slider = false;
+  if (slider_actions.is_down)
+  {
+    V2 mouse_pos = ui_get_mouse();
+    thumb_offset = mouse_pos.x - slider_box_rect.x;
+    moved_slider = true;
+    ui_set_active(slider_box->id);
+  }
+  else 
+  {
+    ui_reset_active_match(slider_box->id);
+  }
+  clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
 
-//   UI_Parent(slider_box)
-//   {
-//     ui_set_next_size_x(ui_px(thumb_offset));
-//     ui_set_next_size_y(ui_px(slider_style->height));
-//     ui_set_next_corner_radius(slider_style->corner_r);
-//     ui_set_next_color(slider_style->slided_part_color);
-//     UI_Box* thumb_box = ui_box_make(Str8{}, 0);
-//   }
+  UI_Parent(slider_box)
+  {
+    ui_set_next_size_x(ui_px(thumb_offset));
+    ui_set_next_size_y(ui_px(slider_style->height));
+    ui_set_next_corner_radius(slider_style->corner_r);
+    ui_set_next_color(slider_style->slided_part_color);
+    UI_Box* thumb_box = ui_box_make(Str8{}, 0);
+  }
 
-//   UI_Parent(slider_box)
-//   {
-//     ui_set_next_flags(UI_Box_flag__floating);
-//     UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
-//     {
-//       ui_set_next_text_color(slider_style->text_color);
-//       ui_set_next_font_size(slider_style->font_size);
-//       ui_label_fmt(slider_style->fmt_str, current_value);
-//     }
-//   }
+  UI_Parent(slider_box)
+  {
+    ui_set_next_flags(UI_Box_flag__floating);
+    UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
+    {
+      ui_set_next_text_color(slider_style->text_color);
+      ui_set_next_font_size(slider_style->font_size);
+      ui_label_fmt(slider_style->fmt_str, current_value);
+    }
+  }
 
-//   F32 new_value = current_value;
-//   if (moved_slider)
-//   {
-//     new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
-//   }
-//   return new_value;
-// }
+  F32 new_value = current_value;
+  if (moved_slider)
+  {
+    new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
+  }
+  return new_value;
+}
 
 // // - Text input field 
 // U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 

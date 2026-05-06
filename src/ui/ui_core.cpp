@@ -619,6 +619,7 @@ B32 ui_is_active(Str8 box_id)
   return result;
 }
 
+// This could just be set_active(0)
 void ui_reset_active()
 {
   UI_Context* ctx = ui_get_context();
@@ -640,8 +641,7 @@ void ui_set_active(Str8 box_id)
   ctx->currently_active_box_id = str8_copy_alloc(ui_build_arena(), box_id); 
 }
 
-/*
-UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_events)
+UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
   // todo: I dont know how to make this be nicer in the api yet
   // todo: more than 1 update for the same box is possible in the same frame
@@ -684,22 +684,16 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_even
 
     if (is_hovered && !was_down)
     {
-      for (RLI_Event* e = rli_events->first; e; e = e->next)
+      if (os_mouse_button_went_down(Mouse_button__Left)) // todo: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
       {
-        if (e->kind == RLI_Event_kind__mouse_button && e->key_went_down && e->key == RLI_Key__mouse_left)
-        { 
-          // note: If nothing was down then we shoudnt have had an active box
-          Assert(!was_down);
-          Assert(ctx->currently_interacted_with_box_id.count == 0); 
-          Assert(ctx->currently_interacted_with_box__is_down == false);
-          Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
-          
-          RLI_consume_event(e);
-          is_down = true;
-          ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_build_arena(), this_frames_box->id);
-          ctx->currently_interacted_with_box__is_down = true;
-          break;
-        }
+        Assert(!was_down);
+        Assert(ctx->currently_interacted_with_box_id.count == 0); 
+        Assert(ctx->currently_interacted_with_box__is_down == false);
+        Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
+
+        is_down = true;
+        ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_build_arena(), this_frames_box->id);
+        ctx->currently_interacted_with_box__is_down = true;
       }
     }
     else if (was_down)
@@ -711,21 +705,15 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_even
         ctx->currently_interacted_with_box__left_box_while_was_down = true;
       }
   
-      for (RLI_Event* e = rli_events->first; e; e = e->next)
+      if (os_mouse_button_went_up(Mouse_button__Left))
       {
-        if (e->kind == RLI_Event_kind__mouse_button && e->key_came_up && e->key == RLI_Key__mouse_left)
-        { 
-          Assert(ctx->currently_interacted_with_box_id.count != 0); // note: If nothing was down then we shoudnt have had an active box
-          RLI_consume_event(e);
-          is_down = false;
+        Assert(ctx->currently_interacted_with_box_id.count != 0);
+        is_down = false;
 
-          // Resetting retained stuff
-          ctx->currently_interacted_with_box_id = Str8{};
-          ctx->currently_interacted_with_box__is_down = false;
-          ctx->currently_interacted_with_box__left_box_while_was_down = false;
-          
-          break;
-        }
+        // Resetting retained stuff
+        ctx->currently_interacted_with_box_id = Str8{};
+        ctx->currently_interacted_with_box__is_down = false;
+        ctx->currently_interacted_with_box__left_box_while_was_down = false;
       }
     }
   }
@@ -738,46 +726,16 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_even
   result_actions.is_clicked = was_down && !is_down && !left_box_while_was_down;
   result_actions.wheel_move = mouse_wheel_move;
 
-  // todo: not sure about these for now
-  {
-    if (is_hovered)
-    {
-      for (RLI_Event* e = rli_events->first; e; e = e->next)
-      {
-        if (e->kind == RLI_Event_kind__mouse_wheel)
-        {
-          result_actions.wheel_move = e->mouse_wheel_move;
-          RLI_consume_event(e);
-          break;
-        }
-      }
-    }
-
-    if (is_hovered || ui_is_active(this_frames_box->id))
-    {
-      for (RLI_Event* ev = rli_events->first; ev; ev = ev->next)
-      {
-        if (ev->kind == RLI_Event_kind__keyboard_button && ev->key == RLI_Key__enter && ev->key_went_down)
-        {
-          RLI_consume_event(ev);
-          result_actions.enter_got_pressed = true; 
-          break;
-        }
-      }
-    }
-  }
-
   return result_actions;
 }
 
-UI_Actions ui_actions_from_id(Str8 id, RLI_Event_list* rli_events)
+UI_Actions ui_actions_from_id(Str8 id)
 {
   UI_Actions actions = {};
   UI_Box* box = ui_get_box_prev_frame(id);
-  if (!ui_box_is_zero(box)) { actions = ui_actions_from_box(box, rli_events); }
+  if (!ui_box_is_zero(box)) { actions = ui_actions_from_box(box); }
   return actions;
 }
-*/
 
 ///////////////////////////////////////////////////////////
 // - Style stacks

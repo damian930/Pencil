@@ -802,4 +802,55 @@ void r_copy_from_texture_to_texture(
   d3d->context->CopyResource(dest_resource, src_resource);
 }
 
+void r_scissoring_begin(Rect rect)
+{
+  D3D_State* d3d = r_get_state();
+
+  ID3D11RasterizerState* old_rasterizer_state = 0;
+  d3d->context->RSGetState(&old_rasterizer_state);
+
+  D3D11_RASTERIZER_DESC desc = {};
+  old_rasterizer_state->GetDesc(&desc);
+  desc.ScissorEnable = true;
+
+  old_rasterizer_state->Release();
+
+  ID3D11RasterizerState* new_rasterizer_state = 0;
+  HRESULT hr1 = d3d->device->CreateRasterizerState(&desc, &new_rasterizer_state);
+  Handle(hr1 == S_OK);
+
+  d3d->context->RSSetState(new_rasterizer_state);
+  new_rasterizer_state->Release();
+  
+  D3D11_RECT scissorRect = {};
+  scissorRect.left   = (LONG)rect.x;
+  scissorRect.top    = (LONG)rect.y;
+  scissorRect.right  = (LONG)rect.width;
+  scissorRect.bottom = (LONG)rect.height;
+  d3d->context->RSSetScissorRects(1, &scissorRect);
+}
+
+void r_scissoring_end()
+{
+  D3D_State* d3d = r_get_state();
+
+  ID3D11RasterizerState* old_rasterizer_state = 0;
+  d3d->context->RSGetState(&old_rasterizer_state);
+
+  D3D11_RASTERIZER_DESC desc = {};
+  old_rasterizer_state->GetDesc(&desc);
+  desc.ScissorEnable = false;
+
+  old_rasterizer_state->Release();
+
+  ID3D11RasterizerState* new_rasterizer_state = 0;
+  HRESULT hr1 = d3d->device->CreateRasterizerState(&desc, &new_rasterizer_state);
+  Handle(hr1 == S_OK);
+
+  d3d->context->RSSetState(new_rasterizer_state);
+  new_rasterizer_state->Release();
+  
+  d3d->context->RSSetScissorRects(0, 0);
+}
+
 #endif

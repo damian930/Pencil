@@ -3,8 +3,8 @@
 
 #include "pencil.h"
 
-// #include "ui/ui_core.h"
-// #include "ui/ui_core.cpp"
+#include "ui/ui_core.h"
+#include "ui/ui_core.cpp"
 
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 {
@@ -302,16 +302,15 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   __active_draw_update_routine_end__: {};
 }
 
+// todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 /*
-void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
+void pencil_do_ui(Pencil_state* P, FP_Font font)
 {
-  int w = os_get_client_area_dims().x;
-  int h = os_get_client_area_dims().y;
-  ui_begin_build((F32)GetScreenWidth(), (F32)GetScreenHeight(), (F32)GetMouseX(), (F32)GetMouseY());
+  ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
 
-  // ui_push_font(G->font_texture_for_ui);
+  ui_push_font(font);
 
-  ui_set_next_border({ 2, { 255, 0, 0, 255 } });
+  ui_set_next_border(2, v4f32(1, 0, 0, 1));
   ui_set_next_size_x(ui_p_of_p(1, 1));
   ui_set_next_size_y(ui_p_of_p(1, 1));
   ui_set_next_layout_axis(Axis2__x);
@@ -322,7 +321,7 @@ void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
   {
     ui_set_next_size_x(ui_px(10));
     ui_set_next_size_y(ui_p_of_p(1, 1));
-    ui_set_next_color({ 255, 0, 0, 255 });
+    ui_set_next_b_color(v4f32(1, 0, 0, 1));
     UI_Box* left_border = ui_box_make(Str8{}, 0);
     
     ui_set_next_size_x(ui_p_of_p(1, 0));
@@ -350,7 +349,7 @@ void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
 
     ui_set_next_size_x(ui_px(10));
     ui_set_next_size_y(ui_p_of_p(1, 1));
-    ui_set_next_color({ 255, 0, 0, 255 });
+    ui_set_next_b_color(v4f32(1, 0, 0, 1));
     UI_Box* right_border = ui_box_make(Str8{}, 0);
   }
 

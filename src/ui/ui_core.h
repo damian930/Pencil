@@ -44,11 +44,11 @@ enum UI_Box_flag : U32 {
   // UI_Box_flag__clip_x = (1 << 7), 
   // UI_Box_flag__clip_y = (1 << 8), 
 
-  // UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
-  // UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
+  UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
+  UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
 
   // UI_Box_flag__floating = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
-  // UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
+  UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
 };
 typedef U32 UI_Box_flags;
 

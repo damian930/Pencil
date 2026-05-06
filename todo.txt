@@ -1,6 +1,6 @@
 [ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
 [ ] - Remove the non-client arena for the window 
-[ ] - Start doing the ui for the thing. Need text.
+[ ] - Start doing the ui for the thing.
 [ ] - Get path to app_data for later use with files and logs
 [ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
       Do it so if the app is to be run the second time, just go into the draw mode.
