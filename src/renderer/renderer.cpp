@@ -825,8 +825,8 @@ void r_scissoring_begin(Rect rect)
   D3D11_RECT scissorRect = {};
   scissorRect.left   = (LONG)rect.x;
   scissorRect.top    = (LONG)rect.y;
-  scissorRect.right  = (LONG)rect.width;
-  scissorRect.bottom = (LONG)rect.height;
+  scissorRect.right  = (LONG)(rect.x + rect.width);
+  scissorRect.bottom = (LONG)(rect.y + rect.height);
   d3d->context->RSSetScissorRects(1, &scissorRect);
 }
 

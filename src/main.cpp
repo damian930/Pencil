@@ -65,30 +65,51 @@ void ui_draw_box(
 
   // Have to scissor ______ (THATS WHAT SHE SAID !!!)
   Rect scissor_rect = parent_scissor_rect;
-  if (root->flags & UI_Box_flag__dont_draw_overflow_x)
+  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
-    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x) 
+    // Have to make sure that the child scissor is contained within the parent scissor, 
+    // so a child cant make a scissor larger than the parent and then have its children
+    // but drawn though the parent is trying to dis allow the drawing of the overflow.
+    RangeF2V32 default_scissor_box = {};
+    default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
+    default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
+    
+    RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
+    RangeF2V32 new_scissor_bbox = default_scissor_box;
+    
+    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
     {
-      // Have to make sure that the child scissor is contained within the parent scissor, 
-      // so a child cant make a scissor larger than the parent and then have its children
-      // but drawn though the parent is trying to dis allow the drawing of the overflow.
+      RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
 
-      F32 min_x = rect.x;
-      F32 min_y = rect.y;
-      F32 max_x = rect.x + rect.width;
-      F32 max_y = rect.y + rect.height;
-
-      if (min_x < parent_scissor_rect.x) { min_x = parent_scissor_rect.x; }
-      if (min_y < parent_scissor_rect.y) { min_y = parent_scissor_rect.y; }
-      if (max_x > parent_scissor_rect.x + parent_scissor_rect.width) { max_x = parent_scissor_rect.x + parent_scissor_rect.width; }
-      if (max_y > parent_scissor_rect.y + parent_scissor_rect.height) { max_y = parent_scissor_rect.y + parent_scissor_rect.height; }
-
-      scissor_rect = rect_make(min_x, min_y, max_x - min_x, max_y - min_y);
-    } 
+      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+      {
+        Axis2 axis = (Axis2)_axis;
+        if (root->parent->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+        {
+          F32 min = rect_bbox.min.v[axis];
+          F32 max = rect_bbox.max.v[axis];
+  
+          if (min < parent_scissor_bbox.min.v[axis]) { min = parent_scissor_bbox.min.v[axis]; }
+          if (max > parent_scissor_bbox.max.v[axis]) { max = parent_scissor_bbox.max.v[axis]; }
+  
+          new_scissor_bbox.min.v[axis] = min; 
+          new_scissor_bbox.max.v[axis] = max; 
+        }
+      }
+    }
     else {
-      scissor_rect = rect;
+      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+      {
+        Axis2 axis = (Axis2)_axis;
+        if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+        {
+          new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; 
+          new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; 
+        }
+      }
     }
 
+    scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
     r_scissoring_begin(scissor_rect);
   }
 
@@ -98,10 +119,10 @@ void ui_draw_box(
   }
 
   // No longer scissoring
-  if (root->flags & UI_Box_flag__dont_draw_overflow_x)
+  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
     r_scissoring_end();
-    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x) { 
+    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
       r_scissoring_begin(parent_scissor_rect); 
     }
   }
@@ -363,9 +384,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       UI_Box* box = ui_box_make(Str8{}, 0);
       ui_push_parent(box);
       {
-        ui_set_next_flags(UI_Box_flag__dont_draw_overflow_x);
+        // ui_set_next_flags(UI_Box_flag__dont_draw_overflow_y);
         ui_set_next_size_x(ui_px(200));
-        ui_set_next_size_y(ui_px(120));
+        ui_set_next_size_y(ui_px(400));
         ui_set_next_b_color(blue_f());
         UI_Box* box2 = ui_box_make(Str8{}, 0);
         ui_push_parent(box2);

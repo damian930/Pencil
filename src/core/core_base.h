@@ -598,6 +598,29 @@ tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
 
+struct RangeF2V32 {
+	V2F32 min;
+	V2F32 max;
+};
+
+tu_specific RangeF2V32 range_f2v32_from_rect(Rect rect)
+{
+	RangeF2V32 range = {};
+	range.min = v2f32(rect.x, rect.y);
+	range.max = v2f32(rect.x + rect.width, rect.y + rect.height);
+	return range;
+}
+
+tu_specific Rect rect_from_range_v2f32(RangeF2V32 range)
+{
+	Rect rect = {};
+	rect.x      = range.min.x;
+	rect.y      = range.min.y;
+	rect.width  = range.max.x - range.min.x;
+	rect.height = range.max.y - range.min.y;
+	return rect;
+}
+
 // note: this is static inline just cause i didnt care to move it to cpp file
 tu_specific B32 __is_memory_zero(U8* p, U64 size)
 {
