@@ -29,6 +29,7 @@ PS_Input vs_main(uint id : SV_VertexID)
   else if (id == 3) { v_pos_in_px = float2(u_circle_origin_x + u_radius, u_circle_origin_y - u_radius); } // top right
 
   float2 v_pos_ndc = (v_pos_in_px / float2(u_window_width, u_window_height)) * 2.0 - 1.0;
+  v_pos_ndc.y *= -1.0;
 
   PS_Input result;
   result.pos   = float4(v_pos_ndc, 0, 1);
@@ -41,7 +42,6 @@ PS_Input vs_main(uint id : SV_VertexID)
 
 float4 ps_main(PS_Input input) : SV_TARGET
 {
-  input.pos.y = u_window_height - input.pos.y;
   float d = distance(input.pos.xy, input.circle_origin_in_px);
   float4 color = input.color;
   if (d > input.circle_r_in_px) { discard; }

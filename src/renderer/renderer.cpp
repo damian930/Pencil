@@ -350,6 +350,10 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
 
   d3d->context->Draw(4, 0);
 
+  // todo: I shoud do this in each call to clear the non retained state per render
+  //       pass to not have weird state bugs from draw call to draw call
+  d3d->context->OMSetRenderTargets(0, 0, Null);
+
   uniform_buffer->Release();
 }
 
@@ -780,6 +784,22 @@ ID3D11RenderTargetView* r_load_texture_from_image(Image image)
   }
 
   return result_rtv;
+}
+
+// note: This is a very shitty function ))
+void r_copy_from_texture_to_texture(
+  ID3D11RenderTargetView* dest_rtv, 
+  ID3D11RenderTargetView* src_rtv
+) {
+  D3D_State* d3d = r_get_state();
+  
+  ID3D11Resource* dest_resource = 0;
+  dest_rtv->GetResource(&dest_resource);
+
+  ID3D11Resource* src_resource = 0;
+  src_rtv->GetResource(&src_resource);
+  
+  d3d->context->CopyResource(dest_resource, src_resource);
 }
 
 #endif

@@ -6,84 +6,6 @@
 // #include "ui/ui_core.h"
 // #include "ui/ui_core.cpp"
 
-// todo: I dont like that P stored the shaders and all and we ahve to pss it in here like we do
-
-// todo: Have a draw circle separate call in the d3d layer
-/*
-void pencil_draw_circle(
-  const Pencil_state* P, 
-  D3D_State* d3d, ID3D11RenderTargetView* render_target,
-  F32 x_origin, F32 y_origin, F32 r, V4F32 color
-) {
-  ID3D11DeviceContext* context = d3d->context;
-  ID3D11Device* device = d3d->device;
-
-  context->ClearState();
-  context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-  
-  // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
-  {
-    D3D_Circle_program_data u_data = {};
-    u_data.origin_x      = x_origin; 
-    u_data.origin_y      = y_origin; 
-    u_data.radius        = r;
-    u_data.window_width  = (F32)os_get_client_area_dims().x;
-    u_data.window_height = (F32)os_get_client_area_dims().y;
-    u_data.color         = color; 
-
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC;
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    desc.MiscFlags      = {};
-    desc.StructureByteStride = {};
-    device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    memcpy(mapped.pData, &u_data, sizeof(u_data));
-    context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-  }
-
-  context->VSSetShader(P->draw_circle_program.v_shader, 0, 0);
-  context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  ID3D11RasterizerState* rasterizer_state = 0;
-  {
-    // disable culling
-    D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode = D3D11_FILL_SOLID;
-    desc.CullMode = D3D11_CULL_NONE;
-    desc.DepthClipEnable = true;
-    device->CreateRasterizerState(&desc, &rasterizer_state);
-  }
-
-  // todo: Dont do this any more, this is dont in the begin call for rendering
-  D3D11_VIEWPORT vp = {};
-  vp.TopLeftX = 0;
-  vp.TopLeftY = 0;
-  vp.Width    = (F32)os_get_client_area_dims().x;
-  vp.Height   = (F32)os_get_client_area_dims().y;
-  vp.MinDepth = 0;
-  vp.MaxDepth = 1;
-  context->RSSetState(rasterizer_state);
-  context->RSSetViewports(1, &vp);
-  
-  context->PSSetShader(P->draw_circle_program.p_shader, 0, 0);
-  context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-  
-  // todo: This shoud be a separate call to the draw thing that picks the render target
-  context->OMSetRenderTargets(1, &render_target, 0);
-
-  context->Draw(4, 0);
-
-  rasterizer_state->Release();
-  uniform_buffer->Release();
-}
-*/
-
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 {
   Draw_record* result = 0;
@@ -104,7 +26,7 @@ Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 
 // todo: Does this really need to care about is_ui_capturing_mouse, or shoud this
 //       be handled by the caller ????
-Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_State* d3d, B32 is_ui_capturing_mouse)
+Draw_record_registration_result register_new_draw_record(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
   if (P->is_mid_drawing || is_ui_capturing_mouse) { return Draw_record_registration_result{}; }
 
@@ -143,10 +65,10 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_St
   // Adding the new draw record to the draw record queue
   DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev);  Assert(P->last_record == new_draw_record);
 
-  new_draw_record->texture_before_we_affected = r_make_texture(d3d, P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_before_we_affected = r_make_texture(P->draw_texures_width, P->draw_texures_height);
   HandleLater(new_draw_record->texture_before_we_affected != 0);
 
-  new_draw_record->texture_after_we_affected = r_make_texture(d3d, P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_after_we_affected = r_make_texture(P->draw_texures_width, P->draw_texures_height);
   HandleLater(new_draw_record->texture_after_we_affected != 0);
 
   P->current_record = new_draw_record;
@@ -157,22 +79,8 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_St
 
   return result;
 }
-
-void copy_from_texture_to_texture(
-  D3D_State* d3d,
-  ID3D11RenderTargetView* dest_rtv, 
-  ID3D11RenderTargetView* src_rtv
-) {
-  ID3D11Resource* dest_resource = 0;
-  dest_rtv->GetResource(&dest_resource);
-
-  ID3D11Resource* src_resource = 0;
-  src_rtv->GetResource(&src_resource);
-  
-  d3d->context->CopyResource(dest_resource, src_resource);
-}
  
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
   // Handling signals
   /*
@@ -244,10 +152,10 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
       ID3D11RenderTargetView* future_texture = next_record->texture_after_we_affected;
       
       // Change the affected part from the fresh texture to the stored old version
-      copy_from_texture_to_texture(d3d, P->draw_texture_always_fresh, future_texture);
+      r_copy_from_texture_to_texture(P->draw_texture_always_fresh, future_texture);
 
       // Change the affected part from the not so fresh texture to the stored old version
-      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, future_texture);
+      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh, future_texture);
 
       P->current_record = next_record;
     }
@@ -263,10 +171,10 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
       ID3D11RenderTargetView* texture_before_we_affected = record->texture_before_we_affected;
       
       // Change the affected part from the fresh texture to the stored old version
-      copy_from_texture_to_texture(d3d, P->draw_texture_always_fresh, texture_before_we_affected);
+      r_copy_from_texture_to_texture(P->draw_texture_always_fresh, texture_before_we_affected);
 
       // Change the affected part from the not so fresh texture to the stored old version
-      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, texture_before_we_affected);
+      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh, texture_before_we_affected);
 
       P->current_record = P->current_record->prev;
     }
@@ -277,7 +185,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
     dont_start_drawing_this_frame = true;
 
     // Creating a new current record
-    Draw_record_registration_result record_reg = register_new_draw_record(P, d3d, is_ui_capturing_mouse);
+    Draw_record_registration_result record_reg = register_new_draw_record(P, is_ui_capturing_mouse);
     if (record_reg.succ)
     {
       Draw_record* record = record_reg.record;
@@ -287,17 +195,16 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
       U64 h = P->draw_texures_height;
       
       // Clearing the texture
-      F32 _color_[4] = { 0, 0, 0, 0 };
-      d3d->context->ClearRenderTargetView(P->draw_texture_always_fresh, _color_);
+      r_clear_rtv(P->draw_texture_always_fresh, transparent_f());
   
       // Storing the prev texture state
-      copy_from_texture_to_texture(d3d, P->current_record->texture_before_we_affected, P->draw_texture_not_that_fresh);
+      r_copy_from_texture_to_texture(P->current_record->texture_before_we_affected, P->draw_texture_not_that_fresh);
   
       // Storing the new texture state
-      copy_from_texture_to_texture(d3d, P->current_record->texture_after_we_affected, P->draw_texture_always_fresh);
+      r_copy_from_texture_to_texture(P->current_record->texture_after_we_affected, P->draw_texture_always_fresh);
 
       // Matching the prev texture state to the new one
-      copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
+      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
     }
   }
   else // User wants to start using the eraser pen 
@@ -325,7 +232,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
 
   if (!P->is_mid_drawing && !is_ui_capturing_mouse && os_mouse_button_down(Mouse_button__Left)) 
   {
-    Draw_record_registration_result record_registation = register_new_draw_record(P, d3d, is_ui_capturing_mouse);
+    Draw_record_registration_result record_registation = register_new_draw_record(P, is_ui_capturing_mouse);
     if (record_registation.succ)
     {
       // todo: What is .succ here about, do we need it ???
@@ -356,7 +263,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
-        d3d_draw_circle(d3d, P->draw_texture_always_fresh, x, y, pen_size, color);
+        r_draw_circle(P->draw_texture_always_fresh, x, y, pen_size, color);
       }
     }
 
@@ -383,13 +290,13 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d)
     // note: By this point, the fresh draw texture is the new final version of what the user has draw
 
     // Storing the prev version of the draw texture 
-    copy_from_texture_to_texture(d3d, texture_before_we_affected, P->draw_texture_not_that_fresh);
+    r_copy_from_texture_to_texture(texture_before_we_affected, P->draw_texture_not_that_fresh);
 
     // Storing the new version of the draw texture
-    copy_from_texture_to_texture(d3d, texture_after_we_affected, P->draw_texture_always_fresh);
+    r_copy_from_texture_to_texture(texture_after_we_affected, P->draw_texture_always_fresh);
 
     // Updating the prev version of the draw texture to match the new version
-    copy_from_texture_to_texture(d3d, P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
+    r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh, P->draw_texture_always_fresh);
   }
 
   __active_draw_update_routine_end__: {};
@@ -741,13 +648,21 @@ void pencil_build_ui(Pencil_state* P, RLI_Event_list* rli_events)
 }
 */
 
-void pencil_render(const Pencil_state* P, D3D_State* d3d)
+void pencil_render(const Pencil_state* P)
 {
-  InvalidCodePath();
+  ID3D11RenderTargetView* frame_buffer_rtv = r_get_frame_buffer_rtv();
+  Rect rect = rect_make(0, 0, r_get_texture_dims(P->draw_texture_always_fresh).x, r_get_texture_dims(P->draw_texture_always_fresh).y);
+  r_draw_texture(
+    frame_buffer_rtv, rect,
+    P->draw_texture_always_fresh, rect
+  );
+  frame_buffer_rtv->Release();
+
+  // InvalidCodePath();
 }
 
 #if DEBUG_MODE
-void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
+void __debug_export_current_record_images(const Pencil_state* P)
 {
   // todo: I dont like the api for the D3D_Texture_result. 
   //       The way we have to get the texture out and it is 0 if the succ is false
@@ -759,60 +674,27 @@ void __debug_export_current_record_images(const Pencil_state* P, D3D_State* d3d)
   // Loading up always_fresh_texture
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    D3D_Texture_result fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_always_fresh);
-    if (fresh_texture_res.succ)
-    {
-      Image image = d3d_export_texture(P->frame_arena, d3d, fresh_texture_res.texture);
-      stbi_flip_vertically_on_write(true); 
-      int succ = stbi_write_png("always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
-      Assert(succ);
-      fresh_texture_res.texture->Release();
-    } 
-    else { Assert(0); }
+    r_export_texture(P->draw_texture_always_fresh, Str8FromC("always_fresh_texture.png"));
   }
 
   // Loading up not_fresh_texture
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    D3D_Texture_result not_fresh_texture_res = d3d_texture_from_rtv(P->draw_texture_not_that_fresh);
-    if (not_fresh_texture_res.succ)
-    {
-      Image image = d3d_export_texture(P->frame_arena, d3d, not_fresh_texture_res.texture);
-      int succ = stbi_write_png("not_always_fresh_texture.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
-      Assert(succ);
-      not_fresh_texture_res.texture->Release();
-    } 
-    else { Assert(0); }
+    r_export_texture(P->draw_texture_not_that_fresh, Str8FromC("not_always_fresh_texture.png"));
   }
   
   // Loading up current texture_after_we_affected
   if (P->current_record != 0)
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_after_we_affected);
-    if (texture_res.succ)
-    {
-      Image image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
-      int succ = stbi_write_png("current_texture_after_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
-      Assert(succ);
-      texture_res.texture->Release();
-    } 
-    else { Assert(0); }
+    r_export_texture(P->current_record->texture_after_we_affected, Str8FromC("current_texture_after_we_affected.png"));
   }
 
   // Loading up current texture_before_we_affected
   if (P->current_record != 0)
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    D3D_Texture_result texture_res = d3d_texture_from_rtv(P->current_record->texture_before_we_affected);
-    if (texture_res.succ)
-    {
-      Image image = d3d_export_texture(P->frame_arena, d3d, texture_res.texture);
-      int succ = stbi_write_png("current_texture_before_we_affected.png", (int)image.width_in_px, (int)image.height_in_px, 4, image.data, (int)image.width_in_px * (int)image.bytes_per_pixel);
-      Assert(succ);
-      texture_res.texture->Release();
-    } 
-    else { Assert(0); }
+    r_export_texture(P->current_record->texture_before_we_affected, Str8FromC("current_texture_before_we_affected.png"));
   }
 }
 #endif

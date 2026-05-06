@@ -36,7 +36,7 @@ abstract.
 #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -294,19 +294,23 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     os_frame_begin();
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
-    r_clear_frame_buffer(change_alpha_f(black_f(), 1));
-
     if (hot_key_activated && !P.is_mid_drawing)
     {
       hot_key_activated = false;
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
 
-    // pencil_update(&P, false, &d3d);
-    // pencil_render(&P, &d3d);
+    static F32 r = 0.0f;
+    r_clear_frame_buffer(v4f32(r, r / 2, r / 3, 1));
+    r += 0.001;
+    if (r == 1.0f) { r = 0.0f; }
+
+    pencil_update(&P, false);
+    pencil_render(&P);
 
     // Testing ui for now
     // if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
+    /*
     ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     {
       ui_push_font(font);
@@ -337,6 +341,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
     ui_draw(frame_buffer);
     frame_buffer->Release();
+    */
 
     r_render_end();
     os_frame_end();
