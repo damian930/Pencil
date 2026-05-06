@@ -300,11 +300,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
 
-    static F32 r = 0.0f;
-    r_clear_frame_buffer(v4f32(r, r / 2, r / 3, 1));
-    r += 0.001;
-    if (r == 1.0f) { r = 0.0f; }
-
     pencil_update(&P, false);
     pencil_render(&P);
 

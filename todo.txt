@@ -1,22 +1,5 @@
-[x] - Fix the source and dest issue (The issue was that was using the worng case for the RTV in d3d-> To get the resource out of an rtv you have to use ->GetResouce and not just a cast to the resource like with textures. This is the case bacause the textures inherit the Resource interface, so the cast is fine, but rtvs dont, therefore a call to ->GetResource)
-[x] - Have a way to export a texture view and then compare on 
-      the cpu if they are identicall
-[x] - Split the cpp and the header file for os, its getting hard to see the code
-[x] - Split the cpp and the header file for pencil, its getting hard to see the code
-[x] - Start having an fps counter and hitting the fps
-[x] - Start having ctrl+z 
-[x] - Start having ctrl+shift+z 
-[x] - Draw in circles
-[x] - Draw a continuous line
-[x] - Have a transparent widnow
-[x] - Have a maximize function for a window
-[x] - Have a minimize function for a window
-[x] - Have a hot key to go in and out of the draw mode
-[x] - Disallow resize for the window 
 [ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
 [ ] - Remove the non-client arena for the window 
-[x] - Finish with the little things about the drawing part you had in the demo
-[ ] - Need text, have a way to create font atlas textures
 [ ] - Start doing the ui for the thing. Need text.
 [ ] - Get path to app_data for later use with files and logs
 [ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
