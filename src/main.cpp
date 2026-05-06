@@ -131,8 +131,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   }
   
   { // Making the window be on top all the time
-    BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-    HandleLater(succ);
+    // BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    // HandleLater(succ);
   }
 
   ///////////////////////////////////////////////////////////
@@ -223,7 +223,15 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
   // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
 
-  ID3D11RenderTargetView* logo_texture = r_load_texture(Str8FromC("../data/logo.png"));
+  // Testing and working on font provider
+  ID3D11RenderTargetView* atlas_texture = 0;
+  { 
+    Scratch scratch = get_scratch(0, 0);
+    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
+    atlas_texture = r_load_texture_from_image(image); 
+    Image image_copy = r_export_texture(scratch.arena, atlas_texture);
+    end_scratch(&scratch);
+  }
   for (;!os_window_should_close();)
   {
     os_frame_begin(); 
@@ -232,12 +240,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_clear_frame_buffer(blue_f());
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-    r_draw_rect(frame_buffer, rect_make(10, 50, 100, 200), orange_f());
+
+    r_draw_texture(
+      frame_buffer, 
+      rect_make(0, 0, r_get_texture_dims(atlas_texture).x, r_get_texture_dims(atlas_texture).y),
+      // rect_make(0, 0, r_get_texture_dims(frame_buffer).x, r_get_texture_dims(frame_buffer).y), 
+      // rect_make(0, 0, 900, 900),
+      atlas_texture, 
+      rect_make(0, 0, r_get_texture_dims(atlas_texture).x, r_get_texture_dims(atlas_texture).y)
+    );
     frame_buffer->Release();
-    // r_draw_texture(frame_buffer, P.draw_texture_always_fresh, v2f32(os_get_client_area_dims().x - 5, os_get_client_area_dims().y - 5));//, v2f32(0, 0));
-
-    r_draw_texture(frame_buffer, logo_texture, v2f32(0, 0));
-
+    
     r_render_end();
     os_frame_end();
 
@@ -246,18 +259,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     Handle(commit_hr == S_OK);
   }
 
-  // Testing and working on font provider
-  { 
-    Scratch scratch = get_scratch(0, 0);
-
-    Image image = font_provider_create_cpu_side_font_atlas(scratch.arena, String("../data/Roboto.ttf"), 32, range_u64_make((U64)'a', (U64)'z'));
-    
-    // todo: This has to get loaded onto the texture to then be able to reference it via offsets from stb_truetype
-    
-    end_scratch(&scratch);
-
-    // int res = stbi_write_png("test_png_atlas.png", image.width_in_px, image.height_in_px, 4, image.data, image.width_in_px * 4);
-  }
+  
 
   os_window_set_mouse_passthrough(true);
 

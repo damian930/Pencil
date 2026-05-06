@@ -332,7 +332,7 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   uniform_buffer->Release();
 }
 
-void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin)
+void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
 {
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
@@ -341,10 +341,13 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
   ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Texture_program_data u_data = {};
-    u_data.vp_width  = d3d->render_viewport_width;
-    u_data.vp_height = d3d->render_viewport_height;
-    u_data.origin    = origin; 
-    // u_data.size   = size;
+    u_data.vp_width         = d3d->render_viewport_width;
+    u_data.vp_height        = d3d->render_viewport_height;
+    u_data.dest_rect_origin = v2f32(rect_in_dest.x, rect_in_dest.y);
+    u_data.dest_rect_size   = v2f32(rect_in_dest.width, rect_in_dest.height);
+    u_data.src_rect_origin  = v2f32(rect_in_src.x, rect_in_src.y);
+    u_data.src_rect_size    = v2f32(rect_in_src.width, rect_in_src.height);
+    u_data.src_texture_dims = r_get_texture_dims(src_rtv);
 
     D3D11_BUFFER_DESC desc = {};
     desc.ByteWidth      = sizeof(u_data);
@@ -376,7 +379,6 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
     InvariantCheck(!IsMemZero(vp));
   }
 
-  // todo: See if this sampler need to be removed later
   ID3D11SamplerState* sampler;
   {
     D3D11_SAMPLER_DESC desc = {};
@@ -394,17 +396,17 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
   d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
   {
     ID3D11Resource* resource = 0;
-    source_rtv->GetResource(&resource);
+    src_rtv->GetResource(&resource);
 
     ID3D11ShaderResourceView* view = 0;
     d3d->device->CreateShaderResourceView(resource, NULL, &view);
     d3d->context->PSSetShaderResources(0, 1, &view);
     d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-    resource->Release();
     view->Release();
+    resource->Release();
   }
 
-  d3d->context->OMSetRenderTargets(1, &target_rtv, 0);
+  d3d->context->OMSetRenderTargets(1, &dest_rtv, 0);
 
   d3d->context->Draw(4, 0);
 
@@ -456,6 +458,7 @@ ID3D11RenderTargetView* r_make_texture(U32 width, U32 height)
   return rtv;
 }
 
+// note: The texture has to be released later
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv)
 {
   HRESULT hr = S_OK;
@@ -472,6 +475,19 @@ D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv)
 
   resource->Release();
   return result;
+}
+
+V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv)
+{
+  D3D_Texture_result texture_res = r_texture_from_rtv(rtv);
+  Handle(texture_res.succ);
+
+  D3D11_TEXTURE2D_DESC desc = {};
+  texture_res.texture->GetDesc(&desc);
+
+  texture_res.texture->Release();
+  V2F32 dims = v2f32((F32)desc.Width, (F32)desc.Height);
+  return dims;
 }
 
 D3D_Program r_program_from_file(
@@ -559,20 +575,27 @@ D3D_Program r_program_from_file(
 ///////////////////////////////////////////////////////////
 // - Misc
 //
-Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture)
+Image r_export_texture(Arena* arena, ID3D11RenderTargetView* rtv)
 {
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
-  Scratch scratch = get_scratch(0, 0);
+  // Stuff to clear at the end
+  Scratch          scratch      = get_scratch(0, 0);
+  ID3D11Resource*  resource     = 0;
+  ID3D11Texture2D* texture      = 0;
   ID3D11Texture2D* copy_texture = 0;
+
+  rtv->GetResource(&resource);
+  hr = resource->QueryInterface(IID_ID3D11Texture2D, (void**)&texture);
+  Handle(hr == S_OK);
 
   U64 texture_height = 0;
   U64 texture_width  = 0;
   DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
   {
     D3D11_TEXTURE2D_DESC desc = {};
-    src_texture->GetDesc(&desc);
+    texture->GetDesc(&desc);
     desc.BindFlags      = 0;
     desc.Usage          = D3D11_USAGE_STAGING;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
@@ -584,7 +607,7 @@ Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture)
     hr = d3d->device->CreateTexture2D(&desc, 0, &copy_texture);
     HandleLater(hr == S_OK);
 
-    d3d->context->CopyResource((ID3D11Resource*)copy_texture, (ID3D11Resource*)src_texture);
+    d3d->context->CopyResource((ID3D11Resource*)copy_texture, (ID3D11Resource*)texture);
   }
 
   // note: For now only this one
@@ -620,12 +643,14 @@ Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture)
   }
 
   copy_texture->Release();
+  texture->Release();
+  resource->Release();
   end_scratch(&scratch);
 
   return image;
 }
 
-ID3D11RenderTargetView* r_load_texture(Str8 file_name)
+ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name)
 {
   Scratch scratch = get_scratch(0, 0);
   D3D_State* d3d = r_get_state();
@@ -640,32 +665,49 @@ ID3D11RenderTargetView* r_load_texture(Str8 file_name)
   
   if (image_bytes)
   {
-    D3D11_TEXTURE2D_DESC desc = {};
-    desc.Width      = width;
-    desc.Height     = height;
-    desc.MipLevels  = 1;
-    desc.ArraySize  = 1;
-    desc.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
-    desc.SampleDesc = { 1, 0 };
-    desc.Usage      = D3D11_USAGE_DEFAULT;
-    desc.BindFlags  = D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
-
-    D3D11_SUBRESOURCE_DATA data = {};
-    data.pSysMem     = image_bytes;
-    data.SysMemPitch = width * n_channels;
-
-    ID3D11Texture2D* texture = 0;
-    HRESULT create_succ = d3d->device->CreateTexture2D(&desc, &data, &texture);
-    
-    if (create_succ == S_OK)
-    {
-      HRESULT rtv_succ = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, NULL, &result_rtv);
-      Handle(rtv_succ == S_OK);
-      texture->Release();
-    }
+    Image image = {};
+    image.data            = image_bytes;
+    image.width_in_px     = (U64)width;
+    image.height_in_px    = (U64)height;
+    image.bytes_per_pixel = (U64)n_channels;
+    result_rtv = r_load_texture_from_image(image);
   }
 
   end_scratch(&scratch);
+  return result_rtv;
+}
+
+ID3D11RenderTargetView* r_load_texture_from_image(Image image)
+{
+  D3D_State* d3d = r_get_state();
+  ID3D11RenderTargetView* result_rtv = 0;
+
+  if (image.bytes_per_pixel != 4) { NotImplemented(); } // Only DXGI_FORMAT_R8G8B8A8_UNORM supported for now
+
+  D3D11_TEXTURE2D_DESC desc = {};
+  desc.Width      = (UINT)image.width_in_px; // todo: I dont like the U64 to UINT conversion here
+  desc.Height     = (UINT)image.height_in_px; // todo: I dont like the U64 to UINT conversion here
+  desc.MipLevels  = 1;
+  desc.ArraySize  = 1;
+  desc.Format     = DXGI_FORMAT_R8G8B8A8_UNORM;
+  desc.SampleDesc = { 1, 0 };
+  desc.Usage      = D3D11_USAGE_DEFAULT;
+  desc.BindFlags  = D3D11_BIND_RENDER_TARGET|D3D11_BIND_SHADER_RESOURCE;
+
+  D3D11_SUBRESOURCE_DATA data = {};
+  data.pSysMem     = image.data;
+  data.SysMemPitch = (UINT)(image.width_in_px * image.bytes_per_pixel); // todo: I dont like the U64 to uint onversion here
+
+  ID3D11Texture2D* texture = 0;
+  HRESULT create_succ = d3d->device->CreateTexture2D(&desc, &data, &texture);
+  
+  if (create_succ == S_OK)
+  {
+    HRESULT rtv_succ = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, NULL, &result_rtv);
+    Handle(rtv_succ == S_OK);
+    texture->Release();
+  }
+
   return result_rtv;
 }
 

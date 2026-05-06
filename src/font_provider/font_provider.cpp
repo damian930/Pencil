@@ -116,10 +116,11 @@ Image font_provider_create_cpu_side_font_atlas(Arena* image_arena, Str8 ttf_file
       U8 intensity_pixel_value = font_atlas_buffer.data[y_byte_index * font_atlas_width + x_byte_index];
       U32* image_pixel         = image_bytes + (y_byte_index * font_atlas_width + x_byte_index);
 
-      ((U8*)(image_pixel))[0] = 255;
-      ((U8*)(image_pixel))[1] = 255;
-      ((U8*)(image_pixel))[2] = 255;
-      ((U8*)(image_pixel))[3] = intensity_pixel_value;
+      // todo: I am not sure if its supposed to be intensity,intensity,intensity,255 or 255,255,255,intensity 
+      ((U8*)(image_pixel))[0] = intensity_pixel_value;
+      ((U8*)(image_pixel))[1] = intensity_pixel_value;
+      ((U8*)(image_pixel))[2] = intensity_pixel_value;
+      ((U8*)(image_pixel))[3] = 255;
     }
   }
 

@@ -75,10 +75,13 @@ struct D3D_Texture_program_data {
   F32 vp_width;
   F32 vp_height;
  
-  V2F32 origin; // I dont like this name that much, origin means the top left, in this case of a texture
-  // V2F32 size; 
+  V2F32 dest_rect_origin;
+  V2F32 dest_rect_size;
 
-  // F32 _padding[2];
+  V2F32 src_rect_origin;
+  V2F32 src_rect_size;
+
+  V2F32 src_texture_dims;
 };
 
 struct D3D_Program {
@@ -129,6 +132,7 @@ void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* 
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
 ID3D11RenderTargetView* r_make_texture(U32 width, U32 height);
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
+V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv);
 D3D_Program r_program_from_file(
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,
@@ -137,8 +141,9 @@ D3D_Program r_program_from_file(
 );
 
 // - Misc
-Image r_export_texture(Arena* arena, ID3D11Texture2D* src_texture);
-ID3D11RenderTargetView* r_load_texture(Str8 file_name);
+Image r_export_texture(Arena* arena, ID3D11RenderTargetView* rtv);
+ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name);
+ID3D11RenderTargetView* r_load_texture_from_image(Image image);
 
 
 
