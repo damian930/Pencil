@@ -32,8 +32,8 @@ abstract.
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
 #include "pencil/pencil.cpp"
@@ -270,21 +270,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.draw_texture_not_that_fresh = r_make_texture(P.draw_texures_width, P.draw_texures_height);
   }
 
-  /*
-  ID3D11BlendState* blendState;
-  {
-    D3D11_BLEND_DESC desc = {};
-    desc.RenderTarget[0].BlendEnable           = TRUE;
-    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    d3d->device->CreateBlendState(&desc, &blendState);
-  }
-  */
+  r_clear_frame_buffer(white_f());
 
   // todo: Do better with this here
   //       Here is the link to the resource that explaince this code here and why it is needed
@@ -381,41 +367,50 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
 
-    // pencil_do_ui(&P, font);
-    // pencil_update(&P, !ui_is_no_active());
-    // pencil_render(&P);
-    
-    // {
-    //   ID3D11RenderTargetView* buffer = r_get_frame_buffer_rtv();
-    //   ui_draw(buffer);
-    //   buffer->Release();
-    // }
-    // Testing ui for now
+    pencil_do_ui(&P, font);
+    pencil_update(&P, !ui_is_no_active());
+    if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
+    else { ReleaseCapture(); }
+    pencil_render(&P);
+
+    /*
     // if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
     ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     {
       ui_push_font(font);
 
-      ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
-      ui_set_next_size_x(ui_px(100));
-      ui_set_next_size_y(ui_px(100));
-      ui_set_next_b_color(red_f());
-      UI_Box* box = ui_box_make(Str8{}, 0);
-      ui_push_parent(box);
-      {
-        // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
-        ui_set_next_size_x(ui_px(200));
-        ui_set_next_size_y(ui_px(300));
-        ui_set_next_b_color(blue_f());
-        UI_Box* box2 = ui_box_make(Str8{}, 0);
-        ui_push_parent(box2);
-        {
-          ui_set_next_size_x(ui_px(150));
-          ui_set_next_size_y(ui_px(800));
-          ui_set_next_b_color(green_f());
-          UI_Box* box3 = ui_box_make(Str8{}, 0);
-        }
-      }
+      UI_Slider_style slider_style = {};
+      slider_style.width             = 200;
+      slider_style.height            = 75;
+      slider_style.hover_color       = red_f();
+      slider_style.no_hover_color    = blue_f();
+      slider_style.slided_part_color = green_f();
+      slider_style.fmt_str = "%.f \n";
+      static F32 value = 15;
+      value = ui_slider(Str8FromC("Slider id"), &slider_style, value, 10, 50);
+
+      OutputDebugStringF("%f \n", value);
+
+      // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
+      // ui_set_next_size_x(ui_px(100));
+      // ui_set_next_size_y(ui_px(100));
+      // ui_set_next_b_color(red_f());
+      // UI_Box* box = ui_box_make(Str8{}, 0);
+      // ui_push_parent(box);
+      // {
+      //   // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
+      //   ui_set_next_size_x(ui_px(200));
+      //   ui_set_next_size_y(ui_px(300));
+      //   ui_set_next_b_color(blue_f());
+      //   UI_Box* box2 = ui_box_make(Str8{}, 0);
+      //   ui_push_parent(box2);
+      //   {
+      //     ui_set_next_size_x(ui_px(150));
+      //     ui_set_next_size_y(ui_px(800));
+      //     ui_set_next_b_color(green_f());
+      //     UI_Box* box3 = ui_box_make(Str8{}, 0);
+      //   }
+      // }
 
 
       // UI_PaddedBox(ui_px(50), Axis2__x)
@@ -440,6 +435,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       // }
     }
     ui_end_build();
+    */
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
     ui_draw(frame_buffer);

@@ -1,8 +1,6 @@
 #ifndef RENDERER_D3D11_H
 #define RENDERER_D3D11_H
 
-#include "core/core_include.h"
-
 // D3D 
 #include "d3d11.h"
 #include "dxgi.h"
@@ -16,8 +14,10 @@
 
 #include "__third_party/stb/stb_image.h"
 
-// Misc structs here
+#include "core/core_include.h"
 
+
+// Misc structs here
 // todo:
 // note: I wanted to maybe make this be just a zero id for texture like in opengl, 
 //       but since this is a pointer I cant just return a 0 pointer
@@ -107,6 +107,11 @@ struct D3D_State {
   // Per render pass data
   F32 render_viewport_width;
   F32 render_viewport_height;
+
+  // Debug stuff for layer
+  Arena* debug_arena;
+  Str8* error_messages_arr;
+  U64 error_messages_count;
 };
 
 extern global D3D_State __d3d_g_state;
@@ -126,7 +131,10 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color);
 void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color);
 void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
 void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color);
-void r_draw_texture(ID3D11RenderTargetView* target_rtv, ID3D11RenderTargetView* source_rtv, V2F32 origin);
+void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src);
+
+struct FP_Font; // Dont just include fp in here, since fp need the renderer, so we got a circular dependancy
+void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font font, V4F32 color);
 
 // - Other
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
@@ -145,6 +153,9 @@ Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv);
 void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
 ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name);
 ID3D11RenderTargetView* r_load_texture_from_image(Image image);
+void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
+void r_scissoring_set(Rect rect);
+void r_scissoring_clear();
 
 
 

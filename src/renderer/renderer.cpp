@@ -127,6 +127,11 @@ void r_init()
     d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
     Handle(texture_program_succ);
   }
+
+  // Allocating mem for debug info for the layer
+  d3d->debug_arena          = arena_alloc(Megabytes(64));
+  d3d->error_messages_arr   = ArenaCurrentAddressP(d3d->debug_arena, Str8);
+  d3d->error_messages_count = 0;
 }
 
 void r_relesase()
@@ -135,14 +140,25 @@ void r_relesase()
 }
 
 ///////////////////////////////////////////////////////////
+// - TESTING THE ERROR A NEW HANDLING WAY FOR THE LAYER
+//
+void __r_push_error_message(Str8 str)
+{
+  D3D_State* d3d = r_get_state();
+  Str8 error_str = str8_copy_alloc(d3d->debug_arena, str);
+  d3d->error_messages_count += 1;
+}
+
+#define __R_PUSH_ERROR_AND_DEBUG(c_lit) do { __r_push_error_message(Str8FromC(c_lit)); BreakPoint(); } while (0); 
+
+///////////////////////////////////////////////////////////
 // - Render pass
 //
 void r_render_begin(F32 viewport_width, F32 viewport_height)
 {
-  Handle(viewport_width != 0.0f && viewport_height != 0.0f);
+  if (viewport_width == 0.0f || viewport_height == 0.0f) { __R_PUSH_ERROR_AND_DEBUG("Cant begin a render pass with viewport dims of 0.0f"); return; }
 
   D3D_State* d3d = r_get_state();
-
   d3d->context->ClearState(); 
 
   // todo: I dont like conversion from F32 to UINT here just implicitrly like this 
@@ -205,7 +221,12 @@ void r_render_end() {}
 //
 void r_clear_frame_buffer(V4F32 color)
 {
+  // todo: Test this __R_PUSH_ERROR_AND_DEBUG here
+  // todo: I am not use how i feel about having this be possible when we havent called render_begin yet.
+  // todo: See if d3d is immediate and if so then find out wheater you shoud batch the draw calls.
   D3D_State* d3d = r_get_state();
+  if (!d3d) { __R_PUSH_ERROR_AND_DEBUG("Trying to use rendering state before it has been allocated. \n"); return; } 
+
   ID3D11RenderTargetView* rtv = r_get_frame_buffer_rtv();
   d3d->context->ClearRenderTargetView(rtv, color.v);
   rtv->Release();
@@ -293,7 +314,7 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
   uniform_buffer->Release();
 }
 
-void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color)
+void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this)
 {
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
@@ -347,8 +368,21 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
 
   d3d->context->OMSetRenderTargets(1, &rtv, Null);
-
+  
+  ID3D11BlendState* blend_state = 0;
+  FLOAT blend_factor[4]         = {};
+  UINT sample_mask              = {};
+  if (turn_off_blend_for_this) {
+    d3d->context->OMGetBlendState(&blend_state, blend_factor, &sample_mask);
+    d3d->context->OMSetBlendState(0, 0, ~0U);
+  }
+  
   d3d->context->Draw(4, 0);
+
+  if (turn_off_blend_for_this)
+  {
+    d3d->context->OMSetBlendState(blend_state, blend_factor, sample_mask);
+  }
 
   // todo: I shoud do this in each call to clear the non retained state per render
   //       pass to not have weird state bugs from draw call to draw call

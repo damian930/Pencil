@@ -38,8 +38,8 @@ enum UI_Box_flag : U32 {
 
   UI_Box_flag__has_text_contents = (1 << 4),
 
-  // UI_Box_flag__floating_x         = (1 << 5), // note: Right now if floating is inside clip and overflows, it gets clipped,
-  // UI_Box_flag__floating_y         = (1 << 6), //       and there is no way to turn it off.
+  UI_Box_flag__floating_x         = (1 << 5), 
+  UI_Box_flag__floating_y         = (1 << 6), 
 
   // UI_Box_flag__clip_x = (1 << 7), 
   // UI_Box_flag__clip_y = (1 << 8), 
@@ -47,7 +47,7 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
   UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
 
-  // UI_Box_flag__floating = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
+  UI_Box_flag__floating = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
 };
 typedef U32 UI_Box_flags;
@@ -282,8 +282,8 @@ UI_Box_data ui_get_box_data_prev_frame(Str8 id);
 // UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id);
 
 // - Actions
-// UI_Actions ui_actions_from_box(UI_Box* this_frames_box, RLI_Event_list* rli_events);
-// UI_Actions ui_actions_from_id(Str8 id, RLI_Event_list* rli_events);
+UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
+UI_Actions ui_actions_from_id(Str8 id);
 
 // - Style stack operations for default settings
 void ui_add_flags(UI_Box_flags flags);   void ui_add_flags_to_next(UI_Box_flags flags);

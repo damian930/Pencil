@@ -322,7 +322,7 @@ void os_frame_begin()
   }
 
   // Creating frame events though the winproc
-  for (MSG msg = {};PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
+  for (MSG msg = {}; PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
   {
     TranslateMessage(&msg);
     DispatchMessageA(&msg);
@@ -699,7 +699,8 @@ LRESULT win32_proc(
           default:         { /*InvalidCodePath();*/  } break;
           case VK_SHIFT:   { key = Key__Shift;   } break;
           case VK_CONTROL: { key = Key__Control; } break;
-          case VK_DELETE:  { key = Key__Delete; } break;
+          case VK_DELETE:  { key = Key__Delete;  } break;
+          case VK_TAB:     { key = Key__Tab;     } break;
         }
       }
       // Assert(key != Key__NONE);

@@ -83,7 +83,6 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P, B32 is
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
   // Handling signals
-  /*
   {
     if (P->signal_new_pen_size)
     {
@@ -127,7 +126,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
       }
     }
   }
-  */
   
   B32 dont_start_drawing_this_frame = false;
 
@@ -219,14 +217,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     dont_start_drawing_this_frame = true;
     P->is_erasing_mode = false;
   } 
-  /*
   else
-  if (IsKeyPressed(KEY_TAB))
+  if (os_key_went_down(Key__Tab))
   {
-    ToggleBool(P->show_brush_ui_menu);
+    P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
     ui_reset_active_match(P->brush_menu_ui_id);
   }
-  */
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
 
@@ -263,7 +259,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
-        r_draw_circle(P->draw_texture_always_fresh, x, y, pen_size, color);
+        r_draw_circle(P->draw_texture_always_fresh, x, y, pen_size, color, P->is_erasing_mode);
       }
     }
 
@@ -303,7 +299,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 }
 
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
-/*
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 {
   ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
@@ -333,7 +328,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
     {
       ui_set_next_size_x(ui_p_of_p(1, 1));
       ui_set_next_size_y(ui_px(10));
-      ui_set_next_color({ 255, 0, 0, 255 });
+      ui_set_next_b_color(red_f());
       UI_Box* top_border = ui_box_make(Str8{}, 0);
 
       ui_set_next_size_x(ui_p_of_p(1, 0));
@@ -343,7 +338,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
       ui_set_next_size_x(ui_p_of_p(1, 1));
       ui_set_next_size_y(ui_px(10));
-      ui_set_next_color({ 255, 0, 0, 255 });
+      ui_set_next_b_color(red_f());
       UI_Box* bottom_border = ui_box_make(Str8{}, 0);
     }
 
@@ -353,7 +348,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
     UI_Box* right_border = ui_box_make(Str8{}, 0);
   }
 
-  if (G->show_brush_ui_menu)
+  if (P->show_brush_ui_menu)
   {
     UI_Parent(content_inner)
     {
@@ -363,7 +358,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
       UI_Box* brush_wrapper_box_x = ui_box_make(Str8FromC("Wrapper of floating boxes id"), 0);
       
       Str8 brush_floating_hook_box_id = Str8FromC("Brush floating box hook id");
-      G->brush_menu_ui_id = brush_floating_hook_box_id;
+      P->brush_menu_ui_id = brush_floating_hook_box_id;
   
       static F32 drag_mouse_hold_pos_x = 0;
       static F32 drag_mouse_hold_pos_y = 0;
@@ -376,19 +371,19 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
       F32 x_offset_old = x_offset;
       F32 y_offset_old = y_offset;
   
-      UI_Actions brush_box_actions = ui_actions_from_id(brush_floating_hook_box_id, rli_events);
+      UI_Actions brush_box_actions = ui_actions_from_id(brush_floating_hook_box_id);
       UI_Box_data brush_box_actions_data = ui_get_box_data_prev_frame(brush_floating_hook_box_id);
       if (!brush_box_actions.was_down && brush_box_actions.is_down)
       {
         ui_set_active(brush_floating_hook_box_id);
-        drag_mouse_hold_pos_x = (F32)GetMouseX() - brush_box_actions_data.on_screen_rect.x;
-        drag_mouse_hold_pos_y = (F32)GetMouseY() - brush_box_actions_data.on_screen_rect.y;
+        drag_mouse_hold_pos_x = os_get_mouse_pos().x - brush_box_actions_data.on_screen_rect.x;
+        drag_mouse_hold_pos_y = os_get_mouse_pos().y - brush_box_actions_data.on_screen_rect.y;
       }
       else if (brush_box_actions.is_down)
       {
         UI_Box_data float_space_box_data = ui_get_box_data_prev_frame(brush_wrapper_box_x->id);
-        x_offset = (F32)GetMouseX() - drag_mouse_hold_pos_x - float_space_box_data.on_screen_rect.x;
-        y_offset = (F32)GetMouseY() - drag_mouse_hold_pos_y - float_space_box_data.on_screen_rect.y;
+        x_offset = os_get_mouse_pos().x - drag_mouse_hold_pos_x - float_space_box_data.on_screen_rect.x;
+        y_offset = os_get_mouse_pos().y - drag_mouse_hold_pos_y - float_space_box_data.on_screen_rect.y;
       }
       else
       {
@@ -411,14 +406,14 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
           ui_set_next_size_x(ui_px(200)); ui_set_next_size_y(ui_children_sum());
           ui_set_next_layout_axis(Axis2__y);
           // ui_set_next_corner_radius(0.15f);
-          ui_set_next_color({ 255, 255, 255, 255 });
+          ui_set_next_b_color(black_f());
           UI_Box* brushes_menu_box = ui_box_make({}, 0);
           UI_Parent(brushes_menu_box)
           {
             // Header hook box
             ui_set_next_size_x(ui_p_of_p(1, 0)); ui_set_next_size_y(ui_children_sum());
             ui_set_next_layout_axis(Axis2__y);
-            ui_set_next_color({ 151, 184, 210, 255 });
+            ui_set_next_b_color({ 151.f/255.f, 184.f/255.f, 210.f/255.f, 255.f/255.f });
             UI_Box* hook_box = ui_box_make(brush_floating_hook_box_id, 0);
             UI_Parent(hook_box)
             {
@@ -426,11 +421,11 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
   
               UI_PaddedBox(ui_px(5), Axis2__x)
               {
-                ui_set_next_text_color({ 0, 0, 0, 255 });
-                ui_set_next_font_size(24);
-                ui_label_c("Brushes");
+                ui_set_next_text_color(black_f());
+                // ui_set_next_font_size(24);
+                ui_label(Str8FromC("Brushes"));
   
-                ui_set_next_color({ 255, 0, 0, 255 });
+                ui_set_next_b_color(red_f());
                 
               }
   
@@ -445,47 +440,47 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
               {
                 ui_spacer(ui_px(10));
       
-                if (G->is_erasing_mode)
+                if (P->is_erasing_mode)
                 {
                   UI_PaddedBox(ui_px(5), Axis2__x)
                   {
                     UI_Slider_style size_slider_style = {};
                     size_slider_style.height         = 20;
                     size_slider_style.width          = 100;
-                    size_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    size_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    size_slider_style.text_color     = { 0, 0, 0, 255 };
-                    size_slider_style.font_size      = 20;
-                    size_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                    size_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    size_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // size_slider_style.text_color     = { 0, 0, 0, 255.f/255.f };
+                    // size_slider_style.font_size      = 20;
+                    size_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
                     size_slider_style.fmt_str = "%.0f";
         
-                    U64 new_eraser_size = (U64)ui_slider(Str8FromC("Eraser size slider id"), &size_slider_style, (F32)G->eraser_size, 1, 100, rli_events);
-                    if (new_eraser_size != G->eraser_size)
+                    U32 new_eraser_size = (U32)ui_slider(Str8FromC("Eraser size slider id"), &size_slider_style, (F32)P->eraser_size, 1, 100);
+                    if (new_eraser_size != P->eraser_size)
                     {
-                      G->signal_new_eraser_size = true;
-                      G->new_eraser_size = new_eraser_size;
+                      P->signal_new_eraser_size = true;
+                      P->new_eraser_size = new_eraser_size;
                     } 
         
                     ui_spacer(ui_px(10));
         
                     ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Size");
+                    // ui_set_next_font_size(20);
+                    ui_label(Str8FromC("Size"));
                   }
         
                   ui_spacer(ui_px(10));
     
                   UI_PaddedBox(ui_px(5), Axis2__x)
                   {
-                    ui_set_next_color({ 175, 203, 255, 255 });
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
+                    ui_set_next_b_color({ 175.f/255.f, 203.f/255.f, 255.f/255.f, 255.f/255.f });
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
                     UI_PaddedBox(ui_px(5), Axis2__x)
                     {
-                      UI_Actions pen_button = ui_button(Str8FromC("Brush - [B]## button"), rli_events);
+                      UI_Actions pen_button = ui_button(Str8FromC("Brush - [B]## button"));
                       if (pen_button.is_clicked)
                       {
-                        G->signal_swap_to_pen= true;
+                        P->signal_swap_to_pen = true;
                       }
                     }
                   }
@@ -497,26 +492,26 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     UI_Slider_style size_slider_style = {};
                     size_slider_style.height         = 20;
                     size_slider_style.width          = 100;
-                    size_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    size_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    size_slider_style.text_color     = { 0, 0, 0, 255 };
-                    size_slider_style.font_size      = 20;
-                    size_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                    size_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    size_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // size_slider_style.text_color     = { 0, 0, 0, 255 };
+                    // size_slider_style.font_size      = 20;
+                    size_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
                     size_slider_style.fmt_str = "%.0f";
         
-                    U64 new_pen_size = (U64)ui_slider(Str8FromC("Pen size slider id"), &size_slider_style, (F32)G->pen_size, 1, 100, rli_events);
-                    clamp_u64_inplace(&new_pen_size, 1, 100);
-                    if (new_pen_size != G->pen_size)
+                    U32 new_pen_size = (U32)ui_slider(Str8FromC("Pen size slider id"), &size_slider_style, (F32)P->pen_size, 1, 100);
+                    clamp_u32_inplace(&new_pen_size, 1, 100);
+                    if (new_pen_size != P->pen_size)
                     {
-                      G->signal_new_pen_size = true;
-                      G->new_pen_size = new_pen_size;
+                      P->signal_new_pen_size = true;
+                      P->new_pen_size = new_pen_size;
                     } 
         
                     ui_spacer(ui_px(10));
         
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Size");
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
+                    ui_label(Str8FromC("Size"));
                   }
         
                   ui_spacer(ui_px(2));
@@ -526,21 +521,21 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     UI_Slider_style red_slider_style = {};
                     red_slider_style.height         = 20;
                     red_slider_style.width          = 100;
-                    red_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    red_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    red_slider_style.text_color     = { 0, 0, 0, 255 };
-                    red_slider_style.font_size      = 20;
-                    red_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                    red_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    red_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // red_slider_style.text_color     = { 0, 0, 0, 255 };
+                    // red_slider_style.font_size      = 20;
+                    red_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
                     red_slider_style.fmt_str = "%.0f";
         
-                    U8 new_r_color = (U8)ui_slider(Str8FromC("Red slider style id"), &red_slider_style, (F32)G->pen_color.r, 0, 255, rli_events);
-                    G->pen_color.r = new_r_color; 
+                    U8 new_r_color = (U8)ui_slider(Str8FromC("Red slider style id"), &red_slider_style, (F32)P->pen_color.r * 255, 0, 255);
+                    P->pen_color.r = (F32)new_r_color/255.0f; 
         
                     ui_spacer(ui_px(10));
         
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Red");
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
+                    // ui_label_c("Red");
                   }
         
                   ui_spacer(ui_px(2));
@@ -550,21 +545,21 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     UI_Slider_style green_slider_style = {};
                     green_slider_style.height         = 20;
                     green_slider_style.width          = 100;
-                    green_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    green_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    green_slider_style.text_color     = { 0, 0, 0, 255 };
-                    green_slider_style.font_size      = 20;
-                    green_slider_style.slided_part_color = { 97, 171, 255, 255 };
+                    green_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    green_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // green_slider_style.text_color     = { 0, 0, 0, 255 };
+                    // green_slider_style.font_size      = 20;
+                    green_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
                     green_slider_style.fmt_str = "%.0f";
         
-                    U8 new_g_color = (U8)ui_slider(Str8FromC("Green slider style id"), &green_slider_style, (F32)G->pen_color.g, 0, 255, rli_events);
-                    G->pen_color.g = new_g_color; 
+                    U8 new_g_color = (U8)ui_slider(Str8FromC("Green slider style id"), &green_slider_style, (F32)P->pen_color.g * 255, 0, 255);
+                    P->pen_color.g = (F32)new_g_color/255.0f; 
         
                     ui_spacer(ui_px(10));
         
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Green");
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
+                    ui_label(Str8FromC("Green"));
                   }
         
                   ui_spacer(ui_px(2));
@@ -574,21 +569,21 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     UI_Slider_style blue_slider_style = {};
                     blue_slider_style.height         = 20;
                     blue_slider_style.width          = 100;
-                    blue_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    blue_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    blue_slider_style.text_color     = { 0, 0, 0, 255 };
-                    blue_slider_style.font_size      = 20;
+                    blue_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    blue_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // blue_slider_style.text_color     = { 0, 0, 0, 255 };
+                    // blue_slider_style.font_size      = 20;
                     blue_slider_style.slided_part_color = { 97, 171, 255, 255 };
                     blue_slider_style.fmt_str = "%.0f";
         
-                    U8 new_b_color = (U8)ui_slider(Str8FromC("Blue slider style id"), &blue_slider_style, (F32)G->pen_color.b, 0, 255, rli_events);
-                    G->pen_color.b = new_b_color; 
+                    U8 new_b_color = (U8)ui_slider(Str8FromC("Blue slider style id"), &blue_slider_style, (F32)P->pen_color.b * 255, 0, 255);
+                    P->pen_color.b = (F32)new_b_color/255.0f; 
         
                     ui_spacer(ui_px(10));
         
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Blue");
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
+                    ui_label(Str8FromC("Blue"));
                   }
         
                   ui_spacer(ui_px(2));
@@ -598,36 +593,36 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     UI_Slider_style alpa_slider_style = {};
                     alpa_slider_style.height         = 20;
                     alpa_slider_style.width          = 100;
-                    alpa_slider_style.hover_color    = { 169, 205, 246, 255 };
-                    alpa_slider_style.no_hover_color = { 220, 220, 220, 255 };
-                    alpa_slider_style.text_color     = { 0, 0, 0, 255 };
-                    alpa_slider_style.font_size      = 20;
+                    alpa_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
+                    alpa_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
+                    // alpa_slider_style.text_color     = { 0, 0, 0, 255 };
+                    // alpa_slider_style.font_size      = 20;
                     alpa_slider_style.slided_part_color = { 97, 171, 255, 255 };
                     alpa_slider_style.fmt_str = "%.0f";
         
-                    U8 new_a_color = (U8)ui_slider(Str8FromC("Alpha slider style id"), &alpa_slider_style, (F32)G->pen_color.a, 0, 255, rli_events);
-                    G->pen_color.a = new_a_color; 
+                    U8 new_a_color = (U8)ui_slider(Str8FromC("Alpha slider style id"), &alpa_slider_style, (F32)P->pen_color.a * 255, 0, 255);
+                    P->pen_color.a = (F32)new_a_color/255.0f; 
         
                     ui_spacer(ui_px(10));
         
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
-                    ui_label_c("Alpha");
+                    ui_set_next_text_color(black_f());
+                    // ui_set_next_font_size(20);
+                    ui_label(Str8FromC("Alpha"));
                   }
                   
                   ui_spacer(ui_px(10));
           
                   UI_PaddedBox(ui_px(5), Axis2__x)
                   {
-                    ui_set_next_color({ 175, 203, 255, 255 });
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    ui_set_next_font_size(20);
+                    ui_set_next_b_color({ 175.f/255.f, 203.f/255.f, 255.f/255.f, 255.f/255.f });
+                    // ui_set_next_text_color({ 0, 0, 0, 255 });
+                    // ui_set_next_font_size(20);
                     UI_PaddedBox(ui_px(5), Axis2__x)
                     {
-                      UI_Actions eraser_button = ui_button(Str8FromC("Eraser - [E]## button"), rli_events);
+                      UI_Actions eraser_button = ui_button(Str8FromC("Eraser - [E]## button"));
                       if (eraser_button.is_clicked)
                       {
-                        G->signal_swap_to_eraser= true;
+                        P->signal_swap_to_eraser= true;
                       }
                     }
                   }
@@ -645,7 +640,6 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
   ui_end_build();
 }
-*/
 
 void pencil_render(const Pencil_state* P)
 {

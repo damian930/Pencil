@@ -43,20 +43,21 @@ struct Pencil_state {
   B32 is_erasing_mode;
 
   // Signals (These are just here like this right now)
-  // B32 signal_new_pen_size;
-  // U64 new_pen_size;
   //
-  // B32 signal_new_eraser_size;
-  // U64 new_eraser_size;
+  B32 signal_new_pen_size;
+  U32 new_pen_size;
+  //
+  B32 signal_new_eraser_size;
+  U32 new_eraser_size;
   // 
-  // B32 signal_swap_to_eraser;
-  // B32 signal_swap_to_pen;
+  B32 signal_swap_to_eraser;
+  B32 signal_swap_to_pen;
 
   // Misc
   // Font font_texture_for_ui;
   // V2U64 last_screen_dims;
-  // B32 show_brush_ui_menu;
-  // Str8 brush_menu_ui_id;
+  B32 show_brush_ui_menu;
+  Str8 brush_menu_ui_id;
 };
 
 struct Draw_record_registration_result {

@@ -50,8 +50,8 @@ Arena* ui_build_arena()
   return ctx->build_arenas[ctx->build_generation % ArrayCount(ctx->build_arenas)];
 }
 
-F32 ui_get_mouse_x()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
-F32 ui_get_mouse_y()    { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
+F32 ui_get_mouse_x() { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
+F32 ui_get_mouse_y() { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
 V2F32 ui_get_mouse() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 
@@ -320,8 +320,8 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
     {
       for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
       {
-        // note: Floating children dont attribute to the overall size of the parent
-        // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+        // Floating children dont attribute to the overall size of the parent
+        if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
      
         if (root->layout_axis == axis) {
           root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; 
@@ -336,7 +336,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
         F32 children_size_to_maybe_give_out = 0.0f;
         for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
         {
-          // if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/  continue; }
+          if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
 
           F32 child_size = child->final_on_screen_size.v[axis];
           F32 p_to_to_keep = child->semantic_size[axis].strictness;
@@ -357,7 +357,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
         F32 max_size_after_possible_fixing = 0.0f;
         for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
         {
-          // if (child->flags & UI_Box_flag__floating_x<<axis) { /*BreakPoint();*/ continue; } 
+          if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
 
           F32 child_size = child->final_on_screen_size.v[axis];
           F32 p_to_to_keep = child->semantic_size[axis].strictness;
@@ -386,27 +386,19 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
 
 void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
 {
-  // todo: Floating elements are not a part of the childrens tree, 
-  //       what do we do about their overflow ???
   F32 available_space = root->final_on_screen_size.v[axis];
-  // if (root->flags & UI_Box_flag__floating_x<<axis)
-  // {
-    // available_space = root->parent->final_on_screen_size.v[axis];
-  // }
+  if (root->flags & UI_Box_flag__floating_x<<axis)
+  {
+    available_space = root->parent->final_on_screen_size.v[axis];
+  }
 
-  // if (str8_match(root->id, Str8FromC("Y stack id "), 0) && axis == 1)
-  // {
-  //   BreakPoint();
-  // }
-
-  // note: Not implemented for the other axis
   if (root->layout_axis == axis)
   {
     F32 space_used_by_children = 0.0f;
     F32 total_space_children_might_give_out = 0.0f;
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
 
       F32 child_space = child->final_on_screen_size.v[axis];
       space_used_by_children += child_space;
@@ -437,7 +429,7 @@ void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
   {
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      // if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
 
       F32 child_space = child->final_on_screen_size.v[axis];
       if (child_space > available_space)
@@ -472,12 +464,11 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
   F32 accumelated_offset = 0.0f;
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    /*
     if (child->flags & UI_Box_flag__floating_x<<axis) 
     {
-      child->final_parent_offset.v[axis] = 0.0f; // note: If floating, we leave its start where the parent starts
+      child->final_parent_offset.v[axis] = 0.0f; // If floating, we leave its start where the parent starts
     }
-    else*/ if (root->layout_axis == axis)
+    else if (root->layout_axis == axis)
     {
       child->final_parent_offset.v[axis] = accumelated_offset;
       accumelated_offset += child->final_on_screen_size.v[axis]; 

@@ -1,11 +1,15 @@
 [x] - Do scissoring for rendering an ui when overflow.
-[ ] - Make sure that scissoring begin and end work as expected.
+[x] - Make sure that scissoring begin and end work as expected.
+[ ] - Do you have to batch the draw calls and only in the end draw then and then flip via present and commit ?
+      Go see code from november and see if you did that there with opengl.
 [ ] - Redo the rendered so you are fine with how you 
       allocate and then release all the resources.
       Might be a good idea to have it be at the start of the 
       func and then you just release them at the bottom.
       Since funcs are small, they shoud not crash and just be
       implemented fine and we good to go.
+      Also start resettinga all the stuff that 
+      each call allocated so you dont have to deal with unwanted sideeffected that are hard to trace 
 [ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
 [ ] - Remove the non-client arena for the window 
 [ ] - Start doing the ui for the thing.
