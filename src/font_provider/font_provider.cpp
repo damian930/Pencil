@@ -238,7 +238,7 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
       {
         int advance   = 0;
         int bearing_x = 0;
-        stbtt_GetCodepointHMetrics(&stb_font_info, codepoint, &advance, &bearing_x);
+        stbtt_GetCodepointHMetrics(&stb_font_info, (int)codepoint, &advance, &bearing_x); // todo: Remove the (int)
         codepoint_data->bearing_x = f32_floor((F32)bearing_x * scale);
         codepoint_data->advance           = f32_floor((F32)advance * scale);
       }
@@ -258,7 +258,7 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
     
       {
         int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
-        stbtt_GetCodepointBitmapBox(&stb_font_info, codepoint, scale, scale, &x0, &y0, &x1, &y1);
+        stbtt_GetCodepointBitmapBox(&stb_font_info, (int)codepoint, scale, scale, &x0, &y0, &x1, &y1); // todo: Remove the (int) here
         F32 fx0 = f32_floor((F32)x0);
         F32 fy0 = f32_floor((F32)y0);
         F32 fx1 = f32_floor((F32)x1);

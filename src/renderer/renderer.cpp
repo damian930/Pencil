@@ -720,7 +720,7 @@ void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path)
   Image image = r_image_from_texture(scratch.arena, rtv);
 
   Str8 file_path_nt = str8_copy_alloc(scratch.arena, file_path);
-  int succ = stbi_write_png((char*)file_path_nt.data, image.width_in_px, image.height_in_px, image.bytes_per_pixel, image.data, image.width_in_px * image.bytes_per_pixel);
+  int succ = stbi_write_png((char*)file_path_nt.data, (int)image.width_in_px, (int)image.height_in_px, (int)image.bytes_per_pixel, image.data, (int)(image.width_in_px * image.bytes_per_pixel));
   Handle(succ);
   end_scratch(&scratch);
 }

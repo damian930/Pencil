@@ -67,9 +67,6 @@ void ui_draw_box(
   Rect scissor_rect = parent_scissor_rect;
   if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
-    // Have to make sure that the child scissor is contained within the parent scissor, 
-    // so a child cant make a scissor larger than the parent and then have its children
-    // but drawn though the parent is trying to dis allow the drawing of the overflow.
     RangeF2V32 default_scissor_box = {};
     default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
     default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
@@ -77,10 +74,19 @@ void ui_draw_box(
     RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
     RangeF2V32 new_scissor_bbox = default_scissor_box;
     
+    // if (root->flags & UI_Box_flag__dont_draw_overflow_y) { BP; }
+
+    // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
+    // so a child cant make a scissor larger than the parent and then have its children
+    // drawn, though the parent has no overflow flag spcefied.
+    // This works per axis. So if no overflow is aplied only for 1 axis, then the other axis shoud be
+    // drawn as ussual, with oveflow. This is achieved by having default_scissor_box that extends way pass
+    // the ui coordinate limits.  
     if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
     {
       RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
 
+      // Clmaping based to the space that the parent have already limited its children to
       for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
       {
         Axis2 axis = (Axis2)_axis;
@@ -96,8 +102,22 @@ void ui_draw_box(
           new_scissor_bbox.max.v[axis] = max; 
         }
       }
+
+      // The child might have a different axis specified for no overflow, so have to clamp again
+      // but this time for the child (root) and not the parent (root->parent)
+      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+      {
+        Axis2 axis = (Axis2)_axis;
+        if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+        {
+          if (new_scissor_bbox.min.v[axis] < rect_bbox.min.v[axis]) { new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; }
+          if (new_scissor_bbox.max.v[axis] > rect_bbox.max.v[axis]) { new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; }
+        }
+      }
     }
     else {
+      // Simple case, we dont have parent enforce scissoring at all, so we just do it, there are 
+      // no additional adjustments we have to do to not mess up what the parent have enforces before us.
       for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
       {
         Axis2 axis = (Axis2)_axis;
@@ -377,7 +397,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     {
       ui_push_font(font);
 
-      ui_set_next_flags(UI_Box_flag__dont_draw_overflow_x);
+      ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
       ui_set_next_size_x(ui_px(100));
       ui_set_next_size_y(ui_px(100));
       ui_set_next_b_color(red_f());
@@ -386,13 +406,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       {
         // ui_set_next_flags(UI_Box_flag__dont_draw_overflow_y);
         ui_set_next_size_x(ui_px(200));
-        ui_set_next_size_y(ui_px(400));
+        ui_set_next_size_y(ui_px(300));
         ui_set_next_b_color(blue_f());
         UI_Box* box2 = ui_box_make(Str8{}, 0);
         ui_push_parent(box2);
         {
           ui_set_next_size_x(ui_px(150));
-          ui_set_next_size_y(ui_px(40));
+          ui_set_next_size_y(ui_px(800));
           ui_set_next_b_color(green_f());
           UI_Box* box3 = ui_box_make(Str8{}, 0);
         }
