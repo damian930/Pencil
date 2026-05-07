@@ -130,7 +130,7 @@ void ui_draw_box(
     }
 
     scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-    r_scissoring_begin(scissor_rect);
+    r_scissoring_set(scissor_rect);
   }
 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
@@ -141,9 +141,8 @@ void ui_draw_box(
   // No longer scissoring
   if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
-    r_scissoring_end();
     if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-      r_scissoring_begin(parent_scissor_rect); 
+      r_scissoring_set(parent_scissor_rect); 
     }
   }
 
@@ -404,7 +403,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       UI_Box* box = ui_box_make(Str8{}, 0);
       ui_push_parent(box);
       {
-        // ui_set_next_flags(UI_Box_flag__dont_draw_overflow_y);
+        // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
         ui_set_next_size_x(ui_px(200));
         ui_set_next_size_y(ui_px(300));
         ui_set_next_b_color(blue_f());
