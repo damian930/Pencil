@@ -126,6 +126,14 @@ void r_init()
     B32 texture_program_succ = true;
     d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
     Handle(texture_program_succ);
+
+    B32 gradient_program_succ = true;
+    d3d->gradient_rect_program = r_program_from_file(L"../data/shaders/gradient_program_shader.hlsl", "vs_main", "ps_main", &gradient_program_succ);
+    Handle(gradient_program_succ);
+
+    B32 hsv_gradient_rect_program_succ = true;
+    d3d->hsv_gradient_rect_program = r_program_from_file(L"../data/shaders/hsv_gradient_rect_program_shader.hlsl", "vs_main", "ps_main", &hsv_gradient_rect_program_succ);
+    Handle(hsv_gradient_rect_program_succ);
   }
 
   // Allocating mem for debug info for the layer
@@ -305,6 +313,154 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
   }
 
   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
+  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+  d3d->context->Draw(4, 0);
+
+  uniform_buffer->Release();
+}
+
+struct D3D_Rect_hsv_gradient_data {
+  F32 window_width;
+  F32 window_height;
+
+  F32 rect_origin_x; 
+  F32 rect_origin_y; 
+
+  F32 rect_width;
+  F32 rect_height;
+  
+  B32 is_horizontal_gradient;
+
+  F32 _padding[1]; 
+};
+
+void r_draw_hsv_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, B32 is_horizontal_gradient)
+{
+  D3D_State* d3d = r_get_state();
+  HRESULT hr = S_OK;
+
+  // Input assempler stage
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    D3D_Rect_hsv_gradient_data u_data = {};
+    u_data.window_width           = d3d->render_viewport_width;
+    u_data.window_height          = d3d->render_viewport_height;
+    u_data.rect_origin_x          = rect.x; 
+    u_data.rect_origin_y          = rect.y; 
+    u_data.rect_width             = rect.width;
+    u_data.rect_height            = rect.height;
+    u_data.is_horizontal_gradient = is_horizontal_gradient;
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (hr == S_OK) {
+      memcpy(mapped.pData, &u_data, sizeof(u_data));
+      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+    } else {
+      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+    }
+  }
+
+  // Vertex shader stage 
+  d3d->context->VSSetShader(d3d->hsv_gradient_rect_program.v_shader, Null, Null);
+  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+  { 
+    UINT n = 1;
+    D3D11_VIEWPORT vp = {}; 
+    d3d->context->RSGetViewports(&n, &vp);
+    InvariantCheck(!IsMemZero(vp));
+  }
+
+  d3d->context->PSSetShader(d3d->hsv_gradient_rect_program.p_shader, Null, Null);
+  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+  d3d->context->Draw(4, 0);
+
+  uniform_buffer->Release();
+}
+
+struct D3D_Rect_gradient_data {
+  F32 window_width;
+  F32 window_height;
+
+  F32 rect_origin_x; 
+  F32 rect_origin_y; 
+
+  F32 rect_width;
+  F32 rect_height;
+  
+  F32 _padding[2]; 
+
+  V4F32 top_color;
+};
+
+void r_draw_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 top_color)
+{
+  D3D_State* d3d = r_get_state();
+  HRESULT hr = S_OK;
+
+  // Input assempler stage
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+  
+  // Setting the uniform buffer
+  ID3D11Buffer* uniform_buffer = 0;
+  {
+    D3D_Rect_gradient_data u_data = {};
+    u_data.window_width  = d3d->render_viewport_width;
+    u_data.window_height = d3d->render_viewport_height;
+    u_data.rect_origin_x = rect.x; 
+    u_data.rect_origin_y = rect.y; 
+    u_data.rect_width    = rect.width;
+    u_data.rect_height   = rect.height;
+    u_data.top_color     = top_color;
+
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = sizeof(u_data);
+    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+    D3D11_MAPPED_SUBRESOURCE mapped = {};
+    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    if (hr == S_OK) {
+      memcpy(mapped.pData, &u_data, sizeof(u_data));
+      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+    } else {
+      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+    }
+  }
+
+  // Vertex shader stage 
+  d3d->context->VSSetShader(d3d->gradient_rect_program.v_shader, Null, Null);
+  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+  { 
+    UINT n = 1;
+    D3D11_VIEWPORT vp = {}; 
+    d3d->context->RSGetViewports(&n, &vp);
+    InvariantCheck(!IsMemZero(vp));
+  }
+
+  d3d->context->PSSetShader(d3d->gradient_rect_program.p_shader, Null, Null);
   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
 
   d3d->context->OMSetRenderTargets(1, &rtv, Null);

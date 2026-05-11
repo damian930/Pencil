@@ -3,6 +3,10 @@
 
 #include "ui/ui_core.h"
 
+// todo: Remove this dependancy from here
+#include "renderer/renderer.h"
+#include "renderer/renderer.cpp"
+
 // - Simple widgets
 // void ui_label_c(const char* c_str);
 // void ui_label(Str8 str);
@@ -13,8 +17,8 @@ void ui_label_fmt(const char* fmt, ...);
 // - Layout stack
 void ui_layout_stack_begin(Axis2 axis); // todo: Call these like a layout stack
 void ui_layout_stack_end();
-#define UI_XStack() DeferLoop(ui_layout_stack_begin(Axis2__x), ui_layout_stack_end())
-#define UI_YStack() DeferLoop(ui_layout_stack_begin(Axis2__y), ui_layout_stack_end())
+#define UI_Row() DeferLoop(ui_layout_stack_begin(Axis2__x), ui_layout_stack_end())
+#define UI_Col() DeferLoop(ui_layout_stack_begin(Axis2__y), ui_layout_stack_end())
 
 // - Padded box
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
@@ -79,14 +83,14 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   B32 moved_slider = false;
   if (slider_actions.is_down)
   {
-    V2F32 mouse_pos = ui_get_mouse();
+    V2F32 mouse_pos = ui_get_mouse_pos();
     thumb_offset = mouse_pos.x - slider_box_rect.x;
     moved_slider = true;
-    ui_set_active(slider_box->id);
+    ui_set_active_box(slider_box);
   }
   else 
   {
-    ui_reset_active_match(slider_box->id);
+    ui_reset_active_box_match(slider_box);
   }
   clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
 
@@ -119,6 +123,7 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   }
   return new_value;
 }
+
 
 // // - Text input field 
 // U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 

@@ -104,6 +104,9 @@ struct D3D_State {
   D3D_Program draw_circle_program;
   D3D_Program draw_texture_program;
 
+  D3D_Program gradient_rect_program;
+  D3D_Program hsv_gradient_rect_program;
+
   // Per render pass data
   F32 render_viewport_width;
   F32 render_viewport_height;

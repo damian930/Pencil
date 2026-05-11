@@ -44,7 +44,7 @@ void ui_set_context(UI_Context* context)
   _ui_g_context = context;
 }
 
-Arena* ui_build_arena()
+Arena* ui_get_build_arena()
 {
   UI_Context* ctx = ui_get_context();
   return ctx->build_arenas[ctx->build_generation % ArrayCount(ctx->build_arenas)];
@@ -52,7 +52,7 @@ Arena* ui_build_arena()
 
 F32 ui_get_mouse_x() { UI_Context* ctx = ui_get_context(); return ctx->mouse_x;  }
 F32 ui_get_mouse_y() { UI_Context* ctx = ui_get_context(); return ctx->mouse_y;  }
-V2F32 ui_get_mouse() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
+V2F32 ui_get_mouse_pos() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 
 // void ui_set_text_measuring_function(UI_text_measuring_ft* fp)
@@ -121,7 +121,7 @@ Str8 ui_get_text_part_from_str8(Str8 id_and_text)
 UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
 {
   UI_Context* ctx = ui_get_context();
-  Arena* arena = ui_build_arena();
+  Arena* arena = ui_get_build_arena();
 
   flags |= ui_get_flags();
   
@@ -131,7 +131,7 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
   
-  box->id = str8_copy_alloc(ui_build_arena(), id_and_text);
+  box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
 
   if (flags & UI_Box_flag__has_background)    { box->shape_style.color         = ui_get_color(); }
   // if (flags & UI_Box_flag__draw_corner_radius) { box->shape_style.corner_radius = ui_get_corner_radius(); }
@@ -142,7 +142,7 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   if (flags & UI_Box_flag__has_text_contents)
   {
     Str8 text = ui_get_text_part_from_str8(id_and_text);
-    box->text_style.text       = str8_copy_alloc(ui_build_arena(), text);    
+    box->text_style.text       = str8_copy_alloc(ui_get_build_arena(), text);    
     box->text_style.font       = ui_get_font();       
     // box->text_style.font_size  = ui_get_font_size();  
     box->text_style.text_color = ui_get_text_color(); 
@@ -193,14 +193,16 @@ void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_
   ctx->current_parent_box = &_ui_g_zero_box;
   arena_clear(ctx->style_stacks_arena);
 
+  ctx->draw_rtv = 0;
+
   // Creating the new build state
   ctx->build_generation += 1;
-  Arena* arena = ui_build_arena();
+  Arena* arena = ui_get_build_arena();
   arena_clear(arena);
   
   // Copying these since they are allocated on old build arenas
-  ctx->currently_active_box_id = str8_copy_alloc(ui_build_arena(), ctx->currently_active_box_id);
-  ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_build_arena(), ctx->currently_interacted_with_box_id);
+  ctx->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_active_box_id);
+  ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_interacted_with_box_id);
 
   __ui_push_defaults_onto_stacks();
 
@@ -589,47 +591,48 @@ UI_Box_data ui_get_box_data_prev_frame(Str8 id)
 //   return result_data;
 // } 
 
-B32 ui_is_no_active()
+B32 ui_is_active_id(Str8 box_id)
 {
-  UI_Context* ctx = ui_get_context();
-  B32 result = (ctx->currently_active_box_id.count == 0);
-  return result; 
+  return str8_match(ui_get_context()->currently_active_box_id, box_id, 0); 
 }
 
-B32 ui_has_active()
+void ui_set_active_id(Str8 box_id)
 {
-  Str8 id = ui_get_context()->currently_active_box_id;
-  B32 result = !str8_match(id, Str8{}, 0);
-  return result;
+  UI_Context* context = ui_get_context();
+  context->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), box_id);
 }
 
-B32 ui_is_active(Str8 box_id)
+void ui_reset_active_id_match(Str8 box_id)
 {
-  UI_Context* ctx = ui_get_context();
-  B32 result = str8_match(ctx->currently_active_box_id, box_id, 0); 
-  return result;
-}
-
-// This could just be set_active(0)
-void ui_reset_active()
-{
-  UI_Context* ctx = ui_get_context();
-  ctx->currently_active_box_id = Str8{};
-}
-
-void ui_reset_active_match(Str8 id_to_match)
-{
-  UI_Context* ctx = ui_get_context();
-  if (str8_match(id_to_match, ctx->currently_active_box_id, 0))
-  {
+  UI_Context* context = ui_get_context();
+  if (str8_match(context->currently_active_box_id, box_id, 0)) {
     ui_reset_active();
   }
 }
 
-void ui_set_active(Str8 box_id)
+B32 ui_is_active_box(UI_Box* box)
 {
-  UI_Context* ctx = ui_get_context();
-  ctx->currently_active_box_id = str8_copy_alloc(ui_build_arena(), box_id); 
+  return ui_is_active_id(box->id);
+}
+
+void ui_set_active_box(UI_Box* box)
+{
+  return ui_set_active_id(box->id);
+}
+
+void ui_reset_active_box_match(UI_Box* box)
+{
+  ui_reset_active_id_match(box->id);
+}
+
+B32 ui_has_active()
+{
+  return str8_match(ui_get_context()->currently_active_box_id, Str8{}, 0);
+}
+
+void ui_reset_active()
+{
+  ui_get_context()->currently_active_box_id = Str8{};
 }
 
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
@@ -683,7 +686,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
 
         is_down = true;
-        ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_build_arena(), this_frames_box->id);
+        ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
         ctx->currently_interacted_with_box__is_down = true;
       }
     }
@@ -864,8 +867,8 @@ FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_Style
 // void ui_set_next_id(Str8 id)
 // {
 //   UI_Context* ctx = ui_get_context();
-//   UI_ID_node* node = ArenaPush(ui_build_arena(), UI_ID_node);
-//   node->id = str8_copy_alloc(ui_build_arena(), id); // todo: Check is allocation in the middle of the arena
+//   UI_ID_node* node = ArenaPush(ui_get_build_arena(), UI_ID_node);
+//   node->id = str8_copy_alloc(ui_get_build_arena(), id); // todo: Check is allocation in the middle of the arena
 //   StackPush(&ctx->id_stack, node);
 //   ctx->id_stack.count += 1;
 //   ctx->id_stack.pop_after_first_use = true;

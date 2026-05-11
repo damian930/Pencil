@@ -562,6 +562,27 @@ tu_specific B32 v2f32_match(V2F32 v1, V2F32 v2) { B32 b = (v1.x == v2.x && v1.y 
 tu_specific F32 v2f32_len_sq(V2F32 v) { F32 len = (v.x * v.x) + (v.y * v.y); return len; }
 tu_specific F32 v2f32_len(V2F32 v) { F32 len = sqrtf(v2f32_len_sq(v)); return len; }
 
+union V3F32 {
+	struct {
+		F32 x;
+		F32 y;
+		F32 z;
+	};
+	struct {
+		F32 r;
+		F32 g;
+		F32 b;
+	};
+	struct {
+		F32 hue;
+		F32 saturation;
+		F32 value;
+	};
+	F32 v[3];
+};
+
+tu_specific V3F32 v3f32(F32 x, F32 y, F32 z) { V3F32 v = { x, y, z }; return v; }
+
 struct V2U64 {
 	struct {
 		U64 x;
@@ -753,6 +774,90 @@ V4F32 change_alpha_f(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
 F32 f32_round(F32 f) { return roundf(f); }
 F32 f32_floor(F32 f) { return floorf(f); }
+
+V3F32 hsv_from_rgb(V4F32 rgb)
+{
+	V3F32 hsv = {};
+
+	F32 max = rgb.v[0];
+	F32 min = rgb.v[0];
+	U64 max_channel_index = 0;
+	for (U64 i = 1; i < ArrayCount(rgb.v); i += 1)
+	{
+		if (rgb.v[i] > max) {
+			max = rgb.v[i];
+			max_channel_index = i;
+		}
+
+		if (rgb.v[i] < min) {
+			min = rgb.v[i];
+		}
+	}
+	F32 delta = max - min;
+
+	hsv.value = max;
+	hsv.saturation = delta / max;
+
+	if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
+	else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
+	else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
+
+	hsv.hue /= 6.0f;
+	if (hsv.hue < 0.0f) { hsv.hue += 1.0; }
+
+	return hsv;
+}
+
+// note: Took this from the raddbg codebase just to have it be working, i dont really care that much about 
+//       where these colors actually come from, what am i, gay or something ?
+V3F32 rgb_from_hsv(V3F32 hsv)
+{
+  F32 h = fmodf(hsv.hue * 360.f, 360.f);
+  F32 s = hsv.saturation;
+  F32 v = hsv.value;
+  
+  F32 c = v*s;
+  F32 x = c*(1.f - abs_f32(fmodf(h/60.f, 2.f) - 1.f));
+  F32 m = v - c;
+  
+  F32 r = 0;
+  F32 g = 0;
+  F32 b = 0;
+  
+  if ((h >= 0.f && h < 60.f) || (h >= 360.f && h < 420.f)){
+    r = c;
+    g = x;
+    b = 0;
+  }
+  else if (h >= 60.f && h < 120.f){
+    r = x;
+    g = c;
+    b = 0;
+  }
+  else if (h >= 120.f && h < 180.f){
+    r = 0;
+    g = c;
+    b = x;
+  }
+  else if (h >= 180.f && h < 240.f){
+    r = 0;
+    g = x;
+    b = c;
+  }
+  else if (h >= 240.f && h < 300.f){
+    r = x;
+    g = 0;
+    b = c;
+  }
+  else if ((h >= 300.f && h <= 360.f) || (h >= -60.f && h <= 0.f)){
+    r = c;
+    g = 0;
+    b = x;
+  }
+  
+  V3F32 rgb = v3f32(r + m, g + m, b + m);
+  return rgb;
+}
 
 
 #endif

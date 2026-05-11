@@ -12,7 +12,15 @@
       each call allocated so you dont have to deal with unwanted sideeffected that are hard to trace 
 [ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
 [ ] - Remove the non-client arena for the window 
+
+*****
 [ ] - Start doing the ui for the thing.
+      - Do your first ever color picker
+            - Have 4 vertexes per rect 
+*****
+
+[ ] - When drawing have a pen like in cactus image viewer
+
 [ ] - Get path to app_data for later use with files and logs
 [ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
       Do it so if the app is to be run the second time, just go into the draw mode.
@@ -32,6 +40,8 @@
 [ ] - Have ctrl+z when held remove the drawings instead of having to press it a bunch of times
 [ ] - Look into this https://web.archive.org/web/20190913214618/http://www.pjblewis.com/site/posts/2016-04-27-p2-efficient-alpha-blended-windows-directcomposition.html
 [ ] - Start using V memory instead of malloc
+[ ] - https://github.com/mmozeiko/c_d2d_dwrite for DWrite,
+      found this in Digital Grove 
 
 Feature ideas:
 - Screen shot with the back of the desktop

@@ -43,17 +43,24 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-void ui_draw_box(
-  ID3D11RenderTargetView* rtv, UI_Box* root, 
-  Rect parent_scissor_rect
-) {
+void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
+{
   #if DEBUG_MODE
   // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
   #endif
   
+  ID3D11RenderTargetView* rtv = ui_get_context()->draw_rtv;
+
+  // todo: This loop here is dumb
+  if (root->custom_draw_func != 0) { root->custom_draw_func(root); }
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    ui_draw_box(child, parent_scissor_rect);
+  }
+
   Rect rect = root->final_on_screen_rect;
 
-  if (root->flags & UI_Box_flag__has_background)
+  if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
   {
     r_draw_rect_pro(rtv, rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
   }
@@ -135,7 +142,7 @@ void ui_draw_box(
 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    ui_draw_box(rtv, child, scissor_rect);
+    ui_draw_box(child, scissor_rect);
   }
 
   // No longer scissoring
@@ -151,7 +158,8 @@ void ui_draw_box(
 void ui_draw(ID3D11RenderTargetView* rtv)
 {
   UI_Context* ctx = ui_get_context();
-  ui_draw_box(rtv, ctx->root_box, Rect{});
+  ctx->draw_rtv = rtv;
+  ui_draw_box(ctx->root_box, Rect{});
 }
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
@@ -235,8 +243,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   }
   
   { // Making the window be on top all the time
-    // BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-    // HandleLater(succ);
+    BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    HandleLater(succ);
   }
 
   ///////////////////////////////////////////////////////////
@@ -328,31 +336,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     font = fp_load_font(path_to_font, 18, range_u64_make(0, (U64)u8_max + 1));
     end_scratch(&scratch);
   }
-  
-  // r_export_texture(font.atlas_texture, Str8FromC("Font_atlas.png"));
-
-  /*
-  for (;!os_window_should_close();)
-  {
-    os_frame_begin(); 
-    r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
-
-    r_clear_frame_buffer(blue_f());
-
-    ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-    
-    test_draw_text(font, Str8FromC("This is here cause we nee to you while grabbing"), frame_buffer, v2f32(50, 50));
-
-    frame_buffer->Release();
-    
-    r_render_end();
-    os_frame_end();
-
-    r_get_state()->swap_chain->Present(1, 0);
-    HRESULT commit_hr = comp_device->Commit(); 
-    Handle(commit_hr == S_OK);
-  }
-  */
 
   // os_window_set_mouse_passthrough(true);
 
@@ -361,6 +344,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     os_frame_begin();
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
+    // /*
     if (hot_key_activated && !P.is_mid_drawing)
     {
       hot_key_activated = false;
@@ -368,76 +352,21 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
 
     pencil_do_ui(&P, font);
-    pencil_update(&P, !ui_is_no_active());
-    if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
-    else { ReleaseCapture(); }
-    pencil_render(&P);
+    // pencil_update(&P, !ui_has_active());
+    // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
+    // else { ReleaseCapture(); }
+    // pencil_render(&P);
+    // */
 
-    /*
-    // if (os_window_is_mouse_passthrough()) { os_window_set_mouse_passthrough(false); }
-    ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
-    {
-      ui_push_font(font);
-
-      UI_Slider_style slider_style = {};
-      slider_style.width             = 200;
-      slider_style.height            = 75;
-      slider_style.hover_color       = red_f();
-      slider_style.no_hover_color    = blue_f();
-      slider_style.slided_part_color = green_f();
-      slider_style.fmt_str = "%.f \n";
-      static F32 value = 15;
-      value = ui_slider(Str8FromC("Slider id"), &slider_style, value, 10, 50);
-
-      OutputDebugStringF("%f \n", value);
-
-      // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
-      // ui_set_next_size_x(ui_px(100));
-      // ui_set_next_size_y(ui_px(100));
-      // ui_set_next_b_color(red_f());
-      // UI_Box* box = ui_box_make(Str8{}, 0);
-      // ui_push_parent(box);
-      // {
-      //   // ui_set_next_flags(UI_Box_flag__dont_draw_overflow);
-      //   ui_set_next_size_x(ui_px(200));
-      //   ui_set_next_size_y(ui_px(300));
-      //   ui_set_next_b_color(blue_f());
-      //   UI_Box* box2 = ui_box_make(Str8{}, 0);
-      //   ui_push_parent(box2);
-      //   {
-      //     ui_set_next_size_x(ui_px(150));
-      //     ui_set_next_size_y(ui_px(800));
-      //     ui_set_next_b_color(green_f());
-      //     UI_Box* box3 = ui_box_make(Str8{}, 0);
-      //   }
-      // }
-
-
-      // UI_PaddedBox(ui_px(50), Axis2__x)
-      // {
-      //   ui_set_next_size_x(ui_px(50));
-      //   ui_set_next_size_y(ui_px(50));
-      //   ui_set_next_b_color(red_f());
-      //   ui_set_next_border(-10, yellow_f());
-      //   UI_Box* box = ui_box_make(Str8{}, 0);
-
-      //   ui_spacer(ui_px(50));
-
-      //   ui_set_next_size_x(ui_children_sum());
-      //   ui_set_next_size_y(ui_children_sum());
-      //   ui_set_next_layout_axis(Axis2__y);
-      //   ui_set_next_b_color(red_f());
-      //   UI_Box* wrapper = ui_box_make(Str8FromC("wrapper"), 0);
-      //   UI_Parent(wrapper)
-      //   {
-      //     ui_label(Str8FromC("Here we go"));
-      //   }
-      // }
-    }
-    ui_end_build();
-    */
+    // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+    // {
+    //   ui_color_picker_test(ui_p_of_p(0.5, 1), ui_p_of_p(0.5, 1), blue_f());
+    // }
+    // ui_end_build();
 
     ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+    // OutputDebugStringF("Color: { %f, %f, %f, %f } \n", g_color_picker_color.r, g_color_picker_color.g, g_color_picker_color.b, g_color_picker_color.a);
+    // r_clear_rtv(frame_buffer, g_color_picker_color);
     ui_draw(frame_buffer);
     frame_buffer->Release();
 

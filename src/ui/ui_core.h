@@ -117,6 +117,9 @@ struct UI_Actions {
   F32 wheel_move;
 };
 
+struct UI_Box;
+typedef void (*UI_Box_custom_draw_func_type) (UI_Box* box);
+
 struct UI_Box {
   // Default box settings
   UI_Box_flags flags;
@@ -139,6 +142,9 @@ struct UI_Box {
   // Some more extensions
   // Texture2D texture_to_draw;
   // V2F32 clip_offset; 
+
+  UI_Box_custom_draw_func_type custom_draw_func;
+  void* custom_draw_data;
 
   Str8 id; // Per build  
   B32 has_been_updated_this_build;
@@ -206,6 +212,9 @@ struct UI_Context {
 
   // Speciall stacks
   // UI_ID_stack id_stack;
+
+  // note, todo: This is only valid when drawing the ui
+  ID3D11RenderTargetView* draw_rtv;
 };
 
 // - Context variables
@@ -229,10 +238,10 @@ UI_Context* ui_get_context();
 void ui_set_context(UI_Context* context);
 
 // - Simple getters
-Arena* ui_build_arena();
+Arena* ui_get_build_arena();
 F32 ui_get_mouse_x();
 F32 ui_get_mouse_y();
-V2F32 ui_get_mouse();
+V2F32 ui_get_mouse_pos();
 
 // - Text measure function stuff
 // void ui_set_text_measuring_function(UI_text_measuring_ft* fp);
@@ -269,11 +278,16 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
 void ui_layout_box(UI_Box* root, Axis2 axis);
 
 // - Active box stuff
+B32 ui_is_active_id(Str8 box_id);
+void ui_set_active_id(Str8 box_id);
+void ui_reset_active_id_match(Str8 box_id);
+//
+B32 ui_is_active_box(UI_Box* box);
+void ui_set_active_box(UI_Box* box);
+void ui_reset_active_box_match(UI_Box* box);
+//
 B32 ui_has_active();
-B32 ui_is_active(Str8 box_id);
 void ui_reset_active();
-void ui_reset_active_match(Str8 id_to_match);
-void ui_set_active(Str8 box_id);
 
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
@@ -404,7 +418,7 @@ void __ui_push_defaults_onto_stacks()
   // ui_push_font_size(32.0f);
 
   // { // Manually setting up the id stack, it is speciall, so manuall here is fine
-  //   UI_ID_node* default_id = ArenaPush(ui_build_arena(), UI_ID_node);
+  //   UI_ID_node* default_id = ArenaPush(ui_get_build_arena(), UI_ID_node);
   //   default_id->id = Str8{};
   //   StackPush(&ctx->id_stack, default_id);
   //   ctx->id_stack.count += 1;

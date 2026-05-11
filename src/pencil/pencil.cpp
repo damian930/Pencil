@@ -221,7 +221,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   if (os_key_went_down(Key__Tab))
   {
     P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
-    ui_reset_active_match(P->brush_menu_ui_id);
+    ui_reset_active_id_match(P->brush_menu_ui_id);
   }
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
@@ -298,6 +298,155 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   __active_draw_update_routine_end__: {};
 }
 
+void pencil_ui_hsv_slider_gradient_background_draw(UI_Box* box)
+{
+  r_draw_hsv_gradient_rect(ui_get_context()->draw_rtv, box->final_on_screen_rect, false);
+}
+
+struct UI_Color_picker_draw_data {
+  V4F32 top_color;
+};
+
+void ui_color_picker_draw_func(UI_Box* picker_box)
+{
+  UI_Color_picker_draw_data* data = (UI_Color_picker_draw_data*)picker_box->custom_draw_data;
+
+  V3F32 hsv = hsv_from_rgb(data->top_color);
+  V3F32 pure_hsv = hsv;
+  pure_hsv.saturation = 1.0f;
+  pure_hsv.value = 1.0f;
+  V3F32 pure_rgb = rgb_from_hsv(pure_hsv);
+  V4F32 pure_rgb4 = v4f32(pure_rgb.r, pure_rgb.g, pure_rgb.b, 1.0f);
+
+  ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+  r_draw_gradient_rect(frame_buffer, picker_box->final_on_screen_rect, pure_rgb4);
+  frame_buffer->Release();
+}
+
+// todo: Remove this here
+V4F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 in_top_color, V4F32 old_color)
+{
+  V4F32 new_color = old_color;
+
+  Arena* arena = ui_get_build_arena();
+  UI_Color_picker_draw_data* data = ArenaPush(arena, UI_Color_picker_draw_data);
+  data->top_color = in_top_color;
+
+  ui_set_next_size_x(size_x);
+  ui_set_next_size_y(size_y);
+  UI_Box* color_picker_box = ui_box_make(id, 0);
+  color_picker_box->custom_draw_func = ui_color_picker_draw_func;
+  color_picker_box->custom_draw_data = data; 
+
+  UI_Actions actions = ui_actions_from_box(color_picker_box);
+  UI_Box_data box_data = ui_get_box_data_prev_frame(id);
+
+  static F32 norm_rel_x = 0.0f;
+  static F32 norm_rel_y = 0.0f;
+
+  if (actions.is_down && box_data.is_found)
+  {
+    V2F32 pos = ui_get_mouse_pos();
+    
+    F32 rel_x = pos.x - box_data.on_screen_rect.x;
+    norm_rel_x = rel_x / box_data.on_screen_rect.width;
+    
+    F32 rel_y = pos.y - box_data.on_screen_rect.y;
+    norm_rel_y = rel_y / box_data.on_screen_rect.height;
+  }
+  clamp_f32_inplace(&norm_rel_x, 0.0f, 1.0f);
+  clamp_f32_inplace(&norm_rel_y, 0.0f, 1.0f);
+  
+  V3F32 hsv = hsv_from_rgb(in_top_color);
+  V3F32 pure_hsv = hsv;
+  pure_hsv.saturation = 1.0f;
+  pure_hsv.value = 1.0f;
+  V3F32 pure_rgb = rgb_from_hsv(pure_hsv);
+  V4F32 pure_rgb4 = v4f32(pure_rgb.r, pure_rgb.g, pure_rgb.b, 1.0f);
+    
+  V4F32 top_color = v4f32(lerp_f32(1.0f, pure_rgb4.r, norm_rel_x), lerp_f32(1.0f, pure_rgb4.g, norm_rel_x), lerp_f32(1.0f, pure_rgb4.b, norm_rel_x), 1.0f);
+  new_color = v4f32(lerp_f32(top_color.r, 0.0f, norm_rel_y), lerp_f32(top_color.g, 0.0f, norm_rel_y), lerp_f32(top_color.b, 0.0f, norm_rel_y), 1.0f); 
+  
+  UI_Parent(color_picker_box)
+  {
+    ui_set_next_flags(UI_Box_flag__floating);
+    ui_set_next_size_x(size_x);
+    ui_set_next_size_x(size_y);
+    UI_Box* picker_circle_wrapper = ui_box_make(Str8{}, 0);
+    UI_Parent(picker_circle_wrapper)
+    {
+      UI_Col()
+      {
+        ui_spacer(ui_px(norm_rel_y * box_data.on_screen_rect.height));
+        UI_Row()
+        {
+          ui_spacer(ui_px(norm_rel_x * box_data.on_screen_rect.width));
+  
+          ui_set_next_size_x(ui_px(25));
+          ui_set_next_size_y(ui_px(25));
+          ui_set_next_border(2, white_f());
+          UI_Box* picker_circle = ui_box_make(Str8{}, 0);
+        }
+      }
+    }
+  }
+
+  return new_color;
+}
+
+F32 pencil_ui_hsv_slider(Str8 slider_id, UI_Size size_x, UI_Size size_y, F32 current_hue)
+{
+  ui_set_next_size_x(size_x);
+  ui_set_next_size_y(size_y);
+  UI_Box* slider_box = ui_box_make(slider_id, 0);
+
+  UI_Actions slider_actions = ui_actions_from_box(slider_box);
+
+  UI_Parent(slider_box)
+  {
+    // The hsv gradient background
+    ui_set_next_flags(UI_Box_flag__floating);
+    ui_set_next_size_x(size_x);
+    ui_set_next_size_y(size_y);
+    UI_Box* gradient_background_box = ui_box_make(Str8FromC("hsv gradient background box id"), 0);
+    gradient_background_box->custom_draw_func = pencil_ui_hsv_slider_gradient_background_draw;
+
+    // The slider part 
+    UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_box->id);
+    if (slider_box_data.is_found)
+    {
+      if (slider_actions.is_down) { 
+        ui_set_active_box(slider_box); 
+        F32 mouse_pos_inside_gradient = (ui_get_mouse_y() - slider_box_data.on_screen_rect.y);
+        current_hue = mouse_pos_inside_gradient / slider_box_data.on_screen_rect.height;
+      }
+      else { ui_reset_active_box_match(slider_box); }
+      clamp_f32_inplace(&current_hue, 0.0f, 1.0f);
+      
+      F32 current_pos = slider_box_data.on_screen_rect.height * current_hue;
+
+      F32 thumb_size = 25.0f;
+      F32 thumb_origin = current_pos - thumb_size/2.0f;
+
+      ui_set_next_flags(UI_Box_flag__floating);
+      ui_set_next_size_x(size_x);
+      ui_set_next_size_y(size_y);
+      UI_Box* thumb_wrapper = ui_box_make({}, 0);
+      UI_Parent(thumb_wrapper)
+      {
+        ui_spacer(ui_px(thumb_origin));
+
+        ui_set_next_border(-3, white_f());
+        ui_set_next_size_x(size_x);
+        ui_set_next_size_y(ui_px(thumb_size));
+        UI_Box* thumb = ui_box_make({}, 0);
+      }
+    }
+  }
+
+  return current_hue;
+}
+
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 {
@@ -348,296 +497,77 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
     UI_Box* right_border = ui_box_make(Str8{}, 0);
   }
 
-  if (P->show_brush_ui_menu)
+  // todo: Make this not limited, bur rather grow
+  UI_PaddedBox(ui_px(100), Axis2__y)
+  UI_Parent(content_inner)
   {
-    UI_Parent(content_inner)
+    ui_set_next_size_x(ui_children_sum());
+    ui_set_next_size_y(ui_children_sum());
+    ui_set_next_b_color(black_f());
+    UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
+    
+    UI_Parent(brush_box)
     {
-      ui_set_next_flags(UI_Box_flag__floating);
-      ui_set_next_size_x(ui_p_of_p(1, 1)); ui_set_next_size_y(ui_p_of_p(1, 1));
-      ui_set_next_layout_axis(Axis2__y);
-      UI_Box* brush_wrapper_box_x = ui_box_make(Str8FromC("Wrapper of floating boxes id"), 0);
-      
-      Str8 brush_floating_hook_box_id = Str8FromC("Brush floating box hook id");
-      P->brush_menu_ui_id = brush_floating_hook_box_id;
-  
-      static F32 drag_mouse_hold_pos_x = 0;
-      static F32 drag_mouse_hold_pos_y = 0;
-  
-      static F32 x_offset = 50.0f;
-      static F32 y_offset = 100.0f;
-  
-      static B32 is_brush_menu_open = false;
-  
-      F32 x_offset_old = x_offset;
-      F32 y_offset_old = y_offset;
-  
-      UI_Actions brush_box_actions = ui_actions_from_id(brush_floating_hook_box_id);
-      UI_Box_data brush_box_actions_data = ui_get_box_data_prev_frame(brush_floating_hook_box_id);
-      if (!brush_box_actions.was_down && brush_box_actions.is_down)
+      ui_set_next_size_x(ui_px(500));
+      ui_set_next_size_y(ui_px(50));
+      ui_set_next_layout_axis(Axis2__x);
+      ui_set_next_b_color(blue_f());
+      UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), 0);
+
+      UI_Parent(menu_name_box)
       {
-        ui_set_active(brush_floating_hook_box_id);
-        drag_mouse_hold_pos_x = os_get_mouse_pos().x - brush_box_actions_data.on_screen_rect.x;
-        drag_mouse_hold_pos_y = os_get_mouse_pos().y - brush_box_actions_data.on_screen_rect.y;
+        // notes:
+        // Here i need to center the label
+        // I could i either make a flag in the ui core that would center the text box in the end on y or x.
+        // I could just wrap it up all the time, this would not be theat great, since we would not be able 
+        // to handle cases when the parent is children sizes, for that i could introduce a new size
+        // that would limit the p_of_p to not expend pass the immediate parent, so it would be like
+        // clayes grow in a way
+
+        ui_spacer(ui_px(10));
+        ui_label(Str8FromC("Brushes"));
+
+        // ui_spacer(ui_p_of_p(1, 0));
+        // ui_spacer(ui_p_of_p(1, 0));
       }
-      else if (brush_box_actions.is_down)
+
+      ui_spacer(ui_px(50));
+
+      UI_Row()
       {
-        UI_Box_data float_space_box_data = ui_get_box_data_prev_frame(brush_wrapper_box_x->id);
-        x_offset = os_get_mouse_pos().x - drag_mouse_hold_pos_x - float_space_box_data.on_screen_rect.x;
-        y_offset = os_get_mouse_pos().y - drag_mouse_hold_pos_y - float_space_box_data.on_screen_rect.y;
+        static V4F32 final_color = orange_f();
+
+        V3F32 final_color_as_hsv = hsv_from_rgb(final_color);
+
+        F32 new_hue = pencil_ui_hsv_slider(Str8FromC("hsv slider id"), ui_px(150), ui_px(350), final_color_as_hsv.hue);
+        V3F32 new_rgb = rgb_from_hsv(v3f32(new_hue, final_color_as_hsv.saturation, final_color_as_hsv.value));
+        final_color.r = new_rgb.r;
+        final_color.g = new_rgb.g;
+        final_color.b = new_rgb.b;
+
+        ui_spacer(ui_px(25));
+
+        V4F32 new_final_color = ui_color_picker(Str8FromC("Color picker id"), ui_px(150), ui_px(150), final_color, final_color);
+        
+        ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+        r_clear_rtv(frame_buffer, new_final_color);
+        frame_buffer->Release();
+        
+        // final_color.r = new_final_color.r;
+        // final_color.g = new_final_color.g;
+        // final_color.b = new_final_color.b;
+
+        // todo: HSV vertical slider picker
+        // todo: rgb picker based on the hsv value
+        // todo: slider for red color value
+        // todo: slider for green color value
+        // todo: slider for blue color value
+        // todo: slider for alpha color value
       }
-      else
-      {
-        ui_reset_active_match(brush_floating_hook_box_id);
-        drag_mouse_hold_pos_x = 0;
-        drag_mouse_hold_pos_y = 0;
-      }
-  
-      UI_Parent(brush_wrapper_box_x)
-      {
-        ui_spacer(ui_px(y_offset_old));
-  
-        ui_set_next_size_x(ui_p_of_p(1, 1)); ui_set_next_size_y(ui_p_of_p(1, 1));
-        ui_set_next_layout_axis(Axis2__x);
-        UI_Box* brush_wrapper_box_y = ui_box_make({}, 0);
-        UI_Parent(brush_wrapper_box_y)
-        {
-          ui_spacer(ui_px(x_offset_old));
-  
-          ui_set_next_size_x(ui_px(200)); ui_set_next_size_y(ui_children_sum());
-          ui_set_next_layout_axis(Axis2__y);
-          // ui_set_next_corner_radius(0.15f);
-          ui_set_next_b_color(black_f());
-          UI_Box* brushes_menu_box = ui_box_make({}, 0);
-          UI_Parent(brushes_menu_box)
-          {
-            // Header hook box
-            ui_set_next_size_x(ui_p_of_p(1, 0)); ui_set_next_size_y(ui_children_sum());
-            ui_set_next_layout_axis(Axis2__y);
-            ui_set_next_b_color({ 151.f/255.f, 184.f/255.f, 210.f/255.f, 255.f/255.f });
-            UI_Box* hook_box = ui_box_make(brush_floating_hook_box_id, 0);
-            UI_Parent(hook_box)
-            {
-              ui_spacer(ui_px(5));
-  
-              UI_PaddedBox(ui_px(5), Axis2__x)
-              {
-                ui_set_next_text_color(black_f());
-                // ui_set_next_font_size(24);
-                ui_label(Str8FromC("Brushes"));
-  
-                ui_set_next_b_color(red_f());
-                
-              }
-  
-              ui_spacer(ui_px(5));
-            }
-    
-            UI_XStack()
-            {
-              ui_spacer(ui_p_of_p(1, 0));
-  
-              UI_PaddedBox(ui_px(5), Axis2__y) 
-              {
-                ui_spacer(ui_px(10));
-      
-                if (P->is_erasing_mode)
-                {
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style size_slider_style = {};
-                    size_slider_style.height         = 20;
-                    size_slider_style.width          = 100;
-                    size_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    size_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // size_slider_style.text_color     = { 0, 0, 0, 255.f/255.f };
-                    // size_slider_style.font_size      = 20;
-                    size_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
-                    size_slider_style.fmt_str = "%.0f";
-        
-                    U32 new_eraser_size = (U32)ui_slider(Str8FromC("Eraser size slider id"), &size_slider_style, (F32)P->eraser_size, 1, 100);
-                    if (new_eraser_size != P->eraser_size)
-                    {
-                      P->signal_new_eraser_size = true;
-                      P->new_eraser_size = new_eraser_size;
-                    } 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color({ 0, 0, 0, 255 });
-                    // ui_set_next_font_size(20);
-                    ui_label(Str8FromC("Size"));
-                  }
-        
-                  ui_spacer(ui_px(10));
-    
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    ui_set_next_b_color({ 175.f/255.f, 203.f/255.f, 255.f/255.f, 255.f/255.f });
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    UI_PaddedBox(ui_px(5), Axis2__x)
-                    {
-                      UI_Actions pen_button = ui_button(Str8FromC("Brush - [B]## button"));
-                      if (pen_button.is_clicked)
-                      {
-                        P->signal_swap_to_pen = true;
-                      }
-                    }
-                  }
-                }
-                else
-                {
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style size_slider_style = {};
-                    size_slider_style.height         = 20;
-                    size_slider_style.width          = 100;
-                    size_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    size_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // size_slider_style.text_color     = { 0, 0, 0, 255 };
-                    // size_slider_style.font_size      = 20;
-                    size_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
-                    size_slider_style.fmt_str = "%.0f";
-        
-                    U32 new_pen_size = (U32)ui_slider(Str8FromC("Pen size slider id"), &size_slider_style, (F32)P->pen_size, 1, 100);
-                    clamp_u32_inplace(&new_pen_size, 1, 100);
-                    if (new_pen_size != P->pen_size)
-                    {
-                      P->signal_new_pen_size = true;
-                      P->new_pen_size = new_pen_size;
-                    } 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    ui_label(Str8FromC("Size"));
-                  }
-        
-                  ui_spacer(ui_px(2));
-        
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style red_slider_style = {};
-                    red_slider_style.height         = 20;
-                    red_slider_style.width          = 100;
-                    red_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    red_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // red_slider_style.text_color     = { 0, 0, 0, 255 };
-                    // red_slider_style.font_size      = 20;
-                    red_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
-                    red_slider_style.fmt_str = "%.0f";
-        
-                    U8 new_r_color = (U8)ui_slider(Str8FromC("Red slider style id"), &red_slider_style, (F32)P->pen_color.r * 255, 0, 255);
-                    P->pen_color.r = (F32)new_r_color/255.0f; 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    // ui_label_c("Red");
-                  }
-        
-                  ui_spacer(ui_px(2));
-        
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style green_slider_style = {};
-                    green_slider_style.height         = 20;
-                    green_slider_style.width          = 100;
-                    green_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    green_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // green_slider_style.text_color     = { 0, 0, 0, 255 };
-                    // green_slider_style.font_size      = 20;
-                    green_slider_style.slided_part_color = { 97.f/255.f, 171.f/255.f, 255.f/255.f, 255.f/255.f };
-                    green_slider_style.fmt_str = "%.0f";
-        
-                    U8 new_g_color = (U8)ui_slider(Str8FromC("Green slider style id"), &green_slider_style, (F32)P->pen_color.g * 255, 0, 255);
-                    P->pen_color.g = (F32)new_g_color/255.0f; 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    ui_label(Str8FromC("Green"));
-                  }
-        
-                  ui_spacer(ui_px(2));
-        
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style blue_slider_style = {};
-                    blue_slider_style.height         = 20;
-                    blue_slider_style.width          = 100;
-                    blue_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    blue_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // blue_slider_style.text_color     = { 0, 0, 0, 255 };
-                    // blue_slider_style.font_size      = 20;
-                    blue_slider_style.slided_part_color = { 97, 171, 255, 255 };
-                    blue_slider_style.fmt_str = "%.0f";
-        
-                    U8 new_b_color = (U8)ui_slider(Str8FromC("Blue slider style id"), &blue_slider_style, (F32)P->pen_color.b * 255, 0, 255);
-                    P->pen_color.b = (F32)new_b_color/255.0f; 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    ui_label(Str8FromC("Blue"));
-                  }
-        
-                  ui_spacer(ui_px(2));
-        
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    UI_Slider_style alpa_slider_style = {};
-                    alpa_slider_style.height         = 20;
-                    alpa_slider_style.width          = 100;
-                    alpa_slider_style.hover_color    = { 169.f/255.f, 205.f/255.f, 246.f/255.f, 255.f/255.f };
-                    alpa_slider_style.no_hover_color = { 220.f/255.f, 220.f/255.f, 220.f/255.f, 255.f/255.f };
-                    // alpa_slider_style.text_color     = { 0, 0, 0, 255 };
-                    // alpa_slider_style.font_size      = 20;
-                    alpa_slider_style.slided_part_color = { 97, 171, 255, 255 };
-                    alpa_slider_style.fmt_str = "%.0f";
-        
-                    U8 new_a_color = (U8)ui_slider(Str8FromC("Alpha slider style id"), &alpa_slider_style, (F32)P->pen_color.a * 255, 0, 255);
-                    P->pen_color.a = (F32)new_a_color/255.0f; 
-        
-                    ui_spacer(ui_px(10));
-        
-                    ui_set_next_text_color(black_f());
-                    // ui_set_next_font_size(20);
-                    ui_label(Str8FromC("Alpha"));
-                  }
-                  
-                  ui_spacer(ui_px(10));
-          
-                  UI_PaddedBox(ui_px(5), Axis2__x)
-                  {
-                    ui_set_next_b_color({ 175.f/255.f, 203.f/255.f, 255.f/255.f, 255.f/255.f });
-                    // ui_set_next_text_color({ 0, 0, 0, 255 });
-                    // ui_set_next_font_size(20);
-                    UI_PaddedBox(ui_px(5), Axis2__x)
-                    {
-                      UI_Actions eraser_button = ui_button(Str8FromC("Eraser - [E]## button"));
-                      if (eraser_button.is_clicked)
-                      {
-                        P->signal_swap_to_eraser= true;
-                      }
-                    }
-                  }
-                }
-              }
-  
-              ui_spacer(ui_p_of_p(1, 0));
-            }
-  
-          }
-        }
-      }
+
+      // todo: Eraser button
     }
   }
-
   ui_end_build();
 }
 
