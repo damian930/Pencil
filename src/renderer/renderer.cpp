@@ -113,6 +113,21 @@ void r_init()
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
 
+  // Uniform buffer
+  {
+    ID3D11Buffer* uniform_buffer = 0;
+    
+    D3D11_BUFFER_DESC desc = {};
+    desc.ByteWidth      = 256;
+    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+    hr = d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    HR(hr);
+
+    d3d->uniform_buffer = uniform_buffer;
+  }
+
   // Rect program
   {
     B32 rect_program_suc = true;
@@ -140,6 +155,8 @@ void r_init()
   d3d->debug_arena          = arena_alloc(Megabytes(64));
   d3d->error_messages_arr   = ArenaCurrentAddressP(d3d->debug_arena, Str8);
   d3d->error_messages_count = 0;
+
+
 }
 
 void r_relesase()
@@ -178,6 +195,11 @@ void r_render_begin(F32 viewport_width, F32 viewport_height)
   d3d->render_viewport_width  = viewport_width;
   d3d->render_viewport_height = viewport_height;
 
+  d3d->prev_rtv = 0;
+
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+  // Viewport
   {
     D3D11_VIEWPORT vp = {};
     vp.TopLeftX = 0;
@@ -189,6 +211,7 @@ void r_render_begin(F32 viewport_width, F32 viewport_height)
     d3d->context->RSSetViewports(1, &vp);
   }
 
+  // Rasterizer
   {
     ID3D11RasterizerState* rasterizer_state = 0;
     {
@@ -248,33 +271,21 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
 
 void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
 {
+  ProfileFuncBegin();
   r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
+  ProfileFuncEnd();
 }
 
 void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
 {
-  // note: Default blending is used for now, so no alpha blend
-  
-  /* note:
-    At first i wanted to reset all the state, 
-    there is an issue with that since sometimes i need the state to persist,
-    like with viewport. Most of the state for the rendering pipeline i dont understand.
-    I dont know what it is for and dont use in these calls. 
-    Not sure if clearing it would be better or not. So i guess for now i will
-    just only work with the sub set of the rendering pipeline that i know and am using.
-  */
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
-
-  // Input assempler stage
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
   
   // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Rect_program_data u_data = {};
-    u_data.window_width       = d3d->render_viewport_width;//(F32)os_get_client_area_dims().x;
-    u_data.window_height      = d3d->render_viewport_height;//(F32)os_get_client_area_dims().y;
+    u_data.window_width       = d3d->render_viewport_width;
+    u_data.window_height      = d3d->render_viewport_height;
     u_data.rect_origin_x      = rect.x;
     u_data.rect_origin_y      = rect.y;
     u_data.rect_width         = rect.width;
@@ -282,44 +293,30 @@ void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F
     u_data.u_border_thickness = border_line_thickness;
     u_data.rect_color         = rect_color;
     u_data.border_color       = border_color;
-
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
     
     D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    
+    InvariantCheck(hr == S_OK);
     if (hr == S_OK) {
       memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-    } else {
-      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-    }
+      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+    } 
   }
 
   // Vertex shader stage 
   d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-  { 
-    UINT n = 1;
-    D3D11_VIEWPORT vp = {}; 
-    d3d->context->RSGetViewports(&n, &vp);
-    InvariantCheck(!IsMemZero(vp));
-  }
+  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); // todo: Do i have to change this, or is map and unmap fine here
 
   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+  d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
 
-  d3d->context->OMSetRenderTargets(1, &rtv, Null);
+  if (d3d->prev_rtv != rtv) {
+    d3d->prev_rtv = rtv;
+    d3d->context->OMSetRenderTargets(1, &rtv, Null);
+  }
 
   d3d->context->Draw(4, 0);
-
-  uniform_buffer->Release();
 }
 
 struct D3D_Rect_hsv_gradient_data {
@@ -342,9 +339,6 @@ void r_draw_hsv_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, B32 is_hor
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
-  // Input assempler stage
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-  
   // Setting the uniform buffer
   ID3D11Buffer* uniform_buffer = 0;
   {
@@ -416,9 +410,6 @@ void r_draw_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 top_colo
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
-  // Input assempler stage
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-  
   // Setting the uniform buffer
   ID3D11Buffer* uniform_buffer = 0;
   {
@@ -475,11 +466,7 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   D3D_State* d3d = r_get_state();
   HRESULT hr = S_OK;
 
-  // Input assempler stage
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-  
   // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Circle_program_data u_data = {};
     u_data.origin_x      = center_x; 
@@ -489,28 +476,18 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
     u_data.window_height = d3d->render_viewport_height;
     u_data.color         = color; 
 
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC;
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    desc.MiscFlags      = {};
-    desc.StructureByteStride = {};
-    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
     D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    InvariantCheck(hr == S_OK);
     if (hr == S_OK) {
       memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-    } else {
-      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-    }
+      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+    } 
   }
 
   // Vertex shader stage 
   d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
 
   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
   { 
@@ -521,7 +498,7 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   }
 
   d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+  d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
 
   d3d->context->OMSetRenderTargets(1, &rtv, Null);
   
@@ -543,8 +520,6 @@ void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 
   // todo: I shoud do this in each call to clear the non retained state per render
   //       pass to not have weird state bugs from draw call to draw call
   d3d->context->OMSetRenderTargets(0, 0, Null);
-
-  uniform_buffer->Release();
 }
 
 void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
@@ -553,7 +528,6 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
   HRESULT hr = S_OK;
 
   // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
   {
     D3D_Texture_program_data u_data = {};
     u_data.vp_width         = d3d->render_viewport_width;
@@ -564,35 +538,17 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
     u_data.src_rect_size    = v2f32(rect_in_src.width, rect_in_src.height);
     u_data.src_texture_dims = r_get_texture_dims(src_rtv);
 
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
     D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    InvariantCheck(hr == S_OK);
     if (hr == S_OK) {
       memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-    } else {
-      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-    }
+      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+    } 
   }
-
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
   d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
-  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-  { 
-    UINT n = 1;
-    D3D11_VIEWPORT vp = {}; 
-    d3d->context->RSGetViewports(&n, &vp);
-    InvariantCheck(!IsMemZero(vp));
-  }
+  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
 
   ID3D11SamplerState* sampler;
   {
@@ -616,7 +572,7 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
     ID3D11ShaderResourceView* view = 0;
     d3d->device->CreateShaderResourceView(resource, NULL, &view);
     d3d->context->PSSetShaderResources(0, 1, &view);
-    d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+    d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
     view->Release();
     resource->Release();
   }
@@ -625,7 +581,6 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
 
   d3d->context->Draw(4, 0);
 
-  uniform_buffer->Release();
   sampler->Release();
 }
 

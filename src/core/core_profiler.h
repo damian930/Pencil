@@ -50,7 +50,7 @@ void profile_func_end(F64 (*get_time_for_timing_sec)(void))
   Scratch scratch     = get_scratch(0, 0);
   Str8 name_nt        = str8_copy_alloc(scratch.arena, record->func_name);
   F64 duration_in_sec = record->end_time_sec - record->start_time_sec;
-  Str8 str = str8_fmt(scratch.arena, "[Function profile] \"%s\"::%.3fsec (%.3fms) \n", name_nt.data, duration_in_sec, duration_in_sec * MsInSec);
+  Str8 str = str8_fmt(scratch.arena, "[Function profile] \"%s\" :: %.3fsec | (%.3fms) __ EXTRA DATA :: (%.7fms) \n", name_nt.data, duration_in_sec, duration_in_sec * MsInSec, duration_in_sec * MsInSec);
 
   ArenaPushArr(__g_profile_state.final_data_arena, U8, str.count);
   memcpy(__g_profile_state.final_data_arr + __g_profile_state.final_data_byte_count, str.data, str.count);

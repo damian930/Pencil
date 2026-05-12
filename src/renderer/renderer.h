@@ -93,17 +93,23 @@ struct D3D_Program {
 
 struct D3D_State {
   // These we get at initialisation
+  //
+  // State
   IDXGIFactory2* dxgi_factory;
   IDXGIAdapter* dxgi_adapter;
   ID3D11Device* device;
   ID3D11DeviceContext* context;
   IDXGISwapChain1* swap_chain;
+  // 
+  // Other
+  ID3D11Buffer* uniform_buffer;
+  ID3D11RenderTargetView* prev_rtv;
   
   // Draw programs
   D3D_Program draw_rect_program;
   D3D_Program draw_circle_program;
   D3D_Program draw_texture_program;
-
+  // These are for testing for now
   D3D_Program gradient_rect_program;
   D3D_Program hsv_gradient_rect_program;
 
@@ -131,9 +137,10 @@ void r_render_end();
 // - Drawing
 void r_clear_frame_buffer(V4F32 color);
 void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color);
+//
 void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color);
 void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
-void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color);
+void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this);
 void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src);
 
 struct FP_Font; // Dont just include fp in here, since fp need the renderer, so we got a circular dependancy

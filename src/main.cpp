@@ -381,8 +381,12 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     {
       ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-      ui_draw(frame_buffer);
-      r_draw_text_f(frame_buffer, v2f32(25, 25), font, green_f(), "FPS: %d", (U32)(1.0 / prev_frame_duration_sec));
+      for EachIndex(i, 100)
+      {
+        r_draw_rect(frame_buffer, rect_make(50 + i, 50 + i, 300 + i, 300 + i), orange_f());
+      }
+      // ui_draw(frame_buffer);
+      // r_draw_text_f(frame_buffer, v2f32(25, 25), font, green_f(), "FPS: %d", (U32)(1.0 / prev_frame_duration_sec));
       OutputDebugStringF("FPS: %d \n", (U32)(1.0 / prev_frame_duration_sec));
       frame_buffer->Release();
     }
