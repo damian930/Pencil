@@ -62,6 +62,8 @@ U64 get_thread_id()
   return get_thread_context()->id;
 }
 
+// todo: Might want to call this Thread arena
+//       Thread_arena thread_arena 
 Scratch get_scratch(Arena** conflic_arenas, U64 n_conflict_arenas)
 {
   Thread_context* thread_context = get_thread_context();

@@ -449,7 +449,9 @@ F32 pencil_ui_hsv_slider(Str8 slider_id, UI_Size size_x, UI_Size size_y, F32 cur
 
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 void pencil_do_ui(Pencil_state* P, FP_Font font)
-{
+{ 
+  ProfileFuncBegin();
+
   ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
 
   ui_push_font(font);
@@ -533,6 +535,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
       ui_spacer(ui_px(50));
 
+      // /*
       UI_Row()
       {
         static V3F32 final_color_as_hsv = hsv_from_rgb(v3f32(0, 0, 1));
@@ -555,10 +558,14 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
         UI_Col()
         {
-          ui_label_f("hue: %f", new_hue);
-          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).r);//(U32)(final_color.r * 255.0f));
-          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).g);//(U32)(final_color.g * 255.0f));
-          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).b);//(U32)(final_color.b * 255.0f));
+          // ui_label_f("hue: %f", new_hue);
+          // ui_label_f("%f", final_color_as_hsv.r);
+          // ui_label_f("%f", final_color_as_hsv.g);
+          // ui_label_f("%f", final_color_as_hsv.b);
+          // ui_label_f("hue: %f", new_hue);
+          // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).r);//(U32)(final_color.r * 255.0f));
+          // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).g);//(U32)(final_color.g * 255.0f));
+          // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).b);//(U32)(final_color.b * 255.0f));
         }
 
         // final_color.r = new_final_color.r;
@@ -572,11 +579,15 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
         // todo: slider for blue color value
         // todo: slider for alpha color value
       }
+      // */
 
       // todo: Eraser button
     }
   }
+
   ui_end_build();
+
+  ProfileFuncEnd();
 }
 
 void pencil_render(const Pencil_state* P)

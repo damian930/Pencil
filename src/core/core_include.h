@@ -5,6 +5,7 @@
 #include "core_arena.h"
 #include "core_string.h"
 #include "core_thread_context.h"
+#include "core_profiler.h"
 
 #endif
 

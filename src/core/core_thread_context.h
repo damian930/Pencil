@@ -4,7 +4,6 @@
 #include "core/core_base.h"
 #include "core/core_arena.h"
 
-// todo: Since we have to init this per thread, we also have to init this for the main thread
 // todo: There is no default id or something, might be consfusing
 
 struct Thread_context {

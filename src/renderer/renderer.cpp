@@ -629,14 +629,18 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
   sampler->Release();
 }
 
-void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font font, V4F32 color)
-{
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+#include "pencil/pencil.h"
 
+void r_draw_text(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, Str8 text)
+{
+  ProfileFuncBegin();
+  
   F32 origin_y = pos.y + font.ascent;
   F32 x_offset = 0.0f;
-
+  
+  // note: These are some debug drawings for baseline and stuff
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
   // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
 
   for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
@@ -666,6 +670,26 @@ void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font
     } 
     x_offset += advance; 
   }
+
+  ProfileFuncEnd();
+}
+
+void r_draw_text_f(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, const char* fmt, ...)
+{
+  // todo: This only uses 128
+  va_list argptr;
+  va_start(argptr, fmt);
+  Scratch scratch = get_scratch(0, 0);
+  U64 buffer_count = 128;
+  U8* buffer = ArenaPushArr(scratch.arena, U8, buffer_count);
+  int err = vsnprintf((char*)buffer, buffer_count, fmt, argptr);
+  if (err < 0) { Assert(0); }
+  else if (err >= buffer_count) { Assert(0); }
+  else if (err < buffer_count) { /* All good */ }
+  va_end(argptr);
+  Str8 str = str8_manuall(buffer, (U64)err);
+  r_draw_text(dest_rtv, pos, font, color, str);
+  end_scratch(&scratch);
 }
 
 ///////////////////////////////////////////////////////////

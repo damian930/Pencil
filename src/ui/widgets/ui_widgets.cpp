@@ -15,7 +15,8 @@
 
 void ui_label(Str8 str)
 {
-  ui_set_next_size_x(ui_text_size()); ui_set_next_size_y(ui_text_size());
+  ui_set_next_size_x(ui_text_size()); 
+  ui_set_next_size_y(ui_text_size());
   UI_Box* box = ui_box_make(str, UI_Box_flag__has_text_contents);
 }
 

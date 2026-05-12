@@ -664,6 +664,12 @@ U64 os_get_perf_freq_per_sec()
   return state->perf_freq_count_per_sec;
 }
 
+// todo: Maybe this shoud be a macro instead of a call
+F64 os_get_time_for_timing_sec()
+{
+  return (F64)os_get_perf_counter() / (F64)os_get_perf_freq_per_sec(); 
+}
+
 void os_sleep(U64 ms)
 {
   Assert(ms <= u32_max);

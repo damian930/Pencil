@@ -59,6 +59,9 @@ tu_specific Str8 str8_from_cstr(Arena* arena, U8* str);
 tu_specific Str8 str8_copy_alloc(Arena* arena, Str8 str);
 tu_specific Str8 str8_from_list(Arena* arena, Str8_list* list); // todo: There is not point in the list beeing passed by a pointer here. It shoud either be by value. Or a const pointer
 tu_specific Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_before, Str8 str_to_put_between, Str8 str_to_put_after); 
+tu_specific Str8 str8_fmt(Arena* arena, const char* fmt, ...);
+tu_specific U64 str8_fmt_count(const char* fmt, ...);
+tu_specific U64 __str8_fmt_count_valist(const char* fmt, va_list valist);
 
 // - substrings
 tu_specific Str8 str8_substring(Str8 str, U64 start_index, U64 end_index);
@@ -106,9 +109,11 @@ tu_specific Str8 str8_from_month(Month month);
 tu_specific Str8 str8_from_day(Day day);
 tu_specific Comparison str8_compare(Str8 str, Str8 other, Str8_match_flags flags);
 
+/*
 ///////////////////////////////////////////////////////////
 // - fmt (public) 
 // todo: These 2 dont account for max size of u64/s64
+
 tu_specific B32 str8_is_u64(Str8 str);
 tu_specific B32 str8_is_s64(Str8 str);
 
@@ -119,10 +124,10 @@ tu_specific U64 f64_as_str8_size(F64 v);
 tu_specific U64 b64_as_str_size(B64 b);
 
 // - fmt main api
-tu_specific U64 str8_size_for_formated_str(const char* fmt, ...);
-tu_specific Str8 str8_from_fmt_dyn(Arena* arena, const char* fmt, ...);
-tu_specific U64 str8_from_fmt_s(Data_buffer* out_buffer, const char* fmt, ...);
-tu_specific void str8_printf(const char* fmt, ...);
+// tu_specific U64 str8_size_for_formated_str(const char* fmt, ...);
+// tu_specific Str8 str8_from_fmt_dyn(Arena* arena, const char* fmt, ...);
+// tu_specific U64 str8_from_fmt_s(Data_buffer* out_buffer, const char* fmt, ...);
+// tu_specific void str8_printf(const char* fmt, ...);
 // note: These are not thread safe, so dont use them in a thread pool or something
 
 ///////////////////////////////////////////////////////////
@@ -171,7 +176,7 @@ tu_specific U64 __str8_fmt_put_u64_into_buffer(U8* buffer, U64 buffer_size, U64 
 tu_specific U64 __str8_fmt_put_s64_into_buffer(U8* buffer, U64 buffer_size, S64 v);
 tu_specific U64 __str8_fmt_put_str_into_buffer(U8* buffer, U64 buffer_size, Str8 str);
 tu_specific U64 __str8_fmt_put_b64_into_buffer(U8* buffer, U64 buffer_size, B64 b);
-
+*/
 
 
 #endif 

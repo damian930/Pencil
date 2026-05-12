@@ -233,6 +233,7 @@ Readable_time os_get_readable_time();
 Time os_get_time_ms();
 U64 os_get_perf_counter();
 U64 os_get_perf_freq_per_sec();
+F64 os_get_time_for_timing_sec();
 void os_sleep(U64 ms);
 // U64 os_get_mouse_double_click_max_time_ms();
 // U64 os_get_keyboard_initial_repeat_delay();

@@ -67,7 +67,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 
   if (root->flags & UI_Box_flag__has_text_contents)
   {
-    r_draw_text(rtv, root->text_style.text, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color);
+    // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
   }
 
   // Have to scissor ______ (THATS WHAT SHE SAID !!!)
@@ -243,7 +243,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   }
   
   { // Making the window be on top all the time
-    BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    // BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
     HandleLater(succ);
   }
 
@@ -339,8 +340,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // os_window_set_mouse_passthrough(true);
 
+  F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
   {
+    F64 frame_start_time_sec = os_get_time_for_timing_sec();
+
     os_frame_begin();
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
 
@@ -351,30 +355,50 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
 
-    pencil_do_ui(&P, font);
+    // pencil_do_ui(&P, font);
     // pencil_update(&P, !ui_has_active());
     // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
     // else { ReleaseCapture(); }
     // pencil_render(&P);
     // */
 
-    // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
-    // {
-    //   ui_color_picker_test(ui_p_of_p(0.5, 1), ui_p_of_p(0.5, 1), blue_f());
-    // }
-    // ui_end_build();
+    ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+    {
+      ui_push_font(font);
 
-    ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-    // OutputDebugStringF("Color: { %f, %f, %f, %f } \n", g_color_picker_color.r, g_color_picker_color.g, g_color_picker_color.b, g_color_picker_color.a);
-    // r_clear_rtv(frame_buffer, g_color_picker_color);
-    ui_draw(frame_buffer);
-    frame_buffer->Release();
+      ui_set_next_size_x(ui_children_sum());
+      ui_set_next_size_y(ui_children_sum());
+      ui_set_next_b_color(blue_f());
+      ui_set_next_border(3, red_f());
+      UI_Box* box = ui_box_make({}, {});
+      UI_Parent(box)
+      UI_PaddedBox(ui_px(15), Axis2__y)
+      {
+        ui_label(Str8FromC("Label 1"));
+      }
+    }
+    ui_end_build();
 
+    {
+      ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+      ui_draw(frame_buffer);
+      r_draw_text_f(frame_buffer, v2f32(25, 25), font, green_f(), "FPS: %d", (U32)(1.0 / prev_frame_duration_sec));
+      OutputDebugStringF("FPS: %d \n", (U32)(1.0 / prev_frame_duration_sec));
+      frame_buffer->Release();
+    }
+
+    // note: For now these are empty and dont draw, but thats what thye shoud do
     r_render_end();
     os_frame_end();
-    r_get_state()->swap_chain->Present(1, 0);
+
+    // Swapping the dwm buffer in a way
+    B32 vsync = false; 
+    r_get_state()->swap_chain->Present(!!vsync, 0);
     HRESULT commit_hr = comp_device->Commit(); 
     Handle(commit_hr == S_OK);
+
+    F64 frame_end_time_sec = os_get_time_for_timing_sec();
+    prev_frame_duration_sec = frame_end_time_sec - frame_start_time_sec;
 
     #if DEBUG_MODE
     {
@@ -386,6 +410,16 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     #endif
   }
 
+  // Writting the gathered profiling data
+  { 
+    Data_buffer profile_data = profile_get_data();
+
+    OS_File file = os_file_open(Str8FromC("Profiling_data_file.txt"), OS_File_access__read|OS_File_access__write|OS_File_access__visible_read);
+    B32 succ = os_file_write_end(file, profile_data);
+    os_file_close(&file);
+    Assert(succ);
+  }
+
   // note: Not releasing stuff here since who cares, the os will release it for us
 
   return 0;
@@ -394,6 +428,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 ///////////////////////////////////////////////////////////
 // - Main helpers
 //
+// todo: Code for this is bad
 void OutputDebugStringF(const char* fmt, ...)
 {
   #if DEBUG_MODE

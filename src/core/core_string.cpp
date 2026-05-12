@@ -101,6 +101,47 @@ Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_befor
   return str;
 }
 
+Str8 str8_fmt(Arena* arena, const char* fmt, ...)
+{
+  va_list valist;
+  va_start(valist, fmt);
+
+  va_list valist_copy;
+  va_copy(valist_copy, valist);
+  U64 buffer_size_no_nt = __str8_fmt_count_valist(fmt, valist_copy);
+  va_end(valist_copy);
+
+  Data_buffer buffer = data_buffer_make(arena, buffer_size_no_nt + 1);
+  int size_written   = vsprintf((char*)buffer.data, fmt, valist);
+  InvariantCheck(size_written + 1 == buffer.count);
+  va_end(valist);
+
+  Str8 str_no_nt = str8_chop_back(buffer, 1);
+  arena_pop(arena, 1);
+
+  return str_no_nt;
+}
+
+U64 str8_fmt_count(const char* fmt, ...)
+{
+  va_list valist;
+  va_start(valist, fmt);
+  U64 buffer_size_no_nt = __str8_fmt_count_valist(fmt, valist);
+  va_end(valist);
+  return buffer_size_no_nt;
+}
+
+U64 __str8_fmt_count_valist(const char* fmt, va_list valist_)
+{
+  va_list valist;
+  va_copy(valist, valist_);
+  int buffer_size_no_nt = vsnprintf(Null, 0, fmt, valist);
+  va_end(valist);
+  if (buffer_size_no_nt < 0) { buffer_size_no_nt = 0; InvalidCodePath(); }
+  return (U64)buffer_size_no_nt;
+}
+
+
 ///////////////////////////////////////////////////////////
 // - substring 
 // 
@@ -599,7 +640,7 @@ Comparison str8_compare(Str8 str, Str8 other, Str8_match_flags flags)
   return result;
 }
 
-
+/*
 ///////////////////////////////////////////////////////////
 // - fmt (public)
 //
@@ -1011,6 +1052,8 @@ U64 __str8_fmt_put_b64_into_buffer(U8* buffer, U64 buffer_size, B64 b)
   U64 bytes_written = __str8_fmt_put_str_into_buffer(buffer, buffer_size, str);
   return bytes_written;
 }
+*/
+
 
 
 #endif
