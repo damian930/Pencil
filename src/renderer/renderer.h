@@ -16,7 +16,6 @@
 
 #include "core/core_include.h"
 
-
 // Misc structs here
 // todo:
 // note: I wanted to maybe make this be just a zero id for texture like in opengl, 
@@ -95,32 +94,42 @@ struct D3D_State {
   // These we get at initialisation
   //
   // State
-  IDXGIFactory2* dxgi_factory;
-  IDXGIAdapter* dxgi_adapter;
-  ID3D11Device* device;
+  IDXGIFactory2*       dxgi_factory;
+  IDXGIAdapter*        dxgi_adapter;
+  ID3D11Device*        device;
   ID3D11DeviceContext* context;
-  IDXGISwapChain1* swap_chain;
   // 
+  IDXGISwapChain1*        swap_chain;
+  ID3D11RasterizerState*  rasterizer_state;
+  ID3D11BlendState*       alpha_blend_state;
+  //
+  ID3D11Texture2D*        frame_buffer_texture;
+  ID3D11RenderTargetView* frame_buffer_rtv;
+
+  // todo: What is this for dude ???
   // Other
   ID3D11Buffer* uniform_buffer;
   ID3D11RenderTargetView* prev_rtv;
   
   // Draw programs
   D3D_Program draw_rect_program;
-  D3D_Program draw_circle_program;
-  D3D_Program draw_texture_program;
+  // D3D_Program draw_circle_program;
+  // D3D_Program draw_texture_program;
+  //
   // These are for testing for now
-  D3D_Program gradient_rect_program;
-  D3D_Program hsv_gradient_rect_program;
+  // D3D_Program gradient_rect_program;
+  // D3D_Program hsv_gradient_rect_program;
 
+  // todo: See if this is still needed
   // Per render pass data
   F32 render_viewport_width;
   F32 render_viewport_height;
 
+  // -----------------------------
   // Debug stuff for layer
-  Arena* debug_arena;
-  Str8* error_messages_arr;
-  U64 error_messages_count;
+  // Arena* debug_arena;
+  // Str8* error_messages_arr;
+  // U64 error_messages_count;
 };
 
 extern global D3D_State __d3d_g_state;
@@ -150,7 +159,7 @@ void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
 ID3D11RenderTargetView* r_make_texture(U32 width, U32 height);
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
-V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv);
+V2F32 r_get_texture_dims(ID3D11Texture2D* rtv);
 D3D_Program r_program_from_file(
   const WCHAR* shader_program_file, 
   const char* v_shader_main_f_name,

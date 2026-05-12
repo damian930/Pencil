@@ -95,6 +95,7 @@ void arena_pop(Arena* arena, U64 bytes_to_pop)
 
 void arena_clear(Arena* arena)
 {
+  if (arena == 0) { Assert(0); return; }
   arena->bytes_used = arena->metadata_size;
 }
 

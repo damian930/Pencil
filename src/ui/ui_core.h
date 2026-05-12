@@ -413,7 +413,7 @@ void __ui_push_defaults_onto_stacks()
   // ui_push_corner_radius(0.0f);
   // ui_push_border({ 0.0f, V4F32{0.0f, 0.0f, 0.0f, 0.0f} });
 
-  ui_push_text_color(white_f());
+  ui_push_text_color(white());
   // ui_push_font(GetFontDefault()); // todo: Not the biggest fan of this line here
   // ui_push_font_size(32.0f);
 

@@ -60,9 +60,14 @@ void r_init()
   // Device, Context
   {
     D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_1 };
+    UINT flags = 0;
+    #if DEBUG_MODE
+    flags = D3D11_CREATE_DEVICE_DEBUG; 
+    #endif
+
     hr = D3D11CreateDevice(
-      dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null, 
-      D3D11_CREATE_DEVICE_DEBUG, levels, ArrayCount(levels),
+      dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null,  
+      flags, levels, ArrayCount(levels),
       D3D11_SDK_VERSION, &d3d->device, Null, &d3d->context
     );
     HR(hr);
@@ -70,8 +75,8 @@ void r_init()
   ID3D11Device* d3d_device = d3d->device;
   ID3D11DeviceContext* d3d_context = d3d->context;   
 
-  // todo on release: Only use this for the debug version
   // Debug
+  #if DEBUG_MODE
   {
     // Debug for device
     ID3D11InfoQueue* debug_q = 0;
@@ -80,7 +85,6 @@ void r_init()
 
     debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_CORRUPTION, true);
     debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_ERROR, true);
-    // debug_q->SetBreakOnSeverity(D3D11_MESSAGE_SEVERITY_WARNING, true);
     debug_q->Release();
 
     // Debug for dxgi
@@ -89,9 +93,9 @@ void r_init()
     HR(hr);
     dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_CORRUPTION, true);
     dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_ERROR, true);
-    // dxgi_debug->SetBreakOnSeverity(DXGI_DEBUG_ALL, DXGI_INFO_QUEUE_MESSAGE_SEVERITY_WARNING, true);
     dxgi_debug->Release();
   }
+  #endif
 
   // Swap chain
   {
@@ -113,6 +117,7 @@ void r_init()
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
 
+  // todo: Redo this here
   // Uniform buffer
   {
     ID3D11Buffer* uniform_buffer = 0;
@@ -134,29 +139,60 @@ void r_init()
     d3d->draw_rect_program = r_program_from_file(L"../data/shaders/draw_rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
     Handle(rect_program_suc);
   
-    B32 circle_program_succ = true;
-    d3d->draw_circle_program = r_program_from_file(L"../data/shaders/draw_circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
-    Handle(circle_program_succ);
+    // B32 circle_program_succ = true;
+    // d3d->draw_circle_program = r_program_from_file(L"../data/shaders/draw_circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
+    // Handle(circle_program_succ);
 
-    B32 texture_program_succ = true;
-    d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
-    Handle(texture_program_succ);
+    // B32 texture_program_succ = true;
+    // d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
+    // Handle(texture_program_succ);
 
-    B32 gradient_program_succ = true;
-    d3d->gradient_rect_program = r_program_from_file(L"../data/shaders/gradient_program_shader.hlsl", "vs_main", "ps_main", &gradient_program_succ);
-    Handle(gradient_program_succ);
+    // B32 gradient_program_succ = true;
+    // d3d->gradient_rect_program = r_program_from_file(L"../data/shaders/gradient_program_shader.hlsl", "vs_main", "ps_main", &gradient_program_succ);
+    // Handle(gradient_program_succ);
 
-    B32 hsv_gradient_rect_program_succ = true;
-    d3d->hsv_gradient_rect_program = r_program_from_file(L"../data/shaders/hsv_gradient_rect_program_shader.hlsl", "vs_main", "ps_main", &hsv_gradient_rect_program_succ);
-    Handle(hsv_gradient_rect_program_succ);
+    // B32 hsv_gradient_rect_program_succ = true;
+    // d3d->hsv_gradient_rect_program = r_program_from_file(L"../data/shaders/hsv_gradient_rect_program_shader.hlsl", "vs_main", "ps_main", &hsv_gradient_rect_program_succ);
+    // Handle(hsv_gradient_rect_program_succ);
+  }
+
+  // Rasterizer state
+  {
+    // No culling, this makes all the triangles appear, not only the once that follow a specific clock direction (meaning clock-wise or counter clock-wise)
+    D3D11_RASTERIZER_DESC desc = {};
+    desc.FillMode        = D3D11_FILL_SOLID;
+    desc.CullMode        = D3D11_CULL_NONE;
+    desc.DepthClipEnable = true;
+    hr = d3d->device->CreateRasterizerState(&desc, &d3d->rasterizer_state);
+    HR(hr);
+  }
+
+  // Alpha blending
+  {
+    D3D11_BLEND_DESC desc = {};
+    desc.RenderTarget[0].BlendEnable           = TRUE;
+    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
+    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+    d3d->device->CreateBlendState(&desc, &d3d->alpha_blend_state);
+  }
+
+  // Frame buffer
+  {
+    d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
+    d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
   }
 
   // Allocating mem for debug info for the layer
-  d3d->debug_arena          = arena_alloc(Megabytes(64));
-  d3d->error_messages_arr   = ArenaCurrentAddressP(d3d->debug_arena, Str8);
-  d3d->error_messages_count = 0;
-
-
+  // d3d->debug_arena          = arena_alloc(Megabytes(64));
+  // d3d->error_messages_arr   = ArenaCurrentAddressP(d3d->debug_arena, Str8);
+  // d3d->error_messages_count = 0;
+  
+  #undef HR // todo: Remove this HR shit from here
 }
 
 void r_relesase()
@@ -167,100 +203,43 @@ void r_relesase()
 ///////////////////////////////////////////////////////////
 // - TESTING THE ERROR A NEW HANDLING WAY FOR THE LAYER
 //
-void __r_push_error_message(Str8 str)
-{
-  D3D_State* d3d = r_get_state();
-  Str8 error_str = str8_copy_alloc(d3d->debug_arena, str);
-  d3d->error_messages_count += 1;
-}
-
-#define __R_PUSH_ERROR_AND_DEBUG(c_lit) do { __r_push_error_message(Str8FromC(c_lit)); BreakPoint(); } while (0); 
-
+// void __r_push_error_message(Str8 str)
+// {
+//   D3D_State* d3d = r_get_state();
+//   Str8 error_str = str8_copy_alloc(d3d->debug_arena, str);
+//   d3d->error_messages_count += 1;
+// }
+// #define __R_PUSH_ERROR_AND_DEBUG(c_lit) do { __r_push_error_message(Str8FromC(c_lit)); BreakPoint(); } while (0); 
 ///////////////////////////////////////////////////////////
-// - Render pass
-//
+
 void r_render_begin(F32 viewport_width, F32 viewport_height)
 {
-  if (viewport_width == 0.0f || viewport_height == 0.0f) { __R_PUSH_ERROR_AND_DEBUG("Cant begin a render pass with viewport dims of 0.0f"); return; }
-
   D3D_State* d3d = r_get_state();
-  d3d->context->ClearState(); 
 
-  // todo: I dont like conversion from F32 to UINT here just implicitrly like this 
-  // Resizing the swap chain (the frame buffer)
-  HRESULT hr = d3d->swap_chain->ResizeBuffers(0, (UINT)viewport_width, (UINT)viewport_height, DXGI_FORMAT_UNKNOWN, 0);
-  Handle(hr == S_OK);
-
-  // Resizing the viewport for valid on screen px mapping
-  d3d->render_viewport_width  = viewport_width;
-  d3d->render_viewport_height = viewport_height;
-
-  d3d->prev_rtv = 0;
-
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-  // Viewport
+  // Resizing the frame buffer
+  if (viewport_width != 0.0f && viewport_height != 0.0f)
   {
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0;
-    vp.TopLeftY = 0;
-    vp.Width    = viewport_width;
-    vp.Height   = viewport_height;
-    vp.MinDepth = 0;
-    vp.MaxDepth = 1;
-    d3d->context->RSSetViewports(1, &vp);
-  }
-
-  // Rasterizer
-  {
-    ID3D11RasterizerState* rasterizer_state = 0;
-    {
-      // disable culling
-      D3D11_RASTERIZER_DESC desc = {};
-      desc.FillMode = D3D11_FILL_SOLID;
-      desc.CullMode = D3D11_CULL_NONE;
-      desc.DepthClipEnable = true;
-      hr = d3d->device->CreateRasterizerState(&desc, &rasterizer_state);
-      Assert(hr == S_OK);
-    }
-    d3d->context->RSSetState(rasterizer_state);
-    rasterizer_state->Release();
-  }
-
-  // Alpha blending
-  {
-    ID3D11BlendState* blend_state = 0;
-    D3D11_BLEND_DESC desc = {};
-    desc.RenderTarget[0].BlendEnable           = TRUE;
-    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    d3d->device->CreateBlendState(&desc, &blend_state);
-    d3d->context->OMSetBlendState(blend_state, Null, ~0U);
-    blend_state->Release();
+    V2F32 window_dims = os_get_client_area_dims();
+    d3d->frame_buffer_texture->Release();
+    d3d->frame_buffer_rtv->Release();
+    d3d->swap_chain->ResizeBuffers(0, (UINT)window_dims.x, (UINT)window_dims.y, DXGI_FORMAT_UNKNOWN, 0);
+    d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
+    d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
   }
 }
 
-void r_render_end() {}
+void r_render_end()
+{
+  // Nothing here, keeping this to have a logical pair of render_begin/render_end
+}
 
 ///////////////////////////////////////////////////////////
-// - Drawing
+// - Clearing
 //
 void r_clear_frame_buffer(V4F32 color)
 {
-  // todo: Test this __R_PUSH_ERROR_AND_DEBUG here
-  // todo: I am not use how i feel about having this be possible when we havent called render_begin yet.
-  // todo: See if d3d is immediate and if so then find out wheater you shoud batch the draw calls.
   D3D_State* d3d = r_get_state();
-  if (!d3d) { __R_PUSH_ERROR_AND_DEBUG("Trying to use rendering state before it has been allocated. \n"); return; } 
-
-  ID3D11RenderTargetView* rtv = r_get_frame_buffer_rtv();
-  d3d->context->ClearRenderTargetView(rtv, color.v);
-  rtv->Release();
+  d3d->context->ClearRenderTargetView(d3d->frame_buffer_rtv, color.v);
 }
 
 void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
@@ -269,396 +248,494 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
   d3d->context->ClearRenderTargetView(rtv, color.v);
 }
 
-void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
+///////////////////////////////////////////////////////////
+// - New drawing
+//
+struct Rect_node {
+  Rect rect;
+  V4F32 rect_color;
+  F32 border_line_thickness; 
+  V4F32 border_color;
+  
+  Rect_node* next;
+};
+
+struct Rect_list {
+  Rect_node* first;
+  Rect_node* last;
+  U64 count;
+};
+
+static Arena* arena_for_rects = 0;
+static Rect_list rect_list    = {};
+
+void r_draw_rect(Rect rect, V4F32 color)
 {
-  ProfileFuncBegin();
-  r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
-  ProfileFuncEnd();
+  if (!arena_for_rects) { arena_for_rects = arena_alloc(Megabytes(64)); }
+
+  Rect_node* node  = ArenaPush(arena_for_rects, Rect_node);
+  node->rect       = rect;
+  node->rect_color =  color;
+  QueuePushBack(&rect_list, node);
+  rect_list.count += 1;
 }
 
-void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
+// todo: This call gets all the batches and then submits them to be drawn by the gpu to the rendering target
+void r_submit()
 {
   D3D_State* d3d = r_get_state();
-  HRESULT hr = S_OK;
-  
-  // Setting the uniform buffer
+  V2F32 rtv_dims = r_get_texture_dims(d3d->frame_buffer_texture);
+
+  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
+
+  // Viewport 
   {
-    D3D_Rect_program_data u_data = {};
-    u_data.window_width       = d3d->render_viewport_width;
-    u_data.window_height      = d3d->render_viewport_height;
-    u_data.rect_origin_x      = rect.x;
-    u_data.rect_origin_y      = rect.y;
-    u_data.rect_width         = rect.width;
-    u_data.rect_height        = rect.height;
-    u_data.u_border_thickness = border_line_thickness;
-    u_data.rect_color         = rect_color;
-    u_data.border_color       = border_color;
-    
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    
-    InvariantCheck(hr == S_OK);
-    if (hr == S_OK) {
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-    } 
+    D3D11_VIEWPORT vp = {};
+    vp.TopLeftX = 0.0f;
+    vp.TopLeftY = 0.0f;
+    vp.Width    = rtv_dims.x;
+    vp.Height   = rtv_dims.y;
+    vp.MinDepth = 0.0f;
+    vp.MaxDepth = 1.0f;
+    d3d->context->RSSetViewports(1, &vp);
   }
 
-  // Vertex shader stage 
+  // Rasterizer
+  d3d->context->RSSetState(d3d->rasterizer_state);
+  
+  // Vertex shader
   d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); // todo: Do i have to change this, or is map and unmap fine here
-
+  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); 
+  
+  // Pixel shader
   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
   d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-  if (d3d->prev_rtv != rtv) {
-    d3d->prev_rtv = rtv;
-    d3d->context->OMSetRenderTargets(1, &rtv, Null);
-  }
-
-  d3d->context->Draw(4, 0);
-}
-
-struct D3D_Rect_hsv_gradient_data {
-  F32 window_width;
-  F32 window_height;
-
-  F32 rect_origin_x; 
-  F32 rect_origin_y; 
-
-  F32 rect_width;
-  F32 rect_height;
   
-  B32 is_horizontal_gradient;
+  // Render target
+  d3d->context->OMSetRenderTargets(1, &d3d->frame_buffer_rtv, Null);
+  d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U);
 
-  F32 _padding[1]; 
-};
-
-void r_draw_hsv_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, B32 is_horizontal_gradient)
-{
-  D3D_State* d3d = r_get_state();
-  HRESULT hr = S_OK;
-
-  // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
+  for (Rect_node* rect_node = rect_list.first; rect_node != 0; rect_node = rect_node->next)
   {
-    D3D_Rect_hsv_gradient_data u_data = {};
-    u_data.window_width           = d3d->render_viewport_width;
-    u_data.window_height          = d3d->render_viewport_height;
-    u_data.rect_origin_x          = rect.x; 
-    u_data.rect_origin_y          = rect.y; 
-    u_data.rect_width             = rect.width;
-    u_data.rect_height            = rect.height;
-    u_data.is_horizontal_gradient = is_horizontal_gradient;
-
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    if (hr == S_OK) {
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-    } else {
-      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-    }
-  }
-
-  // Vertex shader stage 
-  d3d->context->VSSetShader(d3d->hsv_gradient_rect_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-  { 
-    UINT n = 1;
-    D3D11_VIEWPORT vp = {}; 
-    d3d->context->RSGetViewports(&n, &vp);
-    InvariantCheck(!IsMemZero(vp));
-  }
-
-  d3d->context->PSSetShader(d3d->hsv_gradient_rect_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  d3d->context->OMSetRenderTargets(1, &rtv, Null);
-
-  d3d->context->Draw(4, 0);
-
-  uniform_buffer->Release();
-}
-
-struct D3D_Rect_gradient_data {
-  F32 window_width;
-  F32 window_height;
-
-  F32 rect_origin_x; 
-  F32 rect_origin_y; 
-
-  F32 rect_width;
-  F32 rect_height;
-  
-  F32 _padding[2]; 
-
-  V4F32 top_color;
-};
-
-void r_draw_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 top_color)
-{
-  D3D_State* d3d = r_get_state();
-  HRESULT hr = S_OK;
-
-  // Setting the uniform buffer
-  ID3D11Buffer* uniform_buffer = 0;
-  {
-    D3D_Rect_gradient_data u_data = {};
-    u_data.window_width  = d3d->render_viewport_width;
-    u_data.window_height = d3d->render_viewport_height;
-    u_data.rect_origin_x = rect.x; 
-    u_data.rect_origin_y = rect.y; 
-    u_data.rect_width    = rect.width;
-    u_data.rect_height   = rect.height;
-    u_data.top_color     = top_color;
-
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = sizeof(u_data);
-    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    if (hr == S_OK) {
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-    } else {
-      Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-    }
-  }
-
-  // Vertex shader stage 
-  d3d->context->VSSetShader(d3d->gradient_rect_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-  { 
-    UINT n = 1;
-    D3D11_VIEWPORT vp = {}; 
-    d3d->context->RSGetViewports(&n, &vp);
-    InvariantCheck(!IsMemZero(vp));
-  }
-
-  d3d->context->PSSetShader(d3d->gradient_rect_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-
-  d3d->context->OMSetRenderTargets(1, &rtv, Null);
-
-  d3d->context->Draw(4, 0);
-
-  uniform_buffer->Release();
-}
-
-void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this)
-{
-  D3D_State* d3d = r_get_state();
-  HRESULT hr = S_OK;
-
-  // Setting the uniform buffer
-  {
-    D3D_Circle_program_data u_data = {};
-    u_data.origin_x      = center_x; 
-    u_data.origin_y      = center_y; 
-    u_data.radius        = radius;
-    u_data.window_width  = d3d->render_viewport_width;
-    u_data.window_height = d3d->render_viewport_height;
-    u_data.color         = color; 
-
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    InvariantCheck(hr == S_OK);
-    if (hr == S_OK) {
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-    } 
-  }
-
-  // Vertex shader stage 
-  d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-  // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-  { 
-    UINT n = 1;
-    D3D11_VIEWPORT vp = {}; 
-    d3d->context->RSGetViewports(&n, &vp);
-    InvariantCheck(!IsMemZero(vp));
-  }
-
-  d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-  d3d->context->OMSetRenderTargets(1, &rtv, Null);
-  
-  ID3D11BlendState* blend_state = 0;
-  FLOAT blend_factor[4]         = {};
-  UINT sample_mask              = {};
-  if (turn_off_blend_for_this) {
-    d3d->context->OMGetBlendState(&blend_state, blend_factor, &sample_mask);
-    d3d->context->OMSetBlendState(0, 0, ~0U);
-  }
-  
-  d3d->context->Draw(4, 0);
-
-  if (turn_off_blend_for_this)
-  {
-    d3d->context->OMSetBlendState(blend_state, blend_factor, sample_mask);
-  }
-
-  // todo: I shoud do this in each call to clear the non retained state per render
-  //       pass to not have weird state bugs from draw call to draw call
-  d3d->context->OMSetRenderTargets(0, 0, Null);
-}
-
-void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
-{
-  D3D_State* d3d = r_get_state();
-  HRESULT hr = S_OK;
-
-  // Setting the uniform buffer
-  {
-    D3D_Texture_program_data u_data = {};
-    u_data.vp_width         = d3d->render_viewport_width;
-    u_data.vp_height        = d3d->render_viewport_height;
-    u_data.dest_rect_origin = v2f32(rect_in_dest.x, rect_in_dest.y);
-    u_data.dest_rect_size   = v2f32(rect_in_dest.width, rect_in_dest.height);
-    u_data.src_rect_origin  = v2f32(rect_in_src.x, rect_in_src.y);
-    u_data.src_rect_size    = v2f32(rect_in_src.width, rect_in_src.height);
-    u_data.src_texture_dims = r_get_texture_dims(src_rtv);
-
-    D3D11_MAPPED_SUBRESOURCE mapped = {};
-    hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    InvariantCheck(hr == S_OK);
-    if (hr == S_OK) {
-      memcpy(mapped.pData, &u_data, sizeof(u_data));
-      d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-    } 
-  }
-
-  d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
-  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-  ID3D11SamplerState* sampler;
-  {
-    D3D11_SAMPLER_DESC desc = {};
-    desc.Filter        = D3D11_FILTER_MIN_MAG_MIP_POINT;
-    desc.AddressU      = D3D11_TEXTURE_ADDRESS_WRAP;
-    desc.AddressV      = D3D11_TEXTURE_ADDRESS_WRAP;
-    desc.AddressW      = D3D11_TEXTURE_ADDRESS_WRAP;
-    desc.MipLODBias    = 0;
-    desc.MaxAnisotropy = 1;
-    desc.MinLOD        = 0;
-    desc.MaxLOD        = D3D11_FLOAT32_MAX;
-    d3d->device->CreateSamplerState(&desc, &sampler);
-  }
-  d3d->context->PSSetSamplers(0, 1, &sampler);
-  d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
-  {
-    ID3D11Resource* resource = 0;
-    src_rtv->GetResource(&resource);
-
-    ID3D11ShaderResourceView* view = 0;
-    d3d->device->CreateShaderResourceView(resource, NULL, &view);
-    d3d->context->PSSetShaderResources(0, 1, &view);
-    d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-    view->Release();
-    resource->Release();
-  }
-
-  d3d->context->OMSetRenderTargets(1, &dest_rtv, 0);
-
-  d3d->context->Draw(4, 0);
-
-  sampler->Release();
-}
-
-#include "pencil/pencil.h"
-
-void r_draw_text(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, Str8 text)
-{
-  ProfileFuncBegin();
-  
-  F32 origin_y = pos.y + font.ascent;
-  F32 x_offset = 0.0f;
-  
-  // note: These are some debug drawings for baseline and stuff
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
-
-  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-  {
-    U8 ch = text.data[ch_index];
-    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-    F32 origin_x = pos.x + x_offset;
-
-    // Just puttin them 1 next to another
-    Rect dest_rect = {};
-    dest_rect.x      = origin_x + glyph_data.bearing_x;
-    dest_rect.y      = origin_y - glyph_data.bearing_y;
-    dest_rect.width  = glyph_data.rect_on_atlas.width;
-    dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-    r_draw_texture(
-      dest_rtv, dest_rect,
-      font.atlas_texture, glyph_data.rect_on_atlas
-    );
-
-    F32 advance = glyph_data.advance;
-    if (ch_index < text.count - 1)
+    // Setting the uniform buffer
     {
-      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
-    } 
-    x_offset += advance; 
+      D3D_Rect_program_data u_data = {};
+      u_data.window_width       = rtv_dims.x;
+      u_data.window_height      = rtv_dims.y;
+      u_data.rect_origin_x      = rect_node->rect.x;
+      u_data.rect_origin_y      = rect_node->rect.y;
+      u_data.rect_width         = rect_node->rect.width;
+      u_data.rect_height        = rect_node->rect.height;
+      u_data.u_border_thickness = rect_node->border_line_thickness;
+      u_data.rect_color         = rect_node->rect_color;
+      u_data.border_color       = rect_node->border_color;
+      
+      D3D11_MAPPED_SUBRESOURCE mapped = {};
+      HRESULT hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+      
+      InvariantCheck(hr == S_OK);
+      if (hr == S_OK) {
+        memcpy(mapped.pData, &u_data, sizeof(u_data));
+        d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+      } 
+    }
+
+    d3d->context->Draw(4, 0);
   }
 
-  ProfileFuncEnd();
+  rect_list = {};
+  if (arena_for_rects) { arena_clear(arena_for_rects); }
 }
 
-void r_draw_text_f(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, const char* fmt, ...)
-{
-  // todo: This only uses 128
-  va_list argptr;
-  va_start(argptr, fmt);
-  Scratch scratch = get_scratch(0, 0);
-  U64 buffer_count = 128;
-  U8* buffer = ArenaPushArr(scratch.arena, U8, buffer_count);
-  int err = vsnprintf((char*)buffer, buffer_count, fmt, argptr);
-  if (err < 0) { Assert(0); }
-  else if (err >= buffer_count) { Assert(0); }
-  else if (err < buffer_count) { /* All good */ }
-  va_end(argptr);
-  Str8 str = str8_manuall(buffer, (U64)err);
-  r_draw_text(dest_rtv, pos, font, color, str);
-  end_scratch(&scratch);
-}
+///////////////////////////////////////////////////////////
+// - OLD Drawing
+//
+// void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
+// {
+//   r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
+// }
+
+// void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
+// {
+//   ProfileFuncBegin();
+
+//   D3D_State* d3d = r_get_state();
+//   HRESULT hr = S_OK;
+  
+//   // Setting the uniform buffer
+//   {
+//     D3D_Rect_program_data u_data = {};
+//     u_data.window_width       = d3d->render_viewport_width;
+//     u_data.window_height      = d3d->render_viewport_height;
+//     u_data.rect_origin_x      = rect.x;
+//     u_data.rect_origin_y      = rect.y;
+//     u_data.rect_width         = rect.width;
+//     u_data.rect_height        = rect.height;
+//     u_data.u_border_thickness = border_line_thickness;
+//     u_data.rect_color         = rect_color;
+//     u_data.border_color       = border_color;
+    
+//     D3D11_MAPPED_SUBRESOURCE mapped = {};
+//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+    
+//     InvariantCheck(hr == S_OK);
+//     if (hr == S_OK) {
+//       memcpy(mapped.pData, &u_data, sizeof(u_data));
+//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+//     } 
+//   }
+
+//   // Vertex shader stage 
+//   d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
+//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); // todo: Do i have to change this, or is map and unmap fine here
+
+//   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
+//   d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
+
+//   if (d3d->prev_rtv != rtv) {
+//     d3d->prev_rtv = rtv;
+//     d3d->context->OMSetRenderTargets(1, &rtv, Null);
+//   }
+
+//   d3d->context->Draw(4, 0);
+
+//   ProfileFuncEnd();
+// }
+
+// struct D3D_Rect_hsv_gradient_data {
+//   F32 window_width;
+//   F32 window_height;
+
+//   F32 rect_origin_x; 
+//   F32 rect_origin_y; 
+
+//   F32 rect_width;
+//   F32 rect_height;
+  
+//   B32 is_horizontal_gradient;
+
+//   F32 _padding[1]; 
+// };
+
+// void r_draw_hsv_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, B32 is_horizontal_gradient)
+// {
+//   D3D_State* d3d = r_get_state();
+//   HRESULT hr = S_OK;
+
+//   // Setting the uniform buffer
+//   ID3D11Buffer* uniform_buffer = 0;
+//   {
+//     D3D_Rect_hsv_gradient_data u_data = {};
+//     u_data.window_width           = d3d->render_viewport_width;
+//     u_data.window_height          = d3d->render_viewport_height;
+//     u_data.rect_origin_x          = rect.x; 
+//     u_data.rect_origin_y          = rect.y; 
+//     u_data.rect_width             = rect.width;
+//     u_data.rect_height            = rect.height;
+//     u_data.is_horizontal_gradient = is_horizontal_gradient;
+
+//     D3D11_BUFFER_DESC desc = {};
+//     desc.ByteWidth      = sizeof(u_data);
+//     desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+//     desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+//     desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+//     d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+//     D3D11_MAPPED_SUBRESOURCE mapped = {};
+//     hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+//     if (hr == S_OK) {
+//       memcpy(mapped.pData, &u_data, sizeof(u_data));
+//       d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+//     } else {
+//       Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+//     }
+//   }
+
+//   // Vertex shader stage 
+//   d3d->context->VSSetShader(d3d->hsv_gradient_rect_program.v_shader, Null, Null);
+//   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+//   { 
+//     UINT n = 1;
+//     D3D11_VIEWPORT vp = {}; 
+//     d3d->context->RSGetViewports(&n, &vp);
+//     InvariantCheck(!IsMemZero(vp));
+//   }
+
+//   d3d->context->PSSetShader(d3d->hsv_gradient_rect_program.p_shader, Null, Null);
+//   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+//   d3d->context->Draw(4, 0);
+
+//   uniform_buffer->Release();
+// }
+
+// struct D3D_Rect_gradient_data {
+//   F32 window_width;
+//   F32 window_height;
+
+//   F32 rect_origin_x; 
+//   F32 rect_origin_y; 
+
+//   F32 rect_width;
+//   F32 rect_height;
+  
+//   F32 _padding[2]; 
+
+//   V4F32 top_color;
+// };
+
+// void r_draw_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 top_color)
+// {
+//   D3D_State* d3d = r_get_state();
+//   HRESULT hr = S_OK;
+
+//   // Setting the uniform buffer
+//   ID3D11Buffer* uniform_buffer = 0;
+//   {
+//     D3D_Rect_gradient_data u_data = {};
+//     u_data.window_width  = d3d->render_viewport_width;
+//     u_data.window_height = d3d->render_viewport_height;
+//     u_data.rect_origin_x = rect.x; 
+//     u_data.rect_origin_y = rect.y; 
+//     u_data.rect_width    = rect.width;
+//     u_data.rect_height   = rect.height;
+//     u_data.top_color     = top_color;
+
+//     D3D11_BUFFER_DESC desc = {};
+//     desc.ByteWidth      = sizeof(u_data);
+//     desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+//     desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+//     desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+//     d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
+    
+//     D3D11_MAPPED_SUBRESOURCE mapped = {};
+//     hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+//     if (hr == S_OK) {
+//       memcpy(mapped.pData, &u_data, sizeof(u_data));
+//       d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
+//     } else {
+//       Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
+//     }
+//   }
+
+//   // Vertex shader stage 
+//   d3d->context->VSSetShader(d3d->gradient_rect_program.v_shader, Null, Null);
+//   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
+
+//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+//   { 
+//     UINT n = 1;
+//     D3D11_VIEWPORT vp = {}; 
+//     d3d->context->RSGetViewports(&n, &vp);
+//     InvariantCheck(!IsMemZero(vp));
+//   }
+
+//   d3d->context->PSSetShader(d3d->gradient_rect_program.p_shader, Null, Null);
+//   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
+
+//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
+
+//   d3d->context->Draw(4, 0);
+
+//   uniform_buffer->Release();
+// }
+
+// void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this)
+// {
+//   D3D_State* d3d = r_get_state();
+//   HRESULT hr = S_OK;
+
+//   // Setting the uniform buffer
+//   {
+//     D3D_Circle_program_data u_data = {};
+//     u_data.origin_x      = center_x; 
+//     u_data.origin_y      = center_y; 
+//     u_data.radius        = radius;
+//     u_data.window_width  = d3d->render_viewport_width;
+//     u_data.window_height = d3d->render_viewport_height;
+//     u_data.color         = color; 
+
+//     D3D11_MAPPED_SUBRESOURCE mapped = {};
+//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+//     InvariantCheck(hr == S_OK);
+//     if (hr == S_OK) {
+//       memcpy(mapped.pData, &u_data, sizeof(u_data));
+//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+//     } 
+//   }
+
+//   // Vertex shader stage 
+//   d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
+//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
+
+//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
+//   { 
+//     UINT n = 1;
+//     D3D11_VIEWPORT vp = {}; 
+//     d3d->context->RSGetViewports(&n, &vp);
+//     InvariantCheck(!IsMemZero(vp));
+//   }
+
+//   d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
+//   d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
+
+//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
+  
+//   ID3D11BlendState* blend_state = 0;
+//   FLOAT blend_factor[4]         = {};
+//   UINT sample_mask              = {};
+//   if (turn_off_blend_for_this) {
+//     d3d->context->OMGetBlendState(&blend_state, blend_factor, &sample_mask);
+//     d3d->context->OMSetBlendState(0, 0, ~0U);
+//   }
+  
+//   d3d->context->Draw(4, 0);
+
+//   if (turn_off_blend_for_this)
+//   {
+//     d3d->context->OMSetBlendState(blend_state, blend_factor, sample_mask);
+//   }
+
+//   // todo: I shoud do this in each call to clear the non retained state per render
+//   //       pass to not have weird state bugs from draw call to draw call
+//   d3d->context->OMSetRenderTargets(0, 0, Null);
+// }
+
+// void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
+// {
+//   D3D_State* d3d = r_get_state();
+//   HRESULT hr = S_OK;
+
+//   // Setting the uniform buffer
+//   {
+//     D3D_Texture_program_data u_data = {};
+//     u_data.vp_width         = d3d->render_viewport_width;
+//     u_data.vp_height        = d3d->render_viewport_height;
+//     u_data.dest_rect_origin = v2f32(rect_in_dest.x, rect_in_dest.y);
+//     u_data.dest_rect_size   = v2f32(rect_in_dest.width, rect_in_dest.height);
+//     u_data.src_rect_origin  = v2f32(rect_in_src.x, rect_in_src.y);
+//     u_data.src_rect_size    = v2f32(rect_in_src.width, rect_in_src.height);
+//     u_data.src_texture_dims = r_get_texture_dims(src_rtv);
+
+//     D3D11_MAPPED_SUBRESOURCE mapped = {};
+//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+//     InvariantCheck(hr == S_OK);
+//     if (hr == S_OK) {
+//       memcpy(mapped.pData, &u_data, sizeof(u_data));
+//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
+//     } 
+//   }
+
+//   d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
+//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
+
+//   ID3D11SamplerState* sampler;
+//   {
+//     D3D11_SAMPLER_DESC desc = {};
+//     desc.Filter        = D3D11_FILTER_MIN_MAG_MIP_POINT;
+//     desc.AddressU      = D3D11_TEXTURE_ADDRESS_WRAP;
+//     desc.AddressV      = D3D11_TEXTURE_ADDRESS_WRAP;
+//     desc.AddressW      = D3D11_TEXTURE_ADDRESS_WRAP;
+//     desc.MipLODBias    = 0;
+//     desc.MaxAnisotropy = 1;
+//     desc.MinLOD        = 0;
+//     desc.MaxLOD        = D3D11_FLOAT32_MAX;
+//     d3d->device->CreateSamplerState(&desc, &sampler);
+//   }
+//   d3d->context->PSSetSamplers(0, 1, &sampler);
+//   d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
+//   {
+//     ID3D11Resource* resource = 0;
+//     src_rtv->GetResource(&resource);
+
+//     ID3D11ShaderResourceView* view = 0;
+//     d3d->device->CreateShaderResourceView(resource, NULL, &view);
+//     d3d->context->PSSetShaderResources(0, 1, &view);
+//     d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
+//     view->Release();
+//     resource->Release();
+//   }
+
+//   d3d->context->OMSetRenderTargets(1, &dest_rtv, 0);
+
+//   d3d->context->Draw(4, 0);
+
+//   sampler->Release();
+// }
+
+// #include "pencil/pencil.h"
+
+// void r_draw_text(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, Str8 text)
+// {
+//   ProfileFuncBegin();
+  
+//   F32 origin_y = pos.y + font.ascent;
+//   F32 x_offset = 0.0f;
+  
+//   // note: These are some debug drawings for baseline and stuff
+//   // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
+//   // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+//   // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
+
+//   for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
+//   {
+//     U8 ch = text.data[ch_index];
+//     FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+//     F32 origin_x = pos.x + x_offset;
+
+//     // Just puttin them 1 next to another
+//     Rect dest_rect = {};
+//     dest_rect.x      = origin_x + glyph_data.bearing_x;
+//     dest_rect.y      = origin_y - glyph_data.bearing_y;
+//     dest_rect.width  = glyph_data.rect_on_atlas.width;
+//     dest_rect.height = glyph_data.rect_on_atlas.height;
+    
+//     r_draw_texture(
+//       dest_rtv, dest_rect,
+//       font.atlas_texture, glyph_data.rect_on_atlas
+//     );
+
+//     F32 advance = glyph_data.advance;
+//     if (ch_index < text.count - 1)
+//     {
+//       FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
+//       if (!IsMemZero(entry)) { advance += entry.advance; }
+//     } 
+//     x_offset += advance; 
+//   }
+
+//   ProfileFuncEnd();
+// }
+
+// void r_draw_text_f(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, const char* fmt, ...)
+// {
+//   // todo: This only uses 128
+//   va_list argptr;
+//   va_start(argptr, fmt);
+//   Scratch scratch = get_scratch(0, 0);
+//   U64 buffer_count = 128;
+//   U8* buffer = ArenaPushArr(scratch.arena, U8, buffer_count);
+//   int err = vsnprintf((char*)buffer, buffer_count, fmt, argptr);
+//   if (err < 0) { Assert(0); }
+//   else if (err >= buffer_count) { Assert(0); }
+//   else if (err < buffer_count) { /* All good */ }
+//   va_end(argptr);
+//   Str8 str = str8_manuall(buffer, (U64)err);
+//   r_draw_text(dest_rtv, pos, font, color, str);
+//   end_scratch(&scratch);
+// }
 
 ///////////////////////////////////////////////////////////
 // - Other
 //
 ID3D11RenderTargetView* r_get_frame_buffer_rtv()
 {
-  D3D_State* d3d = r_get_state();
-  ID3D11RenderTargetView* frame_buffer_rtv = 0;
-  ID3D11Texture2D* backbuffer;
-  d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&backbuffer);
-  d3d->device->CreateRenderTargetView((ID3D11Resource*)backbuffer, NULL, &frame_buffer_rtv);
-  backbuffer->Release();
-  return frame_buffer_rtv;
+  return r_get_state()->frame_buffer_rtv;
 }
 
 ID3D11RenderTargetView* r_make_texture(U32 width, U32 height)
@@ -710,17 +787,24 @@ D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv)
   return result;
 }
 
-V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv)
+// V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv)
+// {
+//   D3D_Texture_result texture_res = r_texture_from_rtv(rtv);
+//   Handle(texture_res.succ);
+
+//   D3D11_TEXTURE2D_DESC desc = {};
+//   texture_res.texture->GetDesc(&desc);
+
+//   texture_res.texture->Release();
+//   V2F32 dims = v2f32((F32)desc.Width, (F32)desc.Height);
+//   return dims;
+// }
+
+V2F32 r_get_texture_dims(ID3D11Texture2D* texture)
 {
-  D3D_Texture_result texture_res = r_texture_from_rtv(rtv);
-  Handle(texture_res.succ);
-
   D3D11_TEXTURE2D_DESC desc = {};
-  texture_res.texture->GetDesc(&desc);
-
-  texture_res.texture->Release();
-  V2F32 dims = v2f32((F32)desc.Width, (F32)desc.Height);
-  return dims;
+  texture->GetDesc(&desc);
+  return v2f32((F32)desc.Width, (F32)desc.Height);
 }
 
 D3D_Program r_program_from_file(

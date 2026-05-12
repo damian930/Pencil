@@ -760,17 +760,17 @@ V4U8 change_alpha_u(V4U8 color, U8 new_a) { color.a = new_a; return color; }
 
 #define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.r/255.0f, (F32)uc.g/255.0f, (F32)uc.b/255.0f, (F32)uc.a/255.0f)
 
-V4F32 transparent_f()  { return _U_COLOR_TO_F_COLOR(transparent_u()); } 
-V4F32 black_f()        { return _U_COLOR_TO_F_COLOR(black_u());       } 
-V4F32 white_f()        { return _U_COLOR_TO_F_COLOR(white_u());       } 
-V4F32 red_f()          { return _U_COLOR_TO_F_COLOR(red_u());         }
-V4F32 green_f()        { return _U_COLOR_TO_F_COLOR(green_u());       }
-V4F32 blue_f()         { return _U_COLOR_TO_F_COLOR(blue_u());        }
-V4F32 yellow_f()       { return _U_COLOR_TO_F_COLOR(yellow_u());      } 
-V4F32 pink_f()         { return _U_COLOR_TO_F_COLOR(pink_u());        }  
-V4F32 teal_f()         { return _U_COLOR_TO_F_COLOR(teal_u());        }  
-V4F32 orange_f()       { return _U_COLOR_TO_F_COLOR(orange_u());      }  
-V4F32 change_alpha_f(V4F32 color, F32 new_a) { color.a = new_a; return color; }
+V4F32 transparent()  { return _U_COLOR_TO_F_COLOR(transparent_u()); } 
+V4F32 black()        { return _U_COLOR_TO_F_COLOR(black_u());       } 
+V4F32 white()        { return _U_COLOR_TO_F_COLOR(white_u());       } 
+V4F32 red()          { return _U_COLOR_TO_F_COLOR(red_u());         }
+V4F32 green()        { return _U_COLOR_TO_F_COLOR(green_u());       }
+V4F32 blue()         { return _U_COLOR_TO_F_COLOR(blue_u());        }
+V4F32 yellow()       { return _U_COLOR_TO_F_COLOR(yellow_u());      } 
+V4F32 pink()         { return _U_COLOR_TO_F_COLOR(pink_u());        }  
+V4F32 teal()         { return _U_COLOR_TO_F_COLOR(teal_u());        }  
+V4F32 orange()       { return _U_COLOR_TO_F_COLOR(orange_u());      }  
+V4F32 change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
 F32 f32_round(F32 f) { return roundf(f); }
 F32 f32_floor(F32 f) { return floorf(f); }
