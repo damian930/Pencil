@@ -105,6 +105,9 @@ struct D3D_State {
   //
   ID3D11Texture2D*        frame_buffer_texture;
   ID3D11RenderTargetView* frame_buffer_rtv;
+  //
+  ID3D11Buffer* rect_srv_buffer;
+  ID3D11ShaderResourceView* rect_srv;
 
   // todo: What is this for dude ???
   // Other
@@ -147,8 +150,7 @@ void r_render_end();
 void r_clear_frame_buffer(V4F32 color);
 void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color);
 //
-void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color);
-void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
+void r_draw_rect_pro(Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color);
 void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this);
 void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src);
 

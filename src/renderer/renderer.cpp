@@ -181,6 +181,28 @@ void r_init()
     d3d->device->CreateBlendState(&desc, &d3d->alpha_blend_state);
   }
 
+  // Buffer for data
+  {
+    #define MAX_RECTS 1024
+    UINT byte_width = 1024 * sizeof(D3D_Rect_program_data);
+
+    D3D11_BUFFER_DESC desc   = {};
+    desc.ByteWidth           = byte_width;
+    desc.Usage               = D3D11_USAGE_DYNAMIC;
+    desc.BindFlags           = D3D11_BIND_SHADER_RESOURCE;
+    desc.CPUAccessFlags      = D3D11_CPU_ACCESS_WRITE;
+    desc.MiscFlags           = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
+    desc.StructureByteStride = sizeof(D3D_Rect_program_data);
+    d3d->device->CreateBuffer(&desc, Null, &d3d->rect_srv_buffer);
+  
+    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
+    srv_desc.Format              = DXGI_FORMAT_UNKNOWN;
+    srv_desc.ViewDimension       = D3D11_SRV_DIMENSION_BUFFER;
+    srv_desc.Buffer.FirstElement = 0;
+    srv_desc.Buffer.NumElements  = MAX_RECTS;
+    d3d->device->CreateShaderResourceView(d3d->rect_srv_buffer, &srv_desc, &d3d->rect_srv);
+  }
+
   // Frame buffer
   {
     d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
@@ -268,14 +290,16 @@ struct Rect_list {
 
 static Arena* arena_for_rects = 0;
 static Rect_list rect_list    = {};
-
-void r_draw_rect(Rect rect, V4F32 color)
+ 
+void r_draw_rect_pro(Rect rect, V4F32 color, F32 border, V4F32 border_color)
 {
-  if (!arena_for_rects) { arena_for_rects = arena_alloc(Megabytes(64)); }
+  if (!arena_for_rects) { arena_for_rects = arena_alloc(Gigabytes(1)); }
 
   Rect_node* node  = ArenaPush(arena_for_rects, Rect_node);
-  node->rect       = rect;
-  node->rect_color =  color;
+  node->rect                  = rect;
+  node->rect_color            = color;
+  node->border_line_thickness = border;
+  node->border_color          = border_color;
   QueuePushBack(&rect_list, node);
   rect_list.count += 1;
 }

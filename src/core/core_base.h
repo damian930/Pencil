@@ -151,6 +151,10 @@ typedef double F64;
 #define Gigabytes(n) 1024 * Megabytes(n)
 #define Terabytes(n) 1024 * Terabytes(n)
 
+#define Thousands(n) 1000ULL * (U64)(n)
+#define Millions(n)  1000ULL * Thousands(n)
+#define Billions(n)  1000ULL * Millions(n)
+
 #define ToggleBool(b) (!(b))
 #define XOR(a, b) ( ((a) && !(b)) || (!(a) && (b)) )
 #define NAND(a, b) ( !!(a) != 1 || !!(b) != 1)       // Nand == Not and
@@ -778,7 +782,6 @@ F32 f32_floor(F32 f) { return floorf(f); }
 V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
 V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
 
-
 V3F32 hsv_from_rgb(V3F32 rgb)
 {
 	V3F32 hsv = {};
@@ -862,6 +865,7 @@ V3F32 rgb_from_hsv(V3F32 hsv)
   V3F32 rgb = v3f32(r + m, g + m, b + m);
   return rgb;
 }
+
 
 
 #endif

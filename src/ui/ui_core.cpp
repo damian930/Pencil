@@ -193,8 +193,6 @@ void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_
   ctx->current_parent_box = &_ui_g_zero_box;
   arena_clear(ctx->style_stacks_arena);
 
-  ctx->draw_rtv = 0;
-
   // Creating the new build state
   ctx->build_generation += 1;
   Arena* arena = ui_get_build_arena();

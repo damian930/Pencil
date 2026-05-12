@@ -212,9 +212,6 @@ struct UI_Context {
 
   // Speciall stacks
   // UI_ID_stack id_stack;
-
-  // note, todo: This is only valid when drawing the ui
-  ID3D11RenderTargetView* draw_rtv;
 };
 
 // - Context variables

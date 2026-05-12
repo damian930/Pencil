@@ -30,10 +30,10 @@ abstract.
 #include "font_provider/font_provider.cpp"
 
 #include "ui/ui_core.h"
-// #include "ui/ui_core.cpp"
+#include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
 // #include "pencil/pencil.cpp"
@@ -43,36 +43,34 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-/*
 void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 {
   #if DEBUG_MODE
   // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
   #endif
   
-  ID3D11RenderTargetView* rtv = ui_get_context()->draw_rtv;
-
-  // todo: This loop here is dumb
-  if (root->custom_draw_func != 0) { root->custom_draw_func(root); }
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
-    ui_draw_box(child, parent_scissor_rect);
-  }
+  // // todo: This loop here is dumb
+  // if (root->custom_draw_func != 0) { root->custom_draw_func(root); }
+  // for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  // {
+  //   ui_draw_box(child, parent_scissor_rect);
+  // }
 
   Rect rect = root->final_on_screen_rect;
 
   if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
   {
-    r_draw_rect_pro(rtv, rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
+    r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
   }
 
-  if (root->flags & UI_Box_flag__has_text_contents)
-  {
-    // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
-  }
+  // if (root->flags & UI_Box_flag__has_text_contents)
+  // {
+  //   // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
+  // }
 
   // Have to scissor ______ (THATS WHAT SHE SAID !!!)
   Rect scissor_rect = parent_scissor_rect;
+  /*
   if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
     RangeF2V32 default_scissor_box = {};
@@ -140,12 +138,14 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
     r_scissoring_set(scissor_rect);
   }
+  */
 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
     ui_draw_box(child, scissor_rect);
   }
 
+  /*
   // No longer scissoring
   if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
@@ -153,16 +153,15 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       r_scissoring_set(parent_scissor_rect); 
     }
   }
+  */
 
 }
 
-void ui_draw(ID3D11RenderTargetView* rtv)
+void ui_draw()
 {
   UI_Context* ctx = ui_get_context();
-  ctx->draw_rtv = rtv;
   ui_draw_box(ctx->root_box, Rect{});
 }
-*/
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
@@ -171,7 +170,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   os_init();
   r_init();
   fp_init();
-  // ui_init();
+  ui_init();
 
   // todo: Try to read a file that is longer than 4 gigs
   // todo: Try to write a file that is longer than 4 gigs
@@ -344,11 +343,30 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   for (;!os_window_should_close();)
   {
+    ProfileFuncBegin();
     os_frame_begin();
+
+    // UI
+    // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+    // {
+    //   ui_set_next_size_x(ui_px(50));
+    //   ui_set_next_size_y(ui_px(50));
+    //   ui_set_next_b_color(blue());
+    //   ui_set_next_border(3, red());
+    //   UI_Box* box = ui_box_make({}, {});
+    // }
+    // ui_end_build();
+
+    // Render
     r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
     {
       r_clear_frame_buffer(black());
-      r_draw_rect(rect_make(50, 50, 150, 300), orange());
+      // ui_draw();
+      for EachIndex(i, Thousands(10))
+      {
+        r_draw_rect_pro(rect_make(50, 50, 50, 50), { 1, 1, 1, 0.25f }, 0, {});
+      }
+      // r_draw_rect_pro(rect_make(50, 50, 150, 300), orange(), 2, blue);
     }
     r_submit();
     r_render_end();
@@ -359,6 +377,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_get_state()->swap_chain->Present(!!vsync, 0);
     HRESULT commit_hr = comp_device->Commit(); 
     Handle(commit_hr == S_OK);
+    ProfileFuncEnd();
   }
 
   F64 prev_frame_duration_sec = 0.0;
