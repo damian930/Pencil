@@ -775,7 +775,11 @@ V4F32 change_alpha_f(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 F32 f32_round(F32 f) { return roundf(f); }
 F32 f32_floor(F32 f) { return floorf(f); }
 
-V3F32 hsv_from_rgb(V4F32 rgb)
+V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
+V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
+
+
+V3F32 hsv_from_rgb(V3F32 rgb)
 {
 	V3F32 hsv = {};
 

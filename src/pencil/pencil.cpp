@@ -311,7 +311,7 @@ void ui_color_picker_draw_func(UI_Box* picker_box)
 {
   UI_Color_picker_draw_data* data = (UI_Color_picker_draw_data*)picker_box->custom_draw_data;
 
-  V3F32 hsv = hsv_from_rgb(data->top_color);
+  V3F32 hsv = hsv_from_rgb(rgb_from_rgba(data->top_color));
   V3F32 pure_hsv = hsv;
   pure_hsv.saturation = 1.0f;
   pure_hsv.value = 1.0f;
@@ -324,13 +324,13 @@ void ui_color_picker_draw_func(UI_Box* picker_box)
 }
 
 // todo: Remove this here
-V4F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 in_top_color, V4F32 old_color)
+V3F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V3F32 in_top_color, V3F32 old_color)
 {
-  V4F32 new_color = old_color;
+  V3F32 new_color = old_color;
 
   Arena* arena = ui_get_build_arena();
   UI_Color_picker_draw_data* data = ArenaPush(arena, UI_Color_picker_draw_data);
-  data->top_color = in_top_color;
+  data->top_color = rgba_from_rgb(in_top_color, 1.0f);
 
   ui_set_next_size_x(size_x);
   ui_set_next_size_y(size_y);
@@ -364,8 +364,8 @@ V4F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 in_top_colo
   V3F32 pure_rgb = rgb_from_hsv(pure_hsv);
   V4F32 pure_rgb4 = v4f32(pure_rgb.r, pure_rgb.g, pure_rgb.b, 1.0f);
     
-  V4F32 top_color = v4f32(lerp_f32(1.0f, pure_rgb4.r, norm_rel_x), lerp_f32(1.0f, pure_rgb4.g, norm_rel_x), lerp_f32(1.0f, pure_rgb4.b, norm_rel_x), 1.0f);
-  new_color = v4f32(lerp_f32(top_color.r, 0.0f, norm_rel_y), lerp_f32(top_color.g, 0.0f, norm_rel_y), lerp_f32(top_color.b, 0.0f, norm_rel_y), 1.0f); 
+  V3F32 top_color = v3f32(lerp_f32(1.0f, pure_rgb4.r, norm_rel_x), lerp_f32(1.0f, pure_rgb4.g, norm_rel_x), lerp_f32(1.0f, pure_rgb4.b, norm_rel_x));
+  new_color = v3f32(lerp_f32(top_color.r, 0.0f, norm_rel_y), lerp_f32(top_color.g, 0.0f, norm_rel_y), lerp_f32(top_color.b, 0.0f, norm_rel_y)); 
   
   UI_Parent(color_picker_box)
   {
@@ -535,24 +535,32 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
       UI_Row()
       {
-        static V4F32 final_color = orange_f();
-
-        V3F32 final_color_as_hsv = hsv_from_rgb(final_color);
+        static V3F32 final_color_as_hsv = hsv_from_rgb(v3f32(0, 0, 1));
 
         F32 new_hue = pencil_ui_hsv_slider(Str8FromC("hsv slider id"), ui_px(150), ui_px(350), final_color_as_hsv.hue);
-        V3F32 new_rgb = rgb_from_hsv(v3f32(new_hue, final_color_as_hsv.saturation, final_color_as_hsv.value));
-        final_color.r = new_rgb.r;
-        final_color.g = new_rgb.g;
-        final_color.b = new_rgb.b;
+        final_color_as_hsv.hue = new_hue;
 
         ui_spacer(ui_px(25));
 
-        V4F32 new_final_color = ui_color_picker(Str8FromC("Color picker id"), ui_px(150), ui_px(150), final_color, final_color);
-        
-        ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-        r_clear_rtv(frame_buffer, new_final_color);
-        frame_buffer->Release();
-        
+        V3F32 rgb = rgb_from_hsv(final_color_as_hsv);
+        V3F32 top_color = rgb_from_hsv(v3f32(final_color_as_hsv.hue, 1.0f, 1.0f));
+        V3F32 new_rgb = ui_color_picker(Str8FromC("Color picker id"), ui_px(150), ui_px(150), top_color, rgb);
+        final_color_as_hsv = hsv_from_rgb(new_rgb);
+
+        // ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
+        // r_clear_rtv(frame_buffer, new_final_color);
+        // frame_buffer->Release();
+
+        ui_spacer(ui_px(25));
+
+        UI_Col()
+        {
+          ui_label_f("hue: %f", new_hue);
+          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).r);//(U32)(final_color.r * 255.0f));
+          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).g);//(U32)(final_color.g * 255.0f));
+          ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).b);//(U32)(final_color.b * 255.0f));
+        }
+
         // final_color.r = new_final_color.r;
         // final_color.g = new_final_color.g;
         // final_color.b = new_final_color.b;

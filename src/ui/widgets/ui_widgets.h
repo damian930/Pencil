@@ -10,7 +10,7 @@
 // - Simple widgets
 // void ui_label_c(const char* c_str);
 // void ui_label(Str8 str);
-void ui_label_fmt(const char* fmt, ...);
+void ui_label_f(const char* fmt, ...);
 // void ui_spacer(UI_Size size);
 // UI_Actions ui_button(Str8 str, RLI_Event_list* rli_events); // todo: Remove the fucking rli events from there dude
 
@@ -112,7 +112,7 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     {
       // ui_set_next_text_color(slider_style->text_color);
       // ui_set_next_font_size(slider_style->font_size);
-      ui_label_fmt(slider_style->fmt_str, current_value);
+      ui_label_f(slider_style->fmt_str, current_value);
     }
   }
 

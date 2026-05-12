@@ -19,7 +19,7 @@ void ui_label(Str8 str)
   UI_Box* box = ui_box_make(str, UI_Box_flag__has_text_contents);
 }
 
-void ui_label_fmt(const char* fmt, ...)
+void ui_label_f(const char* fmt, ...)
 {
   va_list argptr;
   va_start(argptr, fmt);
