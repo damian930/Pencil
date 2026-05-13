@@ -36,6 +36,25 @@ D3D_State* r_get_state()
   return &__d3d_g_state;
 }
 
+const global 
+D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] = 
+{
+  { "RECT_COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_X", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_Y", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_WIDTH",    0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_HEIGHT",   0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, height),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
+
+D3D11_INPUT_ELEMENT_DESC texture_program_input_assembler_element_desc[] = 
+{
+  { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
+
 void r_init()
 {
   D3D_State* d3d = r_get_state();
@@ -117,45 +136,6 @@ void r_init()
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
 
-  // todo: Redo this here
-  // Uniform buffer
-  {
-    ID3D11Buffer* uniform_buffer = 0;
-    
-    D3D11_BUFFER_DESC desc = {};
-    desc.ByteWidth      = 256;
-    desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-    desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-    desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    hr = d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    HR(hr);
-
-    d3d->uniform_buffer = uniform_buffer;
-  }
-
-  // Rect program
-  {
-    B32 rect_program_suc = true;
-    d3d->draw_rect_program = r_program_from_file(L"../data/shaders/draw_rect_program_shader.hlsl", "vs_main", "ps_main", &rect_program_suc);
-    Handle(rect_program_suc);
-  
-    // B32 circle_program_succ = true;
-    // d3d->draw_circle_program = r_program_from_file(L"../data/shaders/draw_circle_program_shader.hlsl", "vs_main", "ps_main", &circle_program_succ);
-    // Handle(circle_program_succ);
-
-    // B32 texture_program_succ = true;
-    // d3d->draw_texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", &texture_program_succ);
-    // Handle(texture_program_succ);
-
-    // B32 gradient_program_succ = true;
-    // d3d->gradient_rect_program = r_program_from_file(L"../data/shaders/gradient_program_shader.hlsl", "vs_main", "ps_main", &gradient_program_succ);
-    // Handle(gradient_program_succ);
-
-    // B32 hsv_gradient_rect_program_succ = true;
-    // d3d->hsv_gradient_rect_program = r_program_from_file(L"../data/shaders/hsv_gradient_rect_program_shader.hlsl", "vs_main", "ps_main", &hsv_gradient_rect_program_succ);
-    // Handle(hsv_gradient_rect_program_succ);
-  }
-
   // Rasterizer state
   {
     // No culling, this makes all the triangles appear, not only the once that follow a specific clock direction (meaning clock-wise or counter clock-wise)
@@ -181,26 +161,18 @@ void r_init()
     d3d->device->CreateBlendState(&desc, &d3d->alpha_blend_state);
   }
 
-  // Buffer for data
+  // Sampler
   {
-    #define MAX_RECTS 1024
-    UINT byte_width = 1024 * sizeof(D3D_Rect_program_data);
-
-    D3D11_BUFFER_DESC desc   = {};
-    desc.ByteWidth           = byte_width;
-    desc.Usage               = D3D11_USAGE_DYNAMIC;
-    desc.BindFlags           = D3D11_BIND_SHADER_RESOURCE;
-    desc.CPUAccessFlags      = D3D11_CPU_ACCESS_WRITE;
-    desc.MiscFlags           = D3D11_RESOURCE_MISC_BUFFER_STRUCTURED;
-    desc.StructureByteStride = sizeof(D3D_Rect_program_data);
-    d3d->device->CreateBuffer(&desc, Null, &d3d->rect_srv_buffer);
-  
-    D3D11_SHADER_RESOURCE_VIEW_DESC srv_desc = {};
-    srv_desc.Format              = DXGI_FORMAT_UNKNOWN;
-    srv_desc.ViewDimension       = D3D11_SRV_DIMENSION_BUFFER;
-    srv_desc.Buffer.FirstElement = 0;
-    srv_desc.Buffer.NumElements  = MAX_RECTS;
-    d3d->device->CreateShaderResourceView(d3d->rect_srv_buffer, &srv_desc, &d3d->rect_srv);
+    D3D11_SAMPLER_DESC desc = {};
+    desc.Filter        = D3D11_FILTER_MIN_MAG_MIP_POINT;
+    desc.AddressU      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.AddressV      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.AddressW      = D3D11_TEXTURE_ADDRESS_WRAP;
+    desc.MipLODBias    = 0;
+    desc.MaxAnisotropy = 1;
+    desc.MinLOD        = 0;
+    desc.MaxLOD        = D3D11_FLOAT32_MAX;
+    d3d->device->CreateSamplerState(&desc, &d3d->sampler);
   }
 
   // Frame buffer
@@ -209,11 +181,58 @@ void r_init()
     d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
   }
 
-  // Allocating mem for debug info for the layer
-  // d3d->debug_arena          = arena_alloc(Megabytes(64));
-  // d3d->error_messages_arr   = ArenaCurrentAddressP(d3d->debug_arena, Str8);
-  // d3d->error_messages_count = 0;
-  
+  // Rect program
+  {
+    // Creating a buffer for input assembler data transfer
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = Megabytes(8); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->rect_program_ia_buffer);
+    }
+    
+    // Uniform buffer for rect program
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = sizeof(D3D_Rect_unifrom_data); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->rect_program_uniform_buffer); 
+    }
+
+    // Loading programs
+    d3d->rect_program = r_program_from_file(L"../data/shaders/test_rect_shader.hlsl", "vs_main", "ps_main", rect_program_input_assembler_element_desc, ArrayCount(rect_program_input_assembler_element_desc));
+  }
+
+  // Texture program
+  {
+    // Creating a buffer for input assembler data transfer
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = Megabytes(8); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->texture_program_ia_buffer);
+    }
+    
+    // Uniform buffer for rect program
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = sizeof(D3D_Rect_unifrom_data); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->texture_program_uniform_buffer); 
+    }
+
+    // Loading programs
+    d3d->texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", texture_program_input_assembler_element_desc, ArrayCount(texture_program_input_assembler_element_desc));
+  }
+
   #undef HR // todo: Remove this HR shit from here
 }
 
@@ -234,12 +253,12 @@ void r_relesase()
 // #define __R_PUSH_ERROR_AND_DEBUG(c_lit) do { __r_push_error_message(Str8FromC(c_lit)); BreakPoint(); } while (0); 
 ///////////////////////////////////////////////////////////
 
-void r_render_begin(F32 viewport_width, F32 viewport_height)
+void r_render_begin(V2F32 vp_dims)
 {
   D3D_State* d3d = r_get_state();
 
   // Resizing the frame buffer
-  if (viewport_width != 0.0f && viewport_height != 0.0f)
+  if (vp_dims.x != 0.0f && vp_dims.y != 0.0f)
   {
     V2F32 window_dims = os_get_client_area_dims();
     d3d->frame_buffer_texture->Release();
@@ -273,361 +292,189 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
 ///////////////////////////////////////////////////////////
 // - New drawing
 //
-struct Rect_node {
-  Rect rect;
-  V4F32 rect_color;
-  F32 border_line_thickness; 
-  V4F32 border_color;
-  
-  Rect_node* next;
-};
-
-struct Rect_list {
-  Rect_node* first;
-  Rect_node* last;
-  U64 count;
-};
-
-static Arena* arena_for_rects = 0;
-static Rect_list rect_list    = {};
- 
-void r_draw_rect_pro(Rect rect, V4F32 color, F32 border, V4F32 border_color)
+/*
+void r_draw_text(Str8 text, V2F32 pos, FP_Font font, V4F32 color)
 {
-  if (!arena_for_rects) { arena_for_rects = arena_alloc(Gigabytes(1)); }
+  // note: These are some debug drawings for baseline and stuff
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
+  
+  F32 origin_y = pos.y + font.ascent;
+  F32 x_offset = 0.0f;
 
-  Rect_node* node  = ArenaPush(arena_for_rects, Rect_node);
-  node->rect                  = rect;
-  node->rect_color            = color;
-  node->border_line_thickness = border;
-  node->border_color          = border_color;
-  QueuePushBack(&rect_list, node);
-  rect_list.count += 1;
+  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
+  {
+    U8 ch = text.data[ch_index];
+    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+    F32 origin_x = pos.x + x_offset;
+
+    // Just puttin them 1 next to another
+    Rect dest_rect = {};
+    dest_rect.x      = origin_x + glyph_data.bearing_x;
+    dest_rect.y      = origin_y - glyph_data.bearing_y;
+    dest_rect.width  = glyph_data.rect_on_atlas.width;
+    dest_rect.height = glyph_data.rect_on_atlas.height;
+    
+    r_draw_texture(
+      dest_rtv, dest_rect,
+      font.atlas_texture, glyph_data.rect_on_atlas
+    );
+
+    F32 advance = glyph_data.advance;
+    if (ch_index < text.count - 1)
+    {
+      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
+      if (!IsMemZero(entry)) { advance += entry.advance; }
+    } 
+    x_offset += advance; 
+  }
 }
-
+*/
 // todo: This call gets all the batches and then submits them to be drawn by the gpu to the rendering target
-void r_submit()
+void r_submit(D_Command_batch_list* command_batch_list)
 {
   D3D_State* d3d = r_get_state();
   V2F32 rtv_dims = r_get_texture_dims(d3d->frame_buffer_texture);
 
-  d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
-
-  // Viewport 
+  // Setting state that is the same for all batches
   {
-    D3D11_VIEWPORT vp = {};
-    vp.TopLeftX = 0.0f;
-    vp.TopLeftY = 0.0f;
-    vp.Width    = rtv_dims.x;
-    vp.Height   = rtv_dims.y;
-    vp.MinDepth = 0.0f;
-    vp.MaxDepth = 1.0f;
-    d3d->context->RSSetViewports(1, &vp);
-  }
+    d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-  // Rasterizer
-  d3d->context->RSSetState(d3d->rasterizer_state);
-  
-  // Vertex shader
-  d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
-  d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); 
-  
-  // Pixel shader
-  d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
-  d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-  
-  // Render target
-  d3d->context->OMSetRenderTargets(1, &d3d->frame_buffer_rtv, Null);
-  d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U);
+    // Rasterizer
+    d3d->context->RSSetState(d3d->rasterizer_state);
 
-  for (Rect_node* rect_node = rect_list.first; rect_node != 0; rect_node = rect_node->next)
-  {
-    // Setting the uniform buffer
+    // Viewport 
     {
-      D3D_Rect_program_data u_data = {};
-      u_data.window_width       = rtv_dims.x;
-      u_data.window_height      = rtv_dims.y;
-      u_data.rect_origin_x      = rect_node->rect.x;
-      u_data.rect_origin_y      = rect_node->rect.y;
-      u_data.rect_width         = rect_node->rect.width;
-      u_data.rect_height        = rect_node->rect.height;
-      u_data.u_border_thickness = rect_node->border_line_thickness;
-      u_data.rect_color         = rect_node->rect_color;
-      u_data.border_color       = rect_node->border_color;
-      
-      D3D11_MAPPED_SUBRESOURCE mapped = {};
-      HRESULT hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-      
-      InvariantCheck(hr == S_OK);
-      if (hr == S_OK) {
-        memcpy(mapped.pData, &u_data, sizeof(u_data));
-        d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-      } 
+      D3D11_VIEWPORT vp = {};
+      vp.TopLeftX = 0.0f;
+      vp.TopLeftY = 0.0f;
+      vp.Width    = rtv_dims.x;
+      vp.Height   = rtv_dims.y;
+      vp.MinDepth = 0.0f;
+      vp.MaxDepth = 1.0f;
+      d3d->context->RSSetViewports(1, &vp);
     }
 
-    d3d->context->Draw(4, 0);
+    d3d->context->OMSetRenderTargets(1, &d3d->frame_buffer_rtv, Null);
+    d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U);
   }
 
-  rect_list = {};
-  if (arena_for_rects) { arena_clear(arena_for_rects); }
+  // Working with batches
+  for (D_Command_batch* batch = command_batch_list->first; batch; batch = batch->next_batch)
+  {
+    if (batch->command_type == D_Command_type__Rect)
+    {
+      d3d->context->IASetInputLayout(d3d->rect_program.input_layout);
+
+      // Filling up the uniform buffer with data 
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        d3d->context->Map((ID3D11Resource*)d3d->rect_program_uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        D3D_Rect_unifrom_data uniform_data = {};
+        uniform_data.u_window_width  = rtv_dims.x;
+        uniform_data.u_window_height = rtv_dims.y;
+        memcpy(mapped.pData, &uniform_data, sizeof(uniform_data));
+        d3d->context->Unmap((ID3D11Resource*)d3d->rect_program_uniform_buffer, 0);
+      }
+      
+      // Vertex shader
+      d3d->context->VSSetShader(d3d->rect_program.v_shader, Null, Null);
+      d3d->context->VSSetConstantBuffers(0, 1, &d3d->rect_program_uniform_buffer);  
+      
+      // Pixel shader
+      d3d->context->PSSetShader(d3d->rect_program.p_shader, Null, Null);
+      d3d->context->PSSetConstantBuffers(0, 1, &d3d->rect_program_uniform_buffer);
+
+      // Filling up the ia buffer with data
+      { 
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        d3d->context->Map((ID3D11Resource*)d3d->rect_program_ia_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        
+        U64 i = 0;
+        for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
+        {
+          D3D_Rect_instance_data instance_data = {};
+          instance_data.origin_x = node->command.u.rect_c.rect.x; 
+          instance_data.origin_y = node->command.u.rect_c.rect.y; 
+          instance_data.width    = node->command.u.rect_c.rect.width;
+          instance_data.height   = node->command.u.rect_c.rect.height;
+          instance_data.color    = node->command.u.rect_c.color;
+          memcpy((D3D_Rect_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
+        }
+        d3d->context->Unmap((ID3D11Resource*)d3d->rect_program_ia_buffer, 0);
+      }
+
+      UINT stride = sizeof(D3D_Rect_instance_data);
+      UINT offset = 0;
+      d3d->context->IASetVertexBuffers(0, 1, &d3d->rect_program_ia_buffer, &stride, &offset);
+    }
+    else if (batch->command_type == D_Command_type__Texture)
+    {
+      d3d->context->IASetInputLayout(d3d->texture_program.input_layout);
+
+      // Filling up the uniform buffer with data 
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        d3d->context->Map((ID3D11Resource*)d3d->texture_program_uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        D3D_Texture_uniform_data uniform_data = {};
+        uniform_data.u_window_width  = rtv_dims.x;
+        uniform_data.u_window_height = rtv_dims.y;
+        memcpy(mapped.pData, &uniform_data, sizeof(uniform_data));
+        d3d->context->Unmap((ID3D11Resource*)d3d->texture_program_uniform_buffer, 0);
+      }
+
+      d3d->context->PSSetSamplers(0, 1, &d3d->sampler);
+      
+      // Vertex shader
+      d3d->context->VSSetShader(d3d->texture_program.v_shader, Null, Null);
+      d3d->context->VSSetConstantBuffers(0, 1, &d3d->texture_program_uniform_buffer);  
+      
+      // Pixel shader
+      d3d->context->PSSetShader(d3d->texture_program.p_shader, Null, Null);
+      d3d->context->PSSetConstantBuffers(0, 1, &d3d->texture_program_uniform_buffer);
+      
+      {
+        ID3D11ShaderResourceView* texture_view = 0;
+        d3d->device->CreateShaderResourceView((ID3D11Resource*)batch->texture, NULL, &texture_view);
+        d3d->context->PSSetShaderResources(0, 1, &texture_view);
+        texture_view->Release();
+      }
+
+      // Filling up the ia buffer with data
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        d3d->context->Map((ID3D11Resource*)d3d->texture_program_ia_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        
+        U64 i = 0;
+        for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
+        {
+          D3D_Texture_instance_data instance_data = {};
+          instance_data.dest_rect_origin = rect_origin(node->command.u.texture_c.dest_rect);
+          instance_data.dest_rect_size   = rect_dims(node->command.u.texture_c.dest_rect);
+          instance_data.src_rect_origin  = rect_origin(node->command.u.texture_c.src_rect);
+          instance_data.src_rect_size    = rect_dims(node->command.u.texture_c.src_rect);
+          instance_data.src_texture_dims = r_get_texture_dims(batch->texture);
+          memcpy((D3D_Texture_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
+        }
+        d3d->context->Unmap((ID3D11Resource*)d3d->texture_program_ia_buffer, 0);
+      }
+
+      UINT stride = sizeof(D3D_Texture_instance_data);
+      UINT offset = 0;
+      d3d->context->IASetVertexBuffers(0, 1, &d3d->texture_program_ia_buffer, &stride, &offset);
+    }
+    else { InvalidCodePath(); }
+  
+    d3d->context->DrawInstanced(4, (UINT)batch->count, 0, 0);
+  }
+
 }
 
 ///////////////////////////////////////////////////////////
-// - OLD Drawing
+// - Old drawing code
 //
-// void r_draw_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 color)
-// {
-//   r_draw_rect_pro(rtv, rect, color, 0.0f, V4F32{});
-// }
-
-// void r_draw_rect_pro(ID3D11RenderTargetView* rtv, Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F32 border_color)
-// {
-//   ProfileFuncBegin();
-
-//   D3D_State* d3d = r_get_state();
-//   HRESULT hr = S_OK;
-  
-//   // Setting the uniform buffer
-//   {
-//     D3D_Rect_program_data u_data = {};
-//     u_data.window_width       = d3d->render_viewport_width;
-//     u_data.window_height      = d3d->render_viewport_height;
-//     u_data.rect_origin_x      = rect.x;
-//     u_data.rect_origin_y      = rect.y;
-//     u_data.rect_width         = rect.width;
-//     u_data.rect_height        = rect.height;
-//     u_data.u_border_thickness = border_line_thickness;
-//     u_data.rect_color         = rect_color;
-//     u_data.border_color       = border_color;
-    
-//     D3D11_MAPPED_SUBRESOURCE mapped = {};
-//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-    
-//     InvariantCheck(hr == S_OK);
-//     if (hr == S_OK) {
-//       memcpy(mapped.pData, &u_data, sizeof(u_data));
-//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-//     } 
-//   }
-
-//   // Vertex shader stage 
-//   d3d->context->VSSetShader(d3d->draw_rect_program.v_shader, Null, Null);
-//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer); // todo: Do i have to change this, or is map and unmap fine here
-
-//   d3d->context->PSSetShader(d3d->draw_rect_program.p_shader, Null, Null);
-//   d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-//   if (d3d->prev_rtv != rtv) {
-//     d3d->prev_rtv = rtv;
-//     d3d->context->OMSetRenderTargets(1, &rtv, Null);
-//   }
-
-//   d3d->context->Draw(4, 0);
-
-//   ProfileFuncEnd();
-// }
-
-// struct D3D_Rect_hsv_gradient_data {
-//   F32 window_width;
-//   F32 window_height;
-
-//   F32 rect_origin_x; 
-//   F32 rect_origin_y; 
-
-//   F32 rect_width;
-//   F32 rect_height;
-  
-//   B32 is_horizontal_gradient;
-
-//   F32 _padding[1]; 
-// };
-
-// void r_draw_hsv_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, B32 is_horizontal_gradient)
-// {
-//   D3D_State* d3d = r_get_state();
-//   HRESULT hr = S_OK;
-
-//   // Setting the uniform buffer
-//   ID3D11Buffer* uniform_buffer = 0;
-//   {
-//     D3D_Rect_hsv_gradient_data u_data = {};
-//     u_data.window_width           = d3d->render_viewport_width;
-//     u_data.window_height          = d3d->render_viewport_height;
-//     u_data.rect_origin_x          = rect.x; 
-//     u_data.rect_origin_y          = rect.y; 
-//     u_data.rect_width             = rect.width;
-//     u_data.rect_height            = rect.height;
-//     u_data.is_horizontal_gradient = is_horizontal_gradient;
-
-//     D3D11_BUFFER_DESC desc = {};
-//     desc.ByteWidth      = sizeof(u_data);
-//     desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-//     desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-//     desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-//     d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-//     D3D11_MAPPED_SUBRESOURCE mapped = {};
-//     hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-//     if (hr == S_OK) {
-//       memcpy(mapped.pData, &u_data, sizeof(u_data));
-//       d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-//     } else {
-//       Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-//     }
-//   }
-
-//   // Vertex shader stage 
-//   d3d->context->VSSetShader(d3d->hsv_gradient_rect_program.v_shader, Null, Null);
-//   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-//   { 
-//     UINT n = 1;
-//     D3D11_VIEWPORT vp = {}; 
-//     d3d->context->RSGetViewports(&n, &vp);
-//     InvariantCheck(!IsMemZero(vp));
-//   }
-
-//   d3d->context->PSSetShader(d3d->hsv_gradient_rect_program.p_shader, Null, Null);
-//   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-
-//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
-
-//   d3d->context->Draw(4, 0);
-
-//   uniform_buffer->Release();
-// }
-
-// struct D3D_Rect_gradient_data {
-//   F32 window_width;
-//   F32 window_height;
-
-//   F32 rect_origin_x; 
-//   F32 rect_origin_y; 
-
-//   F32 rect_width;
-//   F32 rect_height;
-  
-//   F32 _padding[2]; 
-
-//   V4F32 top_color;
-// };
-
-// void r_draw_gradient_rect(ID3D11RenderTargetView* rtv, Rect rect, V4F32 top_color)
-// {
-//   D3D_State* d3d = r_get_state();
-//   HRESULT hr = S_OK;
-
-//   // Setting the uniform buffer
-//   ID3D11Buffer* uniform_buffer = 0;
-//   {
-//     D3D_Rect_gradient_data u_data = {};
-//     u_data.window_width  = d3d->render_viewport_width;
-//     u_data.window_height = d3d->render_viewport_height;
-//     u_data.rect_origin_x = rect.x; 
-//     u_data.rect_origin_y = rect.y; 
-//     u_data.rect_width    = rect.width;
-//     u_data.rect_height   = rect.height;
-//     u_data.top_color     = top_color;
-
-//     D3D11_BUFFER_DESC desc = {};
-//     desc.ByteWidth      = sizeof(u_data);
-//     desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
-//     desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-//     desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-//     d3d->device->CreateBuffer(&desc, NULL, &uniform_buffer);
-    
-//     D3D11_MAPPED_SUBRESOURCE mapped = {};
-//     hr = d3d->context->Map((ID3D11Resource*)uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-//     if (hr == S_OK) {
-//       memcpy(mapped.pData, &u_data, sizeof(u_data));
-//       d3d->context->Unmap((ID3D11Resource*)uniform_buffer, 0);
-//     } else {
-//       Assert(false); // note: Dont handle this better than that cause it is not for the user, it shoud just work in the final version regardless
-//     }
-//   }
-
-//   // Vertex shader stage 
-//   d3d->context->VSSetShader(d3d->gradient_rect_program.v_shader, Null, Null);
-//   d3d->context->VSSetConstantBuffers(0, 1, &uniform_buffer);
-
-//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-//   { 
-//     UINT n = 1;
-//     D3D11_VIEWPORT vp = {}; 
-//     d3d->context->RSGetViewports(&n, &vp);
-//     InvariantCheck(!IsMemZero(vp));
-//   }
-
-//   d3d->context->PSSetShader(d3d->gradient_rect_program.p_shader, Null, Null);
-//   d3d->context->PSSetConstantBuffers(0, 1, &uniform_buffer);
-
-//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
-
-//   d3d->context->Draw(4, 0);
-
-//   uniform_buffer->Release();
-// }
-
-// void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this)
-// {
-//   D3D_State* d3d = r_get_state();
-//   HRESULT hr = S_OK;
-
-//   // Setting the uniform buffer
-//   {
-//     D3D_Circle_program_data u_data = {};
-//     u_data.origin_x      = center_x; 
-//     u_data.origin_y      = center_y; 
-//     u_data.radius        = radius;
-//     u_data.window_width  = d3d->render_viewport_width;
-//     u_data.window_height = d3d->render_viewport_height;
-//     u_data.color         = color; 
-
-//     D3D11_MAPPED_SUBRESOURCE mapped = {};
-//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-//     InvariantCheck(hr == S_OK);
-//     if (hr == S_OK) {
-//       memcpy(mapped.pData, &u_data, sizeof(u_data));
-//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-//     } 
-//   }
-
-//   // Vertex shader stage 
-//   d3d->context->VSSetShader(d3d->draw_circle_program.v_shader, Null, Null);
-//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-//   // Making sure that the viewport is set at this point. It all zeroes if not set in d3d 11.
-//   { 
-//     UINT n = 1;
-//     D3D11_VIEWPORT vp = {}; 
-//     d3d->context->RSGetViewports(&n, &vp);
-//     InvariantCheck(!IsMemZero(vp));
-//   }
-
-//   d3d->context->PSSetShader(d3d->draw_circle_program.p_shader, Null, Null);
-//   d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-//   d3d->context->OMSetRenderTargets(1, &rtv, Null);
-  
-//   ID3D11BlendState* blend_state = 0;
-//   FLOAT blend_factor[4]         = {};
-//   UINT sample_mask              = {};
-//   if (turn_off_blend_for_this) {
-//     d3d->context->OMGetBlendState(&blend_state, blend_factor, &sample_mask);
-//     d3d->context->OMSetBlendState(0, 0, ~0U);
-//   }
-  
-//   d3d->context->Draw(4, 0);
-
-//   if (turn_off_blend_for_this)
-//   {
-//     d3d->context->OMSetBlendState(blend_state, blend_factor, sample_mask);
-//   }
-
-//   // todo: I shoud do this in each call to clear the non retained state per render
-//   //       pass to not have weird state bugs from draw call to draw call
-//   d3d->context->OMSetRenderTargets(0, 0, Null);
-// }
 
 // void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
 // {
@@ -831,19 +678,17 @@ V2F32 r_get_texture_dims(ID3D11Texture2D* texture)
   return v2f32((F32)desc.Width, (F32)desc.Height);
 }
 
-D3D_Program r_program_from_file(
-  const WCHAR* shader_program_file, 
-  const char* v_shader_main_f_name,
-  const char* p_shader_main_f_name,
-  B32* out_opt_is_succ
+// note: Returns D3D_Program{} if fails
+D3D_Program r_program_from_file(const WCHAR* shader_program_file, 
+                                const char* v_shader_main_f_name, 
+                                const char* p_shader_main_f_name, 
+                                const D3D11_INPUT_ELEMENT_DESC* opt_desc_arr,
+                                U32 desc_arr_count
 ) {
   D3D_State* d3d = r_get_state();
 
-  B32 is_succ = true;
-
-  // Getting v shader compiled
+  // V shader compilation
   ID3DBlob* v_blob = 0;
-  if (is_succ)
   {
     ID3DBlob* error_blob = 0;
 
@@ -852,17 +697,12 @@ D3D_Program r_program_from_file(
       "vs_main", "vs_5_0", Null, Null, &v_blob, &error_blob
     );
 
-    if (error_blob != 0 || hr != S_OK)
-    {
-      if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
-      is_succ = false;
-    }
-
+    if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
     if (error_blob != 0) { error_blob->Release(); }
   }
 
+  // P shader compilation
   ID3DBlob* p_blob = 0;
-  if (is_succ)
   {
     ID3DBlob* error_blob = 0;
   
@@ -871,45 +711,29 @@ D3D_Program r_program_from_file(
       "ps_main", "ps_5_0", Null, Null, &p_blob, &error_blob
     );
 
-    if (error_blob != 0 || hr != S_OK)
-    {
-      if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
-      is_succ = false;
-    }
-
+    if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
     if (error_blob != 0) { error_blob->Release(); }
   }
 
-  ID3D11VertexShader* v_shader = 0;
-  ID3D11PixelShader* p_shader = 0;
-  if (is_succ)
+  ID3D11VertexShader* v_shader    = 0;
+  ID3D11PixelShader* p_shader     = 0;
+  ID3D11InputLayout* input_layout = 0;
   {
-    HRESULT hr = S_OK;
-    hr = d3d->device->CreateVertexShader(v_blob->GetBufferPointer(), v_blob->GetBufferSize(), Null, &v_shader);
-    if (hr != S_OK) { is_succ = false; }
-    hr = d3d->device->CreatePixelShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), Null, &p_shader);
-    if (hr != S_OK) { is_succ = false; }
-    
-    // D3D11_INPUT_ELEMENT_DESC layout_decs = {};
-    // hr = d3d_device->CreateInputLayout(&layout_decs, 0, v_blob->GetBufferPointer(), v_blob->GetBufferSize(), &grafics.input_layout_for_rect_program);
-    // HR(hr);
+    d3d->device->CreateVertexShader(v_blob->GetBufferPointer(), v_blob->GetBufferSize(), Null, &v_shader);
+    d3d->device->CreatePixelShader(p_blob->GetBufferPointer(), p_blob->GetBufferSize(), Null, &p_shader);
+    if (opt_desc_arr != 0)
+    {
+      d3d->device->CreateInputLayout(opt_desc_arr, desc_arr_count, v_blob->GetBufferPointer(), v_blob->GetBufferSize(), &input_layout);
+    }
   }
 
   if (p_blob != 0) { p_blob->Release(); }  
   if (v_blob != 0) { v_blob->Release(); }  
 
-  // // Creating a uniform buffer
-  // D3D11_BUFFER_DESC uniform_desc = {};
-  // uniform_desc.ByteWidth      = sizeof(D3D_Rect_program_data);
-  // uniform_desc.Usage          = D3D11_USAGE_DYNAMIC;
-  // uniform_desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
-  // uniform_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-  // d3d_device->CreateBuffer(&uniform_desc, NULL, &grafics.uniform_buffer_for_rect_program);
-
-  if (out_opt_is_succ != 0) { *out_opt_is_succ = is_succ; }
   D3D_Program program = {};
   program.v_shader     = v_shader;
   program.p_shader     = p_shader;
+  program.input_layout = input_layout;
   return program;
 }
 

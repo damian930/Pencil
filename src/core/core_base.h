@@ -139,6 +139,7 @@ typedef double F64;
 #define Stringify(x)   __Stringify(x)
 
 #define ArrayCount(arr) (sizeof(arr)/sizeof(arr[0]))
+#define TypeFieldOffset(Type, field) ((U64)&(((Type*)(0))->field))
 
 #define DeferLoop(start_expr, end_expr) for (int __df__ = (start_expr, 0); __df__ != 1; __df__ = (end_expr, 1))
 #define DeferInitReleaseLoop(init_expr, release_expr) \
@@ -214,12 +215,12 @@ typedef double F64;
                 queue->name_for_first_in_queue = new_node;                       \
             }
 #define QueuePushBack_Name(queue, new_node, name_for_first_in_queue, name_for_last_in_queue, name_for_next_in_node) \
-            if (queue->name_for_first_in_queue == 0) {     \
-                queue->name_for_first_in_queue = new_node; \
-                queue->name_for_last_in_queue = new_node;  \
+            if ((queue)->name_for_first_in_queue == 0) {     \
+                (queue)->name_for_first_in_queue = new_node; \
+                (queue)->name_for_last_in_queue = new_node;  \
             } else {                                       \
-               queue->name_for_last_in_queue->name_for_next_in_node = new_node; \
-               queue->name_for_last_in_queue = new_node;                        \
+               (queue)->name_for_last_in_queue->name_for_next_in_node = new_node; \
+               (queue)->name_for_last_in_queue = new_node;                        \
             }
 
 #define QueuePopFront_Name(queue, name_for_the_first_in_queue, name_for_the_last_in_queue, name_for_the_next_in_node) \
@@ -618,6 +619,7 @@ struct Rect {
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
+tu_specific V2F32 rect_origin(Rect rect);
 tu_specific V2F32 rect_dims(Rect rect);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);

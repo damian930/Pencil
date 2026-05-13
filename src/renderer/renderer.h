@@ -35,59 +35,50 @@ struct Image {
   // U64 row_stride; // There are no images right now that might have extra padding
 };
 
-// For uniforms
-struct D3D_Rect_program_data {
-  F32 window_width;
-  F32 window_height;
-
-  F32 rect_origin_x; 
-  F32 rect_origin_y; 
-
-  F32 rect_width;
-  F32 rect_height;
-
-  F32 u_border_thickness;
-
-  F32 _padding[1]; // Padding to have the float4 (V4F32) be on the 16 byte boundary (sizeof(F32) * 4)
-  
-  V4F32 rect_color; 
-  V4F32 border_color; 
-};
-
-// For uniforms
-struct D3D_Circle_program_data {
+// ========
+// ========
+struct D3D_Rect_instance_data {
   V4F32 color;
-
+  
   F32 origin_x; 
   F32 origin_y; 
-  
-  F32 radius;
 
-  F32 window_width;
-  F32 window_height;
-
-  F32 _padding[3];
+  F32 width;
+  F32 height;
 };
 
-// For uniforms
-struct D3D_Texture_program_data {
-  F32 vp_width;
-  F32 vp_height;
- 
+struct D3D_Rect_unifrom_data {
+  F32 u_window_width;
+  F32 u_window_height;
+  F32 _padding_[2];
+};  
+// ========
+// ========
+
+struct D3D_Texture_instance_data {
   V2F32 dest_rect_origin;
   V2F32 dest_rect_size;
-
+  
   V2F32 src_rect_origin;
   V2F32 src_rect_size;
-
+  
   V2F32 src_texture_dims;
+
+  F32 _padding_[2];
 };
 
+struct D3D_Texture_uniform_data {
+  F32 u_window_width;
+  F32 u_window_height;
+  F32 _padding_[2];
+};
+// ========
+// ========
+
 struct D3D_Program {
-  // ID3D11InputLayout* input_layout_for_rect_program;
   ID3D11VertexShader* v_shader;
   ID3D11PixelShader* p_shader;
-  ID3D11Buffer* uniform_data;
+  ID3D11InputLayout* input_layout;
 };
 
 struct D3D_State {
@@ -102,31 +93,19 @@ struct D3D_State {
   IDXGISwapChain1*        swap_chain;
   ID3D11RasterizerState*  rasterizer_state;
   ID3D11BlendState*       alpha_blend_state;
+  ID3D11SamplerState*     sampler;
   //
   ID3D11Texture2D*        frame_buffer_texture;
   ID3D11RenderTargetView* frame_buffer_rtv;
-  //
-  ID3D11Buffer* rect_srv_buffer;
-  ID3D11ShaderResourceView* rect_srv;
-
-  // todo: What is this for dude ???
-  // Other
-  ID3D11Buffer* uniform_buffer;
-  ID3D11RenderTargetView* prev_rtv;
   
   // Draw programs
-  D3D_Program draw_rect_program;
-  // D3D_Program draw_circle_program;
-  // D3D_Program draw_texture_program;
+  ID3D11Buffer* rect_program_ia_buffer;
+  ID3D11Buffer* rect_program_uniform_buffer;
+  D3D_Program   rect_program;
   //
-  // These are for testing for now
-  // D3D_Program gradient_rect_program;
-  // D3D_Program hsv_gradient_rect_program;
-
-  // todo: See if this is still needed
-  // Per render pass data
-  F32 render_viewport_width;
-  F32 render_viewport_height;
+  ID3D11Buffer* texture_program_ia_buffer;
+  ID3D11Buffer* texture_program_uniform_buffer;
+  D3D_Program   texture_program;
 
   // -----------------------------
   // Debug stuff for layer
@@ -143,7 +122,7 @@ void r_init();
 void r_relesase();
 
 // - Render pass
-void r_render_begin(F32 viewport_width, F32 viewport_height);
+void r_render_begin(V2F32 vp_dims);
 void r_render_end();
 
 // - Drawing
@@ -154,20 +133,19 @@ void r_draw_rect_pro(Rect rect, V4F32 rect_color, F32 border_line_thickness, V4F
 void r_draw_circle(ID3D11RenderTargetView* rtv, F32 center_x, F32 center_y, F32 radius, V4F32 color, B32 turn_off_blend_for_this);
 void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src);
 
-struct FP_Font; // Dont just include fp in here, since fp need the renderer, so we got a circular dependancy
-void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font font, V4F32 color);
+// struct FP_Font; // Dont just include fp in here, since fp need the renderer, so we got a circular dependancy
+// void r_draw_text(ID3D11RenderTargetView* dest_rtv, Str8 text, V2F32 pos, FP_Font font, V4F32 color);
 
 // - Other
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
 ID3D11RenderTargetView* r_make_texture(U32 width, U32 height);
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
 V2F32 r_get_texture_dims(ID3D11Texture2D* rtv);
-D3D_Program r_program_from_file(
-  const WCHAR* shader_program_file, 
-  const char* v_shader_main_f_name,
-  const char* p_shader_main_f_name,
-  B32* out_opt_is_succ
-);
+D3D_Program r_program_from_file(const WCHAR* shader_program_file, 
+                                const char* v_shader_main_f_name, 
+                                const char* p_shader_main_f_name, 
+                                const D3D11_INPUT_ELEMENT_DESC* opt_desc_arr,
+                                U32 desc_arr_count);
 
 // - Misc
 Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv);
@@ -178,7 +156,141 @@ void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11Rend
 void r_scissoring_set(Rect rect);
 void r_scissoring_clear();
 
+///////////////////////////////////////////////////////////
+// - Batching (for now here)
+//
+enum D_Command_type : U32 {
+  D_Command_type__Rect,
+  D_Command_type__Texture,
+};
 
+struct D_Rect_command {
+  Rect rect;
+  V4F32 color;
+};
 
+struct D_Texture_command {
+  Rect dest_rect;
+  Rect src_rect;
+};
+
+struct D_Command {
+  union {
+    D_Rect_command rect_c;
+    D_Texture_command texture_c;
+  } u;
+};
+
+struct D_Command_node {
+  D_Command command;
+  D_Command_node* next;
+};
+
+struct D_Command_batch {
+  D_Command_type command_type;
+
+  // Fat stuct data
+  ID3D11Texture2D* texture;
+  
+  D_Command_node* first_command_node;
+  D_Command_node* last_command_node;
+  U64 count;
+
+  D_Command_batch* next_batch; 
+};  
+
+struct D_Command_batch_list {
+  D_Command_batch* first;
+  D_Command_batch* last;
+  U64 count;
+};
+
+struct D_State {
+  Arena* arena_for_draw_commands;
+  D_Command_batch_list command_batch_list;
+};
+
+global D_State __d_g_state = {};
+
+D_State* d_get_state() { return &__d_g_state; }
+
+void d_init()
+{
+  __d_g_state.arena_for_draw_commands = arena_alloc(Gigabytes(1));
+}
+void d_release() { /*todo:*/ }
+
+void d_begin_batching() 
+{ 
+  D_State* draw_state = d_get_state();
+  
+  draw_state->command_batch_list = {};
+  arena_clear(draw_state->arena_for_draw_commands); 
+}
+void d_end_batching() { /*Nothing here*/ }
+
+D_Command_batch_list* d_get_batch_list() { return &d_get_state()->command_batch_list; }
+
+D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* texture)
+{
+  D_State* draw_state = d_get_state();
+  Arena* arena = draw_state->arena_for_draw_commands;
+
+  D_Command_batch* new_batch = ArenaPush(arena, D_Command_batch);
+  new_batch->command_type = command_type;
+  new_batch->texture      = texture;
+  
+  QueuePushBack_Name(&draw_state->command_batch_list, new_batch, first, last, next_batch);
+  draw_state->command_batch_list.count += 1;
+
+  return new_batch;
+}
+
+void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
+{
+  D_State* draw_state = d_get_state();
+  Arena* arena = draw_state->arena_for_draw_commands;
+
+  D_Command_node* node = ArenaPush(arena, D_Command_node);
+  node->command = command;
+  
+  QueuePushBack_Name(batch, node, first_command_node, last_command_node, next);
+  batch->count += 1;
+}
+
+void d_add_rect_command(Rect rect, V4F32 color)
+{
+  D_State* draw_state = d_get_state();
+  Arena* arena = draw_state->arena_for_draw_commands;
+
+  D_Command_batch* batch = draw_state->command_batch_list.last;
+  if (batch == 0 || batch->command_type != D_Command_type__Rect)
+  {
+    batch = d_add_new_batch(D_Command_type__Rect, Null);
+  }
+
+  D_Command command = {};
+  command.u.rect_c.rect  = rect;
+  command.u.rect_c.color = color;
+  d_add_command_to_batch(batch, command);
+}
+
+void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect)
+{
+  D_State* draw_state = d_get_state();
+  Arena* arena = draw_state->arena_for_draw_commands;
+
+  D_Command_batch* batch = draw_state->command_batch_list.last;
+  if (batch == 0 || batch->command_type != D_Command_type__Texture || batch->texture != texture)
+  {
+    batch = d_add_new_batch(D_Command_type__Texture, texture);
+  }
+
+  D_Command command = {};
+  command.u.texture_c.dest_rect = dest_rect;
+  command.u.texture_c.src_rect  = src_rect;
+
+  d_add_command_to_batch(batch, command);
+}
 
 #endif

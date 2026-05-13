@@ -153,19 +153,21 @@ B32 range_u64_is_valid(RangeU64 range)
 Rect rect_make(F32 x, F32 y, F32 width, F32 height)
 {
 	Rect rect = {};
-	rect.x = x;
-	rect.y = y;
-	rect.width = width;
+	rect.x      = x;
+	rect.y      = y;
+	rect.width  = width;
 	rect.height = height;
 	return rect;
 }
 
+V2F32 rect_origin(Rect rect)
+{
+	return v2f32(rect.x, rect.y);
+}
+
 V2F32 rect_dims(Rect rect)
 {
-	V2F32 dims = {};
-	dims.x = rect.width;
-	dims.y = rect.height;
-	return dims;
+	return v2f32(rect.width, rect.height);
 }
 
 B32 is_point_inside_rect(F32 x, F32 y, Rect r)

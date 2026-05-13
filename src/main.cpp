@@ -60,16 +60,17 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 
   if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
   {
-    r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
+    // r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
   }
 
   // if (root->flags & UI_Box_flag__has_text_contents)
   // {
-  //   // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
+  //   r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
   // }
 
   // Have to scissor ______ (THATS WHAT SHE SAID !!!)
   Rect scissor_rect = parent_scissor_rect;
+  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y) { NotImplemented(); }
   /*
   if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
   {
@@ -341,11 +342,25 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // os_window_set_mouse_passthrough(true);
 
+  ID3D11RenderTargetView* texture = r_load_texture_from_file(Str8FromC("../data/color_picker_to_make.png"));
+  Assert(texture);
+
+  d_init();
   for (;!os_window_should_close();)
   {
-    ProfileFuncBegin();
     os_frame_begin();
+    r_render_begin(os_get_client_area_dims());
+    d_begin_batching();
 
+    r_clear_frame_buffer(black());
+    d_add_rect_command(rect_make(50, 50, 100, 150), yellow());
+    d_add_rect_command(rect_make(50, 100, 100, 150), blue());
+
+    ID3D11Texture2D* texture2d = r_texture_from_rtv(texture).texture;
+    d_add_texture_command(texture2d, rect_make(0, 0, 500, 500), rect_make(0, 0, 100, 100));
+
+    // r_draw_texture(texture, rect_make(0, 0, 350, 299), rect_make(50, 50, 400, 349));
+    
     // UI
     // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     // {
@@ -358,21 +373,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // ui_end_build();
 
     // Render
-    r_render_begin(os_get_client_area_dims().x, os_get_client_area_dims().y);
-    {
-      r_clear_frame_buffer(black());
-      // ui_draw();
-      for EachIndex(i, Thousands(10))
-      {
-        r_draw_rect_pro(rect_make(50, 50, 50, 50), { 1, 1, 1, 0.25f }, 0, {});
-      }
-      // r_draw_rect_pro(rect_make(50, 50, 150, 300), orange(), 2, blue);
-    }
-    r_submit();
+    // ui_draw();
+
+    D_Command_batch_list* batch_list = d_get_batch_list();
+    r_submit(batch_list);
+
+    d_end_batching();
     r_render_end();
     os_frame_end();
-
+    
     // Presenting 
+    ProfileFuncBegin();
     B32 vsync = false; 
     r_get_state()->swap_chain->Present(!!vsync, 0);
     HRESULT commit_hr = comp_device->Commit(); 
