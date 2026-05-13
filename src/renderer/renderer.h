@@ -38,7 +38,10 @@ struct Image {
 // ========
 // ========
 struct D3D_Rect_instance_data {
-  V4F32 color;
+  V4F32 color_00;
+  V4F32 color_01;
+  V4F32 color_10;
+  V4F32 color_11;
   
   F32 origin_x; 
   F32 origin_y; 
@@ -56,6 +59,8 @@ struct D3D_Rect_unifrom_data {
 // ========
 
 struct D3D_Texture_instance_data {
+  V4F32 text_color;
+
   V2F32 dest_rect_origin;
   V2F32 dest_rect_size;
   
@@ -63,6 +68,8 @@ struct D3D_Texture_instance_data {
   V2F32 src_rect_size;
   
   V2F32 src_texture_dims;
+
+  B32 is_text_texture;
 
   F32 _padding_[2];
 };
@@ -166,10 +173,12 @@ enum D_Command_type : U32 {
 
 struct D_Rect_command {
   Rect rect;
-  V4F32 color;
+  V4F32 vertex_color[UV__COUNT];
 };
 
 struct D_Texture_command {
+  B32 is_text;
+  V4F32 text_color;
   Rect dest_rect;
   Rect src_rect;
 };
@@ -258,7 +267,7 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
   batch->count += 1;
 }
 
-void d_add_rect_command(Rect rect, V4F32 color)
+void d_add_rect_command_ex(Rect rect, V4F32 color_00, V4F32 color_01, V4F32 color_10, V4F32 color_11)
 {
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
@@ -271,11 +280,19 @@ void d_add_rect_command(Rect rect, V4F32 color)
 
   D_Command command = {};
   command.u.rect_c.rect  = rect;
-  command.u.rect_c.color = color;
+  command.u.rect_c.vertex_color[UV__00] = color_00;
+  command.u.rect_c.vertex_color[UV__01] = color_01;
+  command.u.rect_c.vertex_color[UV__10] = color_10;
+  command.u.rect_c.vertex_color[UV__11] = color_11;
   d_add_command_to_batch(batch, command);
 }
 
-void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect)
+void d_add_rect_command(Rect rect, V4F32 color)
+{
+  d_add_rect_command_ex(rect, color, color, color, color);
+}
+
+void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
 {
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
@@ -287,8 +304,10 @@ void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_re
   }
 
   D_Command command = {};
-  command.u.texture_c.dest_rect = dest_rect;
-  command.u.texture_c.src_rect  = src_rect;
+  command.u.texture_c.dest_rect  = dest_rect;
+  command.u.texture_c.src_rect   = src_rect;
+  command.u.texture_c.is_text    = is_text;
+  command.u.texture_c.text_color = text_color;
 
   d_add_command_to_batch(batch, command);
 }

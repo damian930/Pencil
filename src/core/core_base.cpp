@@ -32,8 +32,12 @@ void clamp_u16_inplace(U16* value, U16 min, U16 max) { if (*value < min) { *valu
 void clamp_u32_inplace(U32* value, U32 min, U32 max) { if (*value < min) { *value = min; } else if (*value > max) { *value = max; } }
 void clamp_u64_inplace(U64* value, U64 min, U64 max) { if (*value < min) { *value = min; } else if (*value > max) { *value = max; } }
 
-F32 lerp_f32(F32 v0, F32 v1, F32 t) { F32 result = v0 + t * (v1 - v0); return result; }
-F64 lerp_f64(F64 v0, F64 v1, F64 t) { F64 result = v0 + t * (v1 - v0); return result; }
+F32 lerp_f32(F32 v0, F32 v1, F32 t) { return v0 + t * (v1 - v0); }
+F64 lerp_f64(F64 v0, F64 v1, F64 t) { return v0 + t * (v1 - v0); }
+V2F32 lerp_v2f32(V2F32 v0, V2F32 v1, F32 t) { return v2f32(lerp_f32(v0.x, v1.x, t), lerp_f32(v0.y, v1.y, t)); }
+V3F32 lerp_v3f32(V3F32 v0, V3F32 v1, F32 t) { return v3f32(lerp_f32(v0.x, v1.x, t), lerp_f32(v0.y, v1.y, t), lerp_f32(v0.z, v1.z, t)); }
+V4F32 lerp_v4f32(V4F32 v0, V4F32 v1, F32 t) { return v4f32(lerp_f32(v0.x, v1.x, t), lerp_f32(v0.y, v1.y, t), lerp_f32(v0.z, v1.z, t), lerp_f32(v0.w, v1.w, t)); }
+F32 lerp(F32 v0, F32 v1, F32 t) { return lerp_f32(v0, v1, t); }
 
 U64 u64_from_2_u32(U32 high_order_word, U32 low_order_word)
 {

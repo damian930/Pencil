@@ -348,8 +348,16 @@ tu_specific void clamp_u16_inplace(U16* value, U16 min, U16 max);
 tu_specific void clamp_u32_inplace(U32* value, U32 min, U32 max);
 tu_specific void clamp_u64_inplace(U64* value, U64 min, U64 max);
 
+// todo: Remove this 
+union V2F32;
+union V3F32;
+union V4F32;
 tu_specific F32 lerp_f32(F32 v0, F32 v1, F32 t);
 tu_specific F64 lerp_f64(F64 v0, F64 v1, F64 t);
+tu_specific V2F32 lerp_v2f32(V2F32 v0, V2F32 v1, F32 t);
+tu_specific V3F32 lerp_v3f32(V3F32 v0, V3F32 v1, F32 t);
+tu_specific V4F32 lerp_v4f32(V4F32 v0, V4F32 v1, F32 t);
+tu_specific F32 lerp(F32 v0, F32 v1, F32 t);
 
 tu_specific U64 u64_from_2_u32(U32 high_order_word, U32 low_order_word);
 
@@ -409,10 +417,18 @@ enum Comparison : U32 {
   Comparison__greater,
 };
 
-enum Axis2 {
+enum Axis2 : U32 {
 	Axis2__x,
 	Axis2__y,
 	Axis2__COUNT,
+};
+
+enum UV : U32 {
+	UV__00,    // Top left
+	UV__01,    // Bottom left
+	UV__10,    // Top right
+	UV__11,    // Bottom right
+	UV__COUNT,
 };
 
 tu_specific Axis2 axis2_other(Axis2 axis) { return (axis == Axis2__x ? Axis2__y : Axis2__x); }
@@ -698,6 +714,12 @@ union V4F32 {
 	struct { F32 x; F32 y; F32 z; F32 w; };
 	struct { F32 r; F32 g; F32 b; F32 a; };
 	F32 v[4];
+	
+	struct { V3F32 rgb; F32 a; };
+	struct { V3F32 xyz; F32 w; };
+	struct { V2F32 xy; V2F32 zw; };
+	struct { F32 x; V3F32 yzw; };
+	struct { F32 hue; F32 saturation; F32 value; F32 _; };
 };
 typedef V4F32 Vec4;
 typedef V4F32 V4;
@@ -784,42 +806,45 @@ F32 f32_floor(F32 f) { return floorf(f); }
 V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
 V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
 
-V3F32 hsv_from_rgb(V3F32 rgb)
+// note: Claude did this 
+V4F32 hsv_from_rgb(V4F32 rgb)
 {
-	V3F32 hsv = {};
+    V4F32 hsv = v4f32(0.0f, 0.0f, 0.0f, 1.0f);
 
-	F32 max = rgb.v[0];
-	F32 min = rgb.v[0];
-	U64 max_channel_index = 0;
-	for (U64 i = 1; i < ArrayCount(rgb.v); i += 1)
-	{
-		if (rgb.v[i] > max) {
-			max = rgb.v[i];
-			max_channel_index = i;
-		}
+    F32 max = rgb.v[0];
+    F32 min = rgb.v[0];
+    U64 max_channel_index = 0;
+    for (U64 i = 1; i < 3; i += 1)
+    {
+        if (rgb.v[i] > max) {
+            max = rgb.v[i];
+            max_channel_index = i;
+        }
 
-		if (rgb.v[i] < min) {
-			min = rgb.v[i];
-		}
-	}
-	F32 delta = max - min;
+        if (rgb.v[i] < min) {
+            min = rgb.v[i];
+        }
+    }
+    F32 delta = max - min;
 
-	hsv.value = max;
-	hsv.saturation = delta / max;
+    if (max == 0.0f || delta == 0.0f) { return hsv; }
 
-	if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
-	else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
-	else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
+    hsv.value = max;
+    hsv.saturation = delta / max;
 
-	hsv.hue /= 6.0f;
-	if (hsv.hue < 0.0f) { hsv.hue += 1.0; }
+    if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
+    else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
+    else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
 
-	return hsv;
+    hsv.hue /= 6.0f;
+    if (hsv.hue < 0.0f) { hsv.hue += 1.0f; }
+
+    return hsv;
 }
 
 // note: Took this from the raddbg codebase just to have it be working, i dont really care that much about 
 //       where these colors actually come from, what am i, gay or something ?
-V3F32 rgb_from_hsv(V3F32 hsv)
+V4F32 rgb_from_hsv(V4F32 hsv)
 {
   F32 h = fmodf(hsv.hue * 360.f, 360.f);
   F32 s = hsv.saturation;
@@ -864,11 +889,18 @@ V3F32 rgb_from_hsv(V3F32 hsv)
     b = x;
   }
   
-  V3F32 rgb = v3f32(r + m, g + m, b + m);
+  V4F32 rgb = v4f32(r + m, g + m, b + m, 1.0f);
   return rgb;
 }
 
-
+V4F32 purify_rgb(V4F32 rgb)
+{
+	V4F32 hsv      = hsv_from_rgb(rgb);
+	hsv.saturation = 1.0f;
+	hsv.value      = 1.0f;
+	V4F32 pure_rgb = rgb_from_hsv(hsv);
+	return pure_rgb;
+}
 
 #endif
 

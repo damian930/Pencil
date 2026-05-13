@@ -39,7 +39,10 @@ D3D_State* r_get_state()
 const global 
 D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] = 
 {
-  { "RECT_COLOR",    0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_00_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_00), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_01_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_10_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_11_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "RECT_ORIGIN_X", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "RECT_ORIGIN_Y", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "RECT_WIDTH",    0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
@@ -48,11 +51,13 @@ D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] =
 
 D3D11_INPUT_ELEMENT_DESC texture_program_input_assembler_element_desc[] = 
 {
-  { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "TEXT_COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, text_color),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "IS_TEXT_TEXTURE",  0, DXGI_FORMAT_R32_UINT,           0, TypeFieldOffset(D3D_Texture_instance_data, is_text_texture),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 void r_init()
@@ -400,7 +405,11 @@ void r_submit(D_Command_batch_list* command_batch_list)
           instance_data.origin_y = node->command.u.rect_c.rect.y; 
           instance_data.width    = node->command.u.rect_c.rect.width;
           instance_data.height   = node->command.u.rect_c.rect.height;
-          instance_data.color    = node->command.u.rect_c.color;
+          instance_data.color_00 = node->command.u.rect_c.vertex_color[UV__00];
+          instance_data.color_01 = node->command.u.rect_c.vertex_color[UV__01];
+          instance_data.color_10 = node->command.u.rect_c.vertex_color[UV__10];
+          instance_data.color_11 = node->command.u.rect_c.vertex_color[UV__11];
+
           memcpy((D3D_Rect_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
         }
         d3d->context->Unmap((ID3D11Resource*)d3d->rect_program_ia_buffer, 0);
@@ -456,6 +465,8 @@ void r_submit(D_Command_batch_list* command_batch_list)
           instance_data.src_rect_origin  = rect_origin(node->command.u.texture_c.src_rect);
           instance_data.src_rect_size    = rect_dims(node->command.u.texture_c.src_rect);
           instance_data.src_texture_dims = r_get_texture_dims(batch->texture);
+          instance_data.is_text_texture  = node->command.u.texture_c.is_text;
+          instance_data.text_color       = node->command.u.texture_c.text_color;
           memcpy((D3D_Texture_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
         }
         d3d->context->Unmap((ID3D11Resource*)d3d->texture_program_ia_buffer, 0);

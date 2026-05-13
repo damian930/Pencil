@@ -3,9 +3,19 @@ cbuffer cbuffer0 : register(b0) {
   float u_window_height;
 };
 
+struct Rect {
+  float x;
+  float y;
+  float width;
+  float height;
+};
+
 struct CpuToVertex {
-  float4 rect_color : RECT_COLOR;
-  
+  float4 rect_color_00 : RECT_00_COLOR;  
+  float4 rect_color_01 : RECT_01_COLOR;  
+  float4 rect_color_10 : RECT_10_COLOR;  
+  float4 rect_color_11 : RECT_11_COLOR;  
+
   float rect_origin_x : RECT_ORIGIN_X; 
   float rect_origin_y : RECT_ORIGIN_Y; 
 
@@ -16,16 +26,14 @@ struct CpuToVertex {
 };
 
 struct VertexToPixel {
-  float4 pos   : SV_POSITION;
-  float4 color : FINAL_COLOR;
+  float4 pos      : SV_POSITION;
+  float4 color_00 : FINAL_COLOR_00;
+  float4 color_01 : FINAL_COLOR_01;
+  float4 color_10 : FINAL_COLOR_10;
+  float4 color_11 : FINAL_COLOR_11;
+  Rect   rect     : RECT;
 };
 
-struct Rect {
-  float x;
-  float y;
-  float width;
-  float height;
-};
 
 // todo: Make it so it works with the culling on 
 VertexToPixel vs_main(CpuToVertex cpu_to_vertex) 
@@ -62,12 +70,25 @@ VertexToPixel vs_main(CpuToVertex cpu_to_vertex)
   rect_vertex_in_ndc.y = 1.0 - (rect_vertex_in_px.y / u_window_height) * 2.0;
 
   VertexToPixel v2p;
-  v2p.pos   = float4(rect_vertex_in_ndc, 0, 1);
-  v2p.color = cpu_to_vertex.rect_color;
+  v2p.pos      = float4(rect_vertex_in_ndc, 0, 1);
+  v2p.color_00 = cpu_to_vertex.rect_color_00;
+  v2p.color_01 = cpu_to_vertex.rect_color_01;
+  v2p.color_10 = cpu_to_vertex.rect_color_10;
+  v2p.color_11 = cpu_to_vertex.rect_color_11;
+  v2p.rect     = rect;
   return v2p;
 }
 
 float4 ps_main(VertexToPixel vertex_to_pixel) : SV_TARGET
 {
-  return vertex_to_pixel.color;
+  float2 pos = vertex_to_pixel.pos.xy;
+
+  float pos_uv_x = (pos.x - vertex_to_pixel.rect.x) / vertex_to_pixel.rect.width;
+  float pos_uv_y = (pos.y - vertex_to_pixel.rect.y) / vertex_to_pixel.rect.height;
+
+  float4 top_color    = lerp(vertex_to_pixel.color_00, vertex_to_pixel.color_10, pos_uv_x);
+  float4 bottom_color = lerp(vertex_to_pixel.color_01, vertex_to_pixel.color_11, pos_uv_x);
+  float4 final_color  = lerp(top_color, bottom_color, pos_uv_y);
+
+  return final_color;
 }

@@ -164,7 +164,7 @@ struct UI_Box {
 };
 
 struct UI_Box_data {
-  B32 is_found;
+  B32 found;
   Rect on_screen_rect;
 };
 
@@ -256,6 +256,7 @@ Str8 ui_get_text_part_from_str8(Str8 id_and_text);
 // - Box stuff
 B32 ui_box_is_zero(UI_Box* box);
 UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags);
+void ui_box_set_custom_draw(UI_Box* box, void (*draw_func) (UI_Box*), void* data);
 void ui_push_parent(UI_Box* box);
 void ui_pop_parent();
 UI_Box* ui_get_parent();
@@ -289,7 +290,9 @@ void ui_reset_active();
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
 UI_Box* ui_get_box_prev_frame(Str8 id);
-UI_Box_data ui_get_box_data_prev_frame(Str8 id);
+UI_Box_data ui_get_box_data_prev_frame_from_box(UI_Box* box);
+UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id);
+
 // UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id);
 
 // - Actions

@@ -344,7 +344,7 @@ V3F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V3F32 in_top_colo
   static F32 norm_rel_x = 0.0f;
   static F32 norm_rel_y = 0.0f;
 
-  if (actions.is_down && box_data.is_found)
+  if (actions.is_down && box_data.found)
   {
     V2F32 pos = ui_get_mouse_pos();
     
@@ -413,7 +413,7 @@ F32 pencil_ui_hsv_slider(Str8 slider_id, UI_Size size_x, UI_Size size_y, F32 cur
 
     // The slider part 
     UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_box->id);
-    if (slider_box_data.is_found)
+    if (slider_box_data.found)
     {
       if (slider_actions.is_down) { 
         ui_set_active_box(slider_box); 

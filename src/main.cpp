@@ -43,128 +43,8 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
-{
-  #if DEBUG_MODE
-  // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
-  #endif
-  
-  // // todo: This loop here is dumb
-  // if (root->custom_draw_func != 0) { root->custom_draw_func(root); }
-  // for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  // {
-  //   ui_draw_box(child, parent_scissor_rect);
-  // }
 
-  Rect rect = root->final_on_screen_rect;
-
-  if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
-  {
-    // r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
-  }
-
-  // if (root->flags & UI_Box_flag__has_text_contents)
-  // {
-  //   r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
-  // }
-
-  // Have to scissor ______ (THATS WHAT SHE SAID !!!)
-  Rect scissor_rect = parent_scissor_rect;
-  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y) { NotImplemented(); }
-  /*
-  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-  {
-    RangeF2V32 default_scissor_box = {};
-    default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
-    default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
-    
-    RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
-    RangeF2V32 new_scissor_bbox = default_scissor_box;
-    
-    // if (root->flags & UI_Box_flag__dont_draw_overflow_y) { BP; }
-
-    // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
-    // so a child cant make a scissor larger than the parent and then have its children
-    // drawn, though the parent has no overflow flag spcefied.
-    // This works per axis. So if no overflow is aplied only for 1 axis, then the other axis shoud be
-    // drawn as ussual, with oveflow. This is achieved by having default_scissor_box that extends way pass
-    // the ui coordinate limits.  
-    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
-    {
-      RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
-
-      // Clmaping based to the space that the parent have already limited its children to
-      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-      {
-        Axis2 axis = (Axis2)_axis;
-        if (root->parent->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-        {
-          F32 min = rect_bbox.min.v[axis];
-          F32 max = rect_bbox.max.v[axis];
-  
-          if (min < parent_scissor_bbox.min.v[axis]) { min = parent_scissor_bbox.min.v[axis]; }
-          if (max > parent_scissor_bbox.max.v[axis]) { max = parent_scissor_bbox.max.v[axis]; }
-  
-          new_scissor_bbox.min.v[axis] = min; 
-          new_scissor_bbox.max.v[axis] = max; 
-        }
-      }
-
-      // The child might have a different axis specified for no overflow, so have to clamp again
-      // but this time for the child (root) and not the parent (root->parent)
-      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-      {
-        Axis2 axis = (Axis2)_axis;
-        if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-        {
-          if (new_scissor_bbox.min.v[axis] < rect_bbox.min.v[axis]) { new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; }
-          if (new_scissor_bbox.max.v[axis] > rect_bbox.max.v[axis]) { new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; }
-        }
-      }
-    }
-    else {
-      // Simple case, we dont have parent enforce scissoring at all, so we just do it, there are 
-      // no additional adjustments we have to do to not mess up what the parent have enforces before us.
-      for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-      {
-        Axis2 axis = (Axis2)_axis;
-        if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-        {
-          new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; 
-          new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; 
-        }
-      }
-    }
-
-    scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-    r_scissoring_set(scissor_rect);
-  }
-  */
-
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
-    ui_draw_box(child, scissor_rect);
-  }
-
-  /*
-  // No longer scissoring
-  if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-  {
-    if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-      r_scissoring_set(parent_scissor_rect); 
-    }
-  }
-  */
-
-}
-
-void ui_draw()
-{
-  UI_Context* ctx = ui_get_context();
-  ui_draw_box(ctx->root_box, Rect{});
-}
-
-void r_draw_text(Str8 text, V2F32 pos, FP_Font font)
+void r_draw_text(Str8 text, V2F32 pos, FP_Font font, V4F32 color)
 {
   // note: These are some debug drawings for baseline and stuff
   // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
@@ -188,7 +68,7 @@ void r_draw_text(Str8 text, V2F32 pos, FP_Font font)
     dest_rect.width  = glyph_data.rect_on_atlas.width;
     dest_rect.height = glyph_data.rect_on_atlas.height;
     
-    d_add_texture_command(font.atlas_texture, dest_rect, glyph_data.rect_on_atlas);
+    d_add_texture_command(font.atlas_texture, dest_rect, glyph_data.rect_on_atlas, true, color);
 
     F32 advance = glyph_data.advance;
     if (ch_index < text.count - 1)
@@ -200,12 +80,146 @@ void r_draw_text(Str8 text, V2F32 pos, FP_Font font)
   }
 }
 
+void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
+{
+  #if DEBUG_MODE
+  // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
+  #endif
+  
+  // todo: I dont fully like this if here, but for now its like this 
+  if (root->custom_draw_func != 0) 
+  { 
+    root->custom_draw_func(root); 
+
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+    {
+      ui_draw_box(child, parent_scissor_rect);
+    }
+  }
+  else 
+  {
+    Rect rect = root->final_on_screen_rect;
+  
+    if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
+    {
+      d_add_rect_command(rect, root->shape_style.color);
+  
+      // note: Old drawing api
+      // r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
+    }
+  
+    if (root->flags & UI_Box_flag__has_text_contents)
+    {
+      r_draw_text(root->text_style.text, rect_origin(rect), root->text_style.font, root->text_style.text_color); 
+  
+      // note: Old drawing api
+      // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
+    }
+  
+    // Have to scissor ______ (THATS WHAT SHE SAID !!!)
+    Rect scissor_rect = parent_scissor_rect;
+    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y) { NotImplemented(); }
+    /*
+    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
+    {
+      RangeF2V32 default_scissor_box = {};
+      default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
+      default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
+      
+      RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
+      RangeF2V32 new_scissor_bbox = default_scissor_box;
+      
+      // if (root->flags & UI_Box_flag__dont_draw_overflow_y) { BP; }
+  
+      // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
+      // so a child cant make a scissor larger than the parent and then have its children
+      // drawn, though the parent has no overflow flag spcefied.
+      // This works per axis. So if no overflow is aplied only for 1 axis, then the other axis shoud be
+      // drawn as ussual, with oveflow. This is achieved by having default_scissor_box that extends way pass
+      // the ui coordinate limits.  
+      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
+      {
+        RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
+  
+        // Clmaping based to the space that the parent have already limited its children to
+        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+        {
+          Axis2 axis = (Axis2)_axis;
+          if (root->parent->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+          {
+            F32 min = rect_bbox.min.v[axis];
+            F32 max = rect_bbox.max.v[axis];
+    
+            if (min < parent_scissor_bbox.min.v[axis]) { min = parent_scissor_bbox.min.v[axis]; }
+            if (max > parent_scissor_bbox.max.v[axis]) { max = parent_scissor_bbox.max.v[axis]; }
+    
+            new_scissor_bbox.min.v[axis] = min; 
+            new_scissor_bbox.max.v[axis] = max; 
+          }
+        }
+  
+        // The child might have a different axis specified for no overflow, so have to clamp again
+        // but this time for the child (root) and not the parent (root->parent)
+        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+        {
+          Axis2 axis = (Axis2)_axis;
+          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+          {
+            if (new_scissor_bbox.min.v[axis] < rect_bbox.min.v[axis]) { new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; }
+            if (new_scissor_bbox.max.v[axis] > rect_bbox.max.v[axis]) { new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; }
+          }
+        }
+      }
+      else {
+        // Simple case, we dont have parent enforce scissoring at all, so we just do it, there are 
+        // no additional adjustments we have to do to not mess up what the parent have enforces before us.
+        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
+        {
+          Axis2 axis = (Axis2)_axis;
+          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
+          {
+            new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; 
+            new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; 
+          }
+        }
+      }
+  
+      scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
+      r_scissoring_set(scissor_rect);
+    }
+    */
+  
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+    {
+      ui_draw_box(child, scissor_rect);
+    }
+  
+    /*
+    // No longer scissoring
+    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
+    {
+      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
+        r_scissoring_set(parent_scissor_rect); 
+      }
+    }
+    */
+  }
+
+}
+
+void ui_draw()
+{
+  UI_Context* ctx = ui_get_context();
+  ui_draw_box(ctx->root_box, Rect{});
+}
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   // Layers we allocate for the runtime 
   allocate_thread_context();
   os_init();
   r_init();
+  d_init();
   fp_init();
   ui_init();
 
@@ -378,112 +392,61 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // os_window_set_mouse_passthrough(true);
 
-  ID3D11Texture2D* texture = r_load_texture_from_file(Str8FromC("../data/color_picker_to_make.png"));
-  Assert(texture);
-
-  d_init();
-  for (;!os_window_should_close();)
-  {
-    os_frame_begin();
-    r_render_begin(os_get_client_area_dims());
-    d_begin_batching();
-
-    r_clear_frame_buffer(black());
-    // d_add_rect_command(rect_make(50, 50, 100, 150), yellow());
-    // d_add_rect_command(rect_make(50, 100, 100, 150), blue());
-
-    r_draw_text(Str8FromC("Text"), v2f32(50, 50), font);
-
-    // ID3D11Texture2D* texture2d = r_texture_from_rtv(texture).texture;
-    // V2F32 dims = r_get_texture_dims(texture2d);
-    // Rect rect = rect_make(0, 0, dims.x, dims.y);
-    // d_add_texture_command(texture2d, rect, rect);
-
-    // r_draw_texture(texture, rect_make(0, 0, 350, 299), rect_make(50, 50, 400, 349));
-    
-    // UI
-    // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
-    // {
-    //   ui_set_next_size_x(ui_px(50));
-    //   ui_set_next_size_y(ui_px(50));
-    //   ui_set_next_b_color(blue());
-    //   ui_set_next_border(3, red());
-    //   UI_Box* box = ui_box_make({}, {});
-    // }
-    // ui_end_build();
-
-    // Render
-    // ui_draw();
-
-    D_Command_batch_list* batch_list = d_get_batch_list();
-    r_submit(batch_list);
-
-    d_end_batching();
-    r_render_end();
-    os_frame_end();
-    
-    // Presenting 
-    ProfileFuncBegin();
-    B32 vsync = false; 
-    r_get_state()->swap_chain->Present(!!vsync, 0);
-    HRESULT commit_hr = comp_device->Commit(); 
-    Handle(commit_hr == S_OK);
-    ProfileFuncEnd();
-  }
-
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
   {
     F64 frame_start_time_sec = os_get_time_for_timing_sec();
+    OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
 
     os_frame_begin();
+    r_render_begin(os_get_client_area_dims());
+    d_begin_batching();
 
-    // /*
+    /*
     if (hot_key_activated && !P.is_mid_drawing)
     {
       hot_key_activated = false;
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
+    */
 
     // pencil_do_ui(&P, font);
     // pencil_update(&P, !ui_has_active());
     // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
     // else { ReleaseCapture(); }
     // pencil_render(&P);
-    // */
 
-    // ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
-    // {
-    //   ui_push_font(font);
+    static V4F32 frame_color_hsv = hsv_from_rgb(red());
 
-    //   ui_set_next_size_x(ui_children_sum());
-    //   ui_set_next_size_y(ui_children_sum());
-    //   ui_set_next_b_color(blue_f());
-    //   ui_set_next_border(3, red_f());
-    //   UI_Box* box = ui_box_make({}, {});
-    //   UI_Parent(box)
-    //   UI_PaddedBox(ui_px(15), Axis2__y)
-    //   {
-    //     ui_label(Str8FromC("Label 1"));
-    //   }
-    // }
-    // ui_end_build();
+    r_clear_frame_buffer(rgb_from_hsv(frame_color_hsv));
 
-    // {
-    //   ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-    //   for EachIndex(i, 100)
-    //   {
-    //     r_draw_rect(frame_buffer, rect_make(50 + i, 50 + i, 300 + i, 300 + i), orange_f());
-    //   }
-    //   // ui_draw(frame_buffer);
-    //   // r_draw_text_f(frame_buffer, v2f32(25, 25), font, green_f(), "FPS: %d", (U32)(1.0 / prev_frame_duration_sec));
-    //   OutputDebugStringF("FPS: %d \n", (U32)(1.0 / prev_frame_duration_sec));
-    //   frame_buffer->Release();
-    // }
+    ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+    {
+      ui_set_next_b_color(blue());
+      // UI_PaddedBox(ui_px(25), Axis2__x)
+      {
+        V4F32 color = blue();
+        V4F32 hsv = hsv_from_rgb(color);
+        hsv.value = 1;
+        hsv.saturation = 1;
+        V4F32 pure_color = rgb_from_hsv(hsv);
+  
+        V4F32 new_color_hsv = {};
+        ui_color_picker_sv_square(Str8FromC("Color picker"), ui_px(500), ui_px(500), frame_color_hsv, &new_color_hsv);
+        frame_color_hsv = new_color_hsv;
+      }
+    }
+    ui_end_build();
 
+    ui_draw();
+
+    r_submit(d_get_batch_list());
+
+    d_end_batching();
+    r_render_end();
     os_frame_end();
 
-    // Swapping the dwm buffer in a way
+    // Presenting 
     B32 vsync = false; 
     r_get_state()->swap_chain->Present(!!vsync, 0);
     HRESULT commit_hr = comp_device->Commit(); 

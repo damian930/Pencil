@@ -63,8 +63,8 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 
   Rect slider_box_rect = {};
   {
-    UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_id);
-    is_data_present &= slider_box_data.is_found;
+    UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
+    is_data_present &= slider_box_data.found;
     slider_box_rect = slider_box_data.on_screen_rect;
   }
 

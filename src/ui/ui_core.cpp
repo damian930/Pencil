@@ -133,18 +133,15 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   
   box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
 
-  if (flags & UI_Box_flag__has_background)    { box->shape_style.color         = ui_get_color(); }
+  if (flags & UI_Box_flag__has_background) { box->shape_style.color  = ui_get_color();  }
+  if (flags & UI_Box_flag__has_borders)    { box->shape_style.border = ui_get_border(); }
   // if (flags & UI_Box_flag__draw_corner_radius) { box->shape_style.corner_radius = ui_get_corner_radius(); }
-  if (flags & UI_Box_flag__has_borders) {
-    box->shape_style.border = ui_get_border();
-  }
 
   if (flags & UI_Box_flag__has_text_contents)
   {
     Str8 text = ui_get_text_part_from_str8(id_and_text);
     box->text_style.text       = str8_copy_alloc(ui_get_build_arena(), text);    
     box->text_style.font       = ui_get_font();       
-    // box->text_style.font_size  = ui_get_font_size();  
     box->text_style.text_color = ui_get_text_color(); 
   }
 
@@ -159,6 +156,12 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   box->parent->children_count += 1;
 
   return box;
+}
+
+void ui_box_set_custom_draw(UI_Box* box, void (*draw_func) (UI_Box*), void* data)
+{
+  box->custom_draw_func = draw_func; 
+  box->custom_draw_data = data; 
 }
 
 void ui_push_parent(UI_Box* box)
@@ -218,9 +221,13 @@ void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_
 
 void ui_end_build()
 {
+  ProfileFuncBegin();
+
   UI_Context* ctx = ui_get_context();
   ui_layout_box(ctx->root_box, Axis2__x);
   ui_layout_box(ctx->root_box, Axis2__y);
+
+  ProfileFuncEnd();
 }
 
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
@@ -290,21 +297,6 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
 {
   // Setting up sizes for children
  
-  // if (str8_match(root->id, Str8FromC("Test id __"), 0))
-  // {
-  //   BreakPoint();
-  // }
-
-  // if (str8_match(root->id, Str8FromC("Floating label id inside slider"), 0))
-  // {
-  //   BreakPoint();
-  // }
-
-  // if (str8_match(root->id, Str8FromC("Y stack id "), 0))
-  // {
-  //   BreakPoint();
-  // }
-  
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) {
     ui_do_sizing_for_child_dependant_box(child, axis);
   }
@@ -551,14 +543,19 @@ UI_Box* ui_get_box_prev_frame(Str8 id)
   return box;
 }
 
-UI_Box_data ui_get_box_data_prev_frame(Str8 id)
+UI_Box_data ui_get_box_data_prev_frame_from_box(UI_Box* box)
+{
+  return ui_get_box_data_prev_frame_from_id(box->id);
+}
+
+UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id)
 {
   UI_Box_data box_data = {};
   UI_Box* box = ui_get_box_prev_frame(id);
   if (!ui_box_is_zero(box)) 
   { 
     box_data.on_screen_rect = box->final_on_screen_rect; 
-    box_data.is_found = true; 
+    box_data.found = true; 
   }
   return box_data;
 }
@@ -793,7 +790,7 @@ Axis2 ui_peek_layout_axis()           { UI_Context* ctx = ui_get_context(); _UI_
 Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
 
 void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
-void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
+void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
 void ui_pop_size_x()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 void ui_auto_pop_size_x_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 UI_Size ui_peek_size_x()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }

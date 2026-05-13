@@ -69,5 +69,4 @@ Data_buffer profile_get_data()
 #define ProfileFuncEnd()   profile_func_end(os_get_time_for_timing_sec);
 
 
-
 #endif
