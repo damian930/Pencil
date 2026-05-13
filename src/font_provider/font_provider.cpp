@@ -46,8 +46,9 @@ struct FP_Kerning_entry {
 };
 
 struct FP_Font {
-  ID3D11RenderTargetView* atlas_texture;
-  
+  // ID3D11RenderTargetView* atlas_texture;
+  ID3D11Texture2D* atlas_texture;
+
   RangeU64 codepoint_range;
   FP_Codepoint_data* codepoints_data_arr;
   
@@ -216,7 +217,7 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
   rgba_font_atlas_image.bytes_per_pixel = 4;
 
 
-  ID3D11RenderTargetView* atlas_texture = 0;
+  ID3D11Texture2D* atlas_texture = 0;
   {
     atlas_texture = r_load_texture_from_image(rgba_font_atlas_image);
     Handle(atlas_texture != 0);

@@ -164,6 +164,42 @@ void ui_draw()
   ui_draw_box(ctx->root_box, Rect{});
 }
 
+void r_draw_text(Str8 text, V2F32 pos, FP_Font font)
+{
+  // note: These are some debug drawings for baseline and stuff
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
+  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
+  
+  F32 origin_y = pos.y + font.ascent;
+  F32 x_offset = 0.0f;
+
+  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
+  {
+    U8 ch = text.data[ch_index];
+    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
+
+    F32 origin_x = pos.x + x_offset;
+
+    // Just puttin them 1 next to another
+    Rect dest_rect = {};
+    dest_rect.x      = origin_x + glyph_data.bearing_x;
+    dest_rect.y      = origin_y - glyph_data.bearing_y;
+    dest_rect.width  = glyph_data.rect_on_atlas.width;
+    dest_rect.height = glyph_data.rect_on_atlas.height;
+    
+    d_add_texture_command(font.atlas_texture, dest_rect, glyph_data.rect_on_atlas);
+
+    F32 advance = glyph_data.advance;
+    if (ch_index < text.count - 1)
+    {
+      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
+      if (!IsMemZero(entry)) { advance += entry.advance; }
+    } 
+    x_offset += advance; 
+  }
+}
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   // Layers we allocate for the runtime 
@@ -342,7 +378,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // os_window_set_mouse_passthrough(true);
 
-  ID3D11RenderTargetView* texture = r_load_texture_from_file(Str8FromC("../data/color_picker_to_make.png"));
+  ID3D11Texture2D* texture = r_load_texture_from_file(Str8FromC("../data/color_picker_to_make.png"));
   Assert(texture);
 
   d_init();
@@ -353,11 +389,15 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     d_begin_batching();
 
     r_clear_frame_buffer(black());
-    d_add_rect_command(rect_make(50, 50, 100, 150), yellow());
-    d_add_rect_command(rect_make(50, 100, 100, 150), blue());
+    // d_add_rect_command(rect_make(50, 50, 100, 150), yellow());
+    // d_add_rect_command(rect_make(50, 100, 100, 150), blue());
 
-    ID3D11Texture2D* texture2d = r_texture_from_rtv(texture).texture;
-    d_add_texture_command(texture2d, rect_make(0, 0, 500, 500), rect_make(0, 0, 100, 100));
+    r_draw_text(Str8FromC("Text"), v2f32(50, 50), font);
+
+    // ID3D11Texture2D* texture2d = r_texture_from_rtv(texture).texture;
+    // V2F32 dims = r_get_texture_dims(texture2d);
+    // Rect rect = rect_make(0, 0, dims.x, dims.y);
+    // d_add_texture_command(texture2d, rect, rect);
 
     // r_draw_texture(texture, rect_make(0, 0, 350, 299), rect_make(50, 50, 400, 349));
     

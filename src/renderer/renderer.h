@@ -150,8 +150,8 @@ D3D_Program r_program_from_file(const WCHAR* shader_program_file,
 // - Misc
 Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv);
 void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
-ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name);
-ID3D11RenderTargetView* r_load_texture_from_image(Image image);
+ID3D11Texture2D* r_load_texture_from_file(Str8 file_name);
+ID3D11Texture2D* r_load_texture_from_image(Image image);
 void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
 void r_scissoring_set(Rect rect);
 void r_scissoring_clear();

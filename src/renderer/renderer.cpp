@@ -826,11 +826,11 @@ void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path)
   end_scratch(&scratch);
 }
 
-ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name)
+ID3D11Texture2D* r_load_texture_from_file(Str8 file_name)
 {
   Scratch scratch = get_scratch(0, 0);
   D3D_State* d3d = r_get_state();
-  ID3D11RenderTargetView* result_rtv = 0;
+  ID3D11Texture2D* result_texture = 0;
 
   Str8 file_name_nt = str8_copy_alloc(scratch.arena, file_name);
 
@@ -846,18 +846,16 @@ ID3D11RenderTargetView* r_load_texture_from_file(Str8 file_name)
     image.width_in_px     = (U64)width;
     image.height_in_px    = (U64)height;
     image.bytes_per_pixel = (U64)n_channels;
-    result_rtv = r_load_texture_from_image(image);
+    result_texture = r_load_texture_from_image(image);
   }
 
   end_scratch(&scratch);
-  return result_rtv;
+  return result_texture;
 }
 
-ID3D11RenderTargetView* r_load_texture_from_image(Image image)
+ID3D11Texture2D* r_load_texture_from_image(Image image)
 {
   D3D_State* d3d = r_get_state();
-  ID3D11RenderTargetView* result_rtv = 0;
-
   if (image.bytes_per_pixel != 4) { NotImplemented(); } // Only DXGI_FORMAT_R8G8B8A8_UNORM supported for now
 
   D3D11_TEXTURE2D_DESC desc = {};
@@ -877,14 +875,7 @@ ID3D11RenderTargetView* r_load_texture_from_image(Image image)
   ID3D11Texture2D* texture = 0;
   HRESULT create_succ = d3d->device->CreateTexture2D(&desc, &data, &texture);
   
-  if (create_succ == S_OK)
-  {
-    HRESULT rtv_succ = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, NULL, &result_rtv);
-    Handle(rtv_succ == S_OK);
-    texture->Release();
-  }
-
-  return result_rtv;
+  return texture;
 }
 
 // note: This is a very shitty function ))
