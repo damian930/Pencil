@@ -125,7 +125,7 @@ struct _UI_Color_picker_sv_square_data {
 void _ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_square_data* data = (_UI_Color_picker_sv_square_data*)box->custom_draw_data;
-  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, V4F32{});
+  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {});
 }
 
 void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 color_hsv, V4F32* out_opt_new_color_hsv)
@@ -189,10 +189,10 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
       {
         ui_spacer(ui_px(circle_x_offset));
 
-        ui_set_next_b_color(white());
         ui_set_next_size_x(ui_px(circle_diameter));
         ui_set_next_size_y(ui_px(circle_diameter));
-        ui_set_next_corner_r(ui_corner_r_all(0.25));
+        ui_set_next_corner_r(ui_corner_r_all(1));
+        ui_set_next_border(2, white());
         UI_Box* circle_picker = ui_box_make({}, 0);
       }
     }

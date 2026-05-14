@@ -51,6 +51,7 @@ D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] =
   { "RECT_10_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "RECT_01_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "RECT_11_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_BORNER_THICKNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, border_thickness), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 D3D11_INPUT_ELEMENT_DESC texture_program_input_assembler_element_desc[] = 
@@ -417,6 +418,7 @@ void r_submit(D_Command_batch_list* command_batch_list)
           instance_data.corner_radius_01 = node->command.u.rect_c.corner_radius[UV__01];
           instance_data.corner_radius_10 = node->command.u.rect_c.corner_radius[UV__10];
           instance_data.corner_radius_11 = node->command.u.rect_c.corner_radius[UV__11];
+          instance_data.border_thickness = node->command.u.rect_c.border_thickness;
 
           memcpy((D3D_Rect_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
         }

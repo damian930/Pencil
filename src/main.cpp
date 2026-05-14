@@ -100,24 +100,22 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   {
     Rect rect = root->final_on_screen_rect;
   
+    // todo: The flags here dont really coniside with drawing or not drawing of the boxes, i just 
+    //       get the data from the box, so either remove the flags, cause you dont need them,
+    //       or have this be like a builder path for the draw command based on the flags and the
+    //      data stored inside the box rect style
     if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
     {
       V4F32 corner_colors[UV__COUNT] = {}; 
       for EachEnum(i, UV, UV__00, UV__COUNT) { corner_colors[i] = root->shape_style.color; }
       V4F32 corner_radiuses = {};
       for EachArrElement(i, corner_radiuses.v) { corner_radiuses.v[i] = root->shape_style.corner_r.r.v[i]; }
-      d_add_rect_command_ex(rect, corner_colors, corner_radiuses);;
-  
-      // note: Old drawing api
-      // r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
+      d_add_rect_command_ex(rect, corner_colors, corner_radiuses, root->shape_style.border.width);
     }
   
     if (root->flags & UI_Box_flag__has_text_contents)
     {
       r_draw_text(root->text_style.text, rect_origin(rect), root->text_style.font, root->text_style.text_color); 
-  
-      // note: Old drawing api
-      // r_draw_text(rtv, v2f32(rect.x, rect.y), root->text_style.font, root->text_style.text_color, root->text_style.text);
     }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
@@ -423,10 +421,20 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     static V4F32 frame_color_hsv = hsv_from_rgb(red());
 
     r_clear_frame_buffer(rgb_from_hsv(frame_color_hsv));
+    // r_clear_frame_buffer(black());
 
     ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
     {
-      ui_set_next_b_color(blue());
+      // ui_set_next_size_x(ui_px(100));
+      // ui_set_next_size_y(ui_px(100));
+      // ui_set_next_border(5, green());
+      // ui_set_next_b_color(blue());
+      // ui_set_next_corner_r(ui_corner_r_all(1));
+      // UI_Box* rect_box = ui_box_make({}, {});
+
+      // ui_spacer(ui_px(50));
+
+      // ui_set_next_b_color(blue());
       // UI_PaddedBox(ui_px(25), Axis2__x)
       {
         V4F32 color = blue();
