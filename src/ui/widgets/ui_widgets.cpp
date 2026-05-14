@@ -149,7 +149,6 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   draw_data->colors[UV__11] = black();
   ui_box_set_custom_draw(color_picker_box, _ui_color_picker_sv_square_draw_func, draw_data);
 
-  
   // note:
   // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
   // the value goes bottom-up in the color picker

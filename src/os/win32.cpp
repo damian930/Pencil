@@ -327,7 +327,24 @@ void os_frame_begin()
     TranslateMessage(&msg);
     DispatchMessageA(&msg);
   }
-  
+
+  // Capturing the mouse when if pressed 
+  {
+    B32 some_button_is_down = false;
+    for (U32 button = Mouse_button__NONE + 1; button < Mouse_button__COUNT; button += 1)
+    {
+      OS_Mouse_button_state state = os_get_mouse_button_state((Mouse_button)button);
+      if (state.is_down) { some_button_is_down = true; }
+    }
+
+    HWND widnow_that_is_capturing_the_mouse = GetCapture();
+    if (os_state->window.handle != widnow_that_is_capturing_the_mouse && some_button_is_down) {
+      SetCapture(os_state->window.handle);
+    } else if (os_state->window.handle == widnow_that_is_capturing_the_mouse && !some_button_is_down) {
+      ReleaseCapture();
+    }
+  }
+
   // Mouse positions
   os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
   {
@@ -770,6 +787,13 @@ LRESULT win32_proc(
       OS_Mouse_button_state* button_state = win32_state->mouse_button_states + button;
       button_state->is_down = went_down;
       button_state->is_up   = went_up;
+    } break;
+
+    case WM_CAPTURECHANGED:
+    {
+      // note: This is called to use as a callback to let us know that some other window
+      //       is now capturing the mouse and we lost the capture.
+      //       There is no message for a callback when we start capturing.
     } break;
 
     case WM_NCCALCSIZE:
