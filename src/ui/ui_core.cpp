@@ -133,9 +133,9 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   
   box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
 
-  if (flags & UI_Box_flag__has_background) { box->shape_style.color  = ui_get_color();  }
-  if (flags & UI_Box_flag__has_borders)    { box->shape_style.border = ui_get_border(); }
-  // if (flags & UI_Box_flag__draw_corner_radius) { box->shape_style.corner_radius = ui_get_corner_radius(); }
+  if (flags & UI_Box_flag__has_background)    { box->shape_style.color  = ui_get_color();  }
+  if (flags & UI_Box_flag__has_borders)       { box->shape_style.border = ui_get_border(); }
+  if (flags & UI_Box_flag__has_corner_radius) { box->shape_style.corner_r = ui_get_corner_r(); }
 
   if (flags & UI_Box_flag__has_text_contents)
   {
@@ -816,14 +816,14 @@ V4F32 ui_get_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleS
 void ui_push_color(V4F32 v) { ui_push_color_no_flag(v);  }
 void ui_set_next_b_color(V4F32 v) { ui_set_next_color_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_background); }
 
-// void ui_push_corner_radius_no_flag(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-// void ui_set_next_corner_radius_no_flag(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-// void ui_pop_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-// void ui_auto_pop_corner_radius_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-// F32 ui_peek_corner_radius()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-// F32 ui_get_corner_radius()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-// void ui_push_corner_radius(F32 v) { ui_push_corner_radius_no_flag(v); ui_add_flags(UI_Box_flag__draw_corner_radius); }
-// void ui_set_next_corner_radius(F32 v) { ui_set_next_corner_radius_no_flag(v); ui_add_flags_to_next(UI_Box_flag__draw_corner_radius); }
+void ui_push_corner_r_no_flag(UI_Corner_radius_style v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+void ui_set_next_corner_r_no_flag(UI_Corner_radius_style v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+void ui_pop_corner_r()                                      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+void ui_auto_pop_corner_r_stack()                           { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+UI_Corner_radius_style ui_peek_corner_r()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+UI_Corner_radius_style ui_get_corner_r()                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+void ui_push_corner_r(UI_Corner_radius_style v)             { ui_push_corner_r_no_flag(v); ui_add_flags(UI_Box_flag__has_corner_radius); }
+void ui_set_next_corner_r(UI_Corner_radius_style v)         { ui_set_next_corner_r_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_corner_radius); }
 
 void ui_push_border_no_flag(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
 void ui_set_next_border_no_flag(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }

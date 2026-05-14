@@ -179,10 +179,10 @@ typedef double F64;
 #define InvalidCodePath(...) do { Assert(false); } while (0)
 #define NotImplemented(...)  do { Assert(false); } while (0)
 
-#define EachIndex(it, count)                  (U64 it = 0; it < count; it += 1)
-#define EachArrElement(it, static_arr)        (U64 it = 0; i < ArrayCount(static_arr); it += 1)
-#define EachInRange(it, range_min, range_max) (U64 it = range_min; it < range_max; it += 1)
-#define EachEnum(it, max_enum_value)          (U64 it = 0; it < max_enum_value; it += 1)
+#define EachIndex(it, count)                     (U64 it = 0; it < count; it += 1)
+#define EachArrElement(it, static_arr)           (U64 it = 0; i < ArrayCount(static_arr); it += 1)
+#define EachInRange(it, range_min, range_max)    (U64 it = range_min; it < range_max; it += 1)
+#define EachEnum(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)i + 1))	
 
 /* NOTES:
   Stack here is a list that only has the "first" node pointer. Nodes only have the "next" pointer.
@@ -425,8 +425,8 @@ enum Axis2 : U32 {
 
 enum UV : U32 {
 	UV__00,    // Top left
-	UV__01,    // Bottom left
 	UV__10,    // Top right
+	UV__01,    // Bottom left
 	UV__11,    // Bottom right
 	UV__COUNT,
 };

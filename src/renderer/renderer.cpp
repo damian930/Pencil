@@ -39,14 +39,18 @@ D3D_State* r_get_state()
 const global 
 D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] = 
 {
-  { "RECT_00_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_00), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_01_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_10_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_11_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_ORIGIN_X", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_ORIGIN_Y", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_WIDTH",    0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_HEIGHT",   0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, height),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_00_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_00),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_10_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_10),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_01_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_01),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_11_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_11),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_X",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_Y",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_WIDTH",            0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),            D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_HEIGHT",           0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, height),           D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_00_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_00), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_10_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_01_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_11_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 D3D11_INPUT_ELEMENT_DESC texture_program_input_assembler_element_desc[] = 
@@ -401,14 +405,18 @@ void r_submit(D_Command_batch_list* command_batch_list)
         for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
         {
           D3D_Rect_instance_data instance_data = {};
-          instance_data.origin_x = node->command.u.rect_c.rect.x; 
-          instance_data.origin_y = node->command.u.rect_c.rect.y; 
-          instance_data.width    = node->command.u.rect_c.rect.width;
-          instance_data.height   = node->command.u.rect_c.rect.height;
-          instance_data.color_00 = node->command.u.rect_c.vertex_color[UV__00];
-          instance_data.color_01 = node->command.u.rect_c.vertex_color[UV__01];
-          instance_data.color_10 = node->command.u.rect_c.vertex_color[UV__10];
-          instance_data.color_11 = node->command.u.rect_c.vertex_color[UV__11];
+          instance_data.origin_x      = node->command.u.rect_c.rect.x; 
+          instance_data.origin_y      = node->command.u.rect_c.rect.y; 
+          instance_data.width         = node->command.u.rect_c.rect.width;
+          instance_data.height        = node->command.u.rect_c.rect.height;
+          instance_data.color_00      = node->command.u.rect_c.vertex_color[UV__00];
+          instance_data.color_01      = node->command.u.rect_c.vertex_color[UV__01];
+          instance_data.color_10      = node->command.u.rect_c.vertex_color[UV__10];
+          instance_data.color_11      = node->command.u.rect_c.vertex_color[UV__11];
+          instance_data.corner_radius_00 = node->command.u.rect_c.corner_radius[UV__00];
+          instance_data.corner_radius_01 = node->command.u.rect_c.corner_radius[UV__01];
+          instance_data.corner_radius_10 = node->command.u.rect_c.corner_radius[UV__10];
+          instance_data.corner_radius_11 = node->command.u.rect_c.corner_radius[UV__11];
 
           memcpy((D3D_Rect_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
         }

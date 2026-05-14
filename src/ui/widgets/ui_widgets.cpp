@@ -125,11 +125,23 @@ struct _UI_Color_picker_sv_square_data {
 void _ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_square_data* data = (_UI_Color_picker_sv_square_data*)box->custom_draw_data;
-  d_add_rect_command_ex(box->final_on_screen_rect, data->colors[UV__00], data->colors[UV__01], data->colors[UV__10], data->colors[UV__11]);
+  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, V4F32{});
 }
 
 void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 color_hsv, V4F32* out_opt_new_color_hsv)
 {
+  // note:
+  // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
+  // the value goes bottom-up in the color picker
+  // the saturation goes left-right in the color picker
+  // the bottom left and right are black
+  // the top left is right
+  // the top right is the purest version of the color. This is represented by hue, but in the rgb worls this
+  // would have to be rgb_from_hsv(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
+  // saturated and brigth color for a shade of color, which is specified by the hue, which is a 0->360* or
+  // 0->1.0f value of the hsv color pallet. 
+
+  // note: Plan on how the state works here:
   // 1) Do the ui based on the current state of the data
   //    - Draw the picker based on the provider prev color
   // 2) Based on the inputs, update the data and just give the new data to the user, keep the old one
@@ -148,18 +160,7 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   draw_data->colors[UV__10] = rgb_from_hsv(pure_color_hsv);
   draw_data->colors[UV__11] = black();
   ui_box_set_custom_draw(color_picker_box, _ui_color_picker_sv_square_draw_func, draw_data);
-
-  // note:
-  // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
-  // the value goes bottom-up in the color picker
-  // the saturation goes left-right in the color picker
-  // the bottom left and right are black
-  // the top left is right
-  // the top right is the purest version of the color. This is represented by hue, but in the rgb worls this
-  // would have to be rgb_from_hsv(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
-  // saturated and brigth color for a shade of color, which is specified by the hue, which is a 0->360* or
-  // 0->1.0f value of the hsv color pallet. 
-
+  
   UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
   V2F32 mouse          = ui_get_mouse_pos();
   F32 circle_diameter  = 50.0f;
@@ -191,6 +192,7 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
         ui_set_next_b_color(white());
         ui_set_next_size_x(ui_px(circle_diameter));
         ui_set_next_size_y(ui_px(circle_diameter));
+        ui_set_next_corner_r(ui_corner_r_all(0.25));
         UI_Box* circle_picker = ui_box_make({}, 0);
       }
     }

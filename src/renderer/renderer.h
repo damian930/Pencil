@@ -39,8 +39,8 @@ struct Image {
 // ========
 struct D3D_Rect_instance_data {
   V4F32 color_00;
-  V4F32 color_01;
   V4F32 color_10;
+  V4F32 color_01;
   V4F32 color_11;
   
   F32 origin_x; 
@@ -48,6 +48,13 @@ struct D3D_Rect_instance_data {
 
   F32 width;
   F32 height;
+
+  F32 corner_radius_00;
+  F32 corner_radius_10;
+  F32 corner_radius_01;
+  F32 corner_radius_11;
+
+  // F32 _padding_[3];
 };
 
 struct D3D_Rect_unifrom_data {
@@ -174,6 +181,7 @@ enum D_Command_type : U32 {
 struct D_Rect_command {
   Rect rect;
   V4F32 vertex_color[UV__COUNT];
+  F32 corner_radius[UV__COUNT];
 };
 
 struct D_Texture_command {
@@ -267,7 +275,7 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
   batch->count += 1;
 }
 
-void d_add_rect_command_ex(Rect rect, V4F32 color_00, V4F32 color_01, V4F32 color_10, V4F32 color_11)
+void d_add_rect_command_ex(Rect rect, V4F32 corner_color[UV__COUNT], V4F32 corner_radiuses)
 {
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
@@ -279,17 +287,16 @@ void d_add_rect_command_ex(Rect rect, V4F32 color_00, V4F32 color_01, V4F32 colo
   }
 
   D_Command command = {};
-  command.u.rect_c.rect  = rect;
-  command.u.rect_c.vertex_color[UV__00] = color_00;
-  command.u.rect_c.vertex_color[UV__01] = color_01;
-  command.u.rect_c.vertex_color[UV__10] = color_10;
-  command.u.rect_c.vertex_color[UV__11] = color_11;
+  command.u.rect_c.rect = rect;
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = corner_color[i]; }
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = corner_radiuses.v[i]; }
   d_add_command_to_batch(batch, command);
 }
 
 void d_add_rect_command(Rect rect, V4F32 color)
 {
-  d_add_rect_command_ex(rect, color, color, color, color);
+  V4F32 colors[UV__COUNT] = { color, color, color, color };
+  d_add_rect_command_ex(rect, colors, V4F32{});
 }
 
 void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)

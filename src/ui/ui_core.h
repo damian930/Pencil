@@ -33,7 +33,7 @@ enum UI_Box_flag : U32 {
 
   // note: testing this for now, but these might be a part of a single bigger thing
   UI_Box_flag__has_background    = (1 << 1),
-  // UI_Box_flag__draw_corner_radius = (1 << 2),
+  UI_Box_flag__has_corner_radius = (1 << 2),
   UI_Box_flag__has_borders       = (1 << 3),
 
   UI_Box_flag__has_text_contents = (1 << 4),
@@ -66,8 +66,24 @@ struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop
 struct UI_Color_node { V4F32 v; UI_Color_node* next; };
 struct UI_Color_stack { UI_Color_node* first; U64 count; B32 pop_after_first_use; };
 
-// struct UI_Corner_radius_node { F32 v; UI_Corner_radius_node* next; };
-// struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_use; };
+#define _MAKE_CORNER_(v) v.r.v[UV__00] = r00; v.r.v[UV__10] = r10; v.r.v[UV__01] = r01; v.r.v[UV__11] = r11; 
+
+struct UI_Corner_radius_style {
+  V4F32 r;
+};
+struct UI_Corner_radius_node { UI_Corner_radius_style v; UI_Corner_radius_node* next; };
+struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_use; };
+
+// todo: Make this better looking 
+UI_Corner_radius_style ui_corner_r_all(F32 f) 
+{ 
+  UI_Corner_radius_style v = {};
+  v.r.v[UV__00] = f;
+  v.r.v[UV__01] = f;
+  v.r.v[UV__10] = f;
+  v.r.v[UV__11] = f;
+  return v;   
+}
 
 // struct UI_Border_width_node { F32 v; UI_Border_width_node* next; };
 // struct UI_Border_width_stack { UI_Border_width_node* first; U64 count; B32 pop_after_first_use; };
@@ -128,7 +144,7 @@ struct UI_Box {
 
   struct {
     V4F32 color; 
-    // F32 corner_radius;
+    UI_Corner_radius_style corner_r;
     UI_Border_style border;
   } shape_style;
 
@@ -202,7 +218,7 @@ struct UI_Context {
 
   // Shape style stacks
   UI_Color_stack         color_stack;
-  // UI_Corner_radius_stack corner_radius_stack;
+  UI_Corner_radius_stack corner_radius_stack;
   UI_Border_style_stack border_style_stack;
 
   // Text style stacks
@@ -321,14 +337,14 @@ V4F32 ui_get_color();
 void ui_push_color(V4F32 v);
 void ui_set_next_b_color(V4F32 v);
 
-// void ui_push_corner_radius_no_flag(F32 v);
-// void ui_set_next_corner_radius_no_flag(F32 v);
-// void ui_pop_corner_radius();
-// void ui_auto_pop_corner_radius_stack();
-// F32 ui_peek_corner_radius();
-// F32 ui_get_corner_radius();
-// void ui_push_corner_radius(F32 v);
-// void ui_set_next_corner_radius(F32 v);
+void ui_push_corner_r_no_flag(UI_Corner_radius_style v);
+void ui_set_next_corner_r_no_flag(UI_Corner_radius_style v);
+void ui_pop_corner_r();
+void ui_auto_pop_corner_r_stack();
+UI_Corner_radius_style ui_peek_corner_r();
+UI_Corner_radius_style ui_get_corner_r();
+void ui_push_corner_r(UI_Corner_radius_style v);
+void ui_set_next_corner_r(UI_Corner_radius_style v);
 
 void ui_push_border_no_flag(F32 width, V4F32 color);
 void ui_set_next_border_no_flag(F32 width, V4F32 color);
@@ -388,7 +404,7 @@ void __ui_clear_style_stacks()
   ctx->semantic_size_y_stack = {};
   
   ctx->color_stack         = {};
-  // ctx->corner_radius_stack = {};
+  ctx->corner_radius_stack = {};
   ctx->border_style_stack = {};
 
   ctx->text_color_stack = {};

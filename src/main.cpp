@@ -102,7 +102,11 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   
     if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
     {
-      d_add_rect_command(rect, root->shape_style.color);
+      V4F32 corner_colors[UV__COUNT] = {}; 
+      for EachEnum(i, UV, UV__00, UV__COUNT) { corner_colors[i] = root->shape_style.color; }
+      V4F32 corner_radiuses = {};
+      for EachArrElement(i, corner_radiuses.v) { corner_radiuses.v[i] = root->shape_style.corner_r.r.v[i]; }
+      d_add_rect_command_ex(rect, corner_colors, corner_radiuses);;
   
       // note: Old drawing api
       // r_draw_rect_pro(rect, root->shape_style.color, -1.0f * root->shape_style.border.width, root->shape_style.border.color);
