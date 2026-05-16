@@ -646,6 +646,7 @@ struct Rect {
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
 tu_specific V2F32 rect_get_origin(Rect rect);
 tu_specific V2F32 rect_get_dims(Rect rect);
+tu_specific B32 rect_match(Rect r1, Rect r2);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
@@ -692,18 +693,18 @@ tu_specific B32 __is_memory_zero(U8* p, U64 size)
 	do { \
 		StaticAssert("Cant copy memory safely, the sizes of dest and src variables are not the eqaul."); \
 		memcpy(&dest, &src, sizeof(dest)); \
-	} while(0);
+	} while(0)
 
-tu_specific B32 __mem_compare(U8* m1, U64 size1, U8* m2, U64 size2)
-{
-	if (size1 != size2) { return false; }
-	B32 result = true;
-	for EachIndex(i, size1)
-	{
-		if (m1[i] != m2[i]) { result = false; break; }
-	}
-	return result;
-}
+// tu_specific B32 __mem_compare(U8* m1, U64 size1, U8* m2, U64 size2)
+// {
+// 	if (size1 != size2) { return false; }
+// 	B32 result = true;
+// 	for EachIndex(i, size1)
+// 	{
+// 		if (m1[i] != m2[i]) { result = false; break; }
+// 	}
+// 	return result;
+// }
 
 // #define MemComapare(var1, size1, var2, size2) __mem_compare((U8*)&var1, sizeof(var1), (U8*)&var2, sizeof(var2))
 
@@ -818,7 +819,7 @@ V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
 // note: Claude did this 
 V4F32 hsv_from_rgb(V4F32 rgb)
 {
-    V4F32 hsv = v4f32(0.0f, 0.0f, 0.0f, 1.0f);
+    V4F32 hsv = v4f32(0.0f, 0.0f, 0.0f, rgb.a);
 
     F32 max = rgb.v[0];
     F32 min = rgb.v[0];
@@ -898,7 +899,7 @@ V4F32 rgb_from_hsv(V4F32 hsv)
     b = x;
   }
   
-  V4F32 rgb = v4f32(r + m, g + m, b + m, 1.0f);
+  V4F32 rgb = v4f32(r + m, g + m, b + m, hsv.a);
   return rgb;
 }
 

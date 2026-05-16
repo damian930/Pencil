@@ -45,7 +45,7 @@ struct UI_Slider_style {
   // V4 text_color;
   // F32 font_size;
 };
-F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max)
+B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, F32* out_opt_new_value)
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
 
@@ -60,72 +60,80 @@ F32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   ui_set_next_layout_axis(Axis2__x);
   UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow); // todo: Why do we have no draw overflow flag here
 
-  B32 is_data_present = true;
-
-  Rect slider_box_rect = {};
-  {
-    UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
-    is_data_present &= slider_box_data.found;
-    slider_box_rect = slider_box_data.on_screen_rect;
-  }
-
-  // if (slider_actions.is_hovered)
-  // {
-  //   current_value += slider_actions.wheel_move;
-  //   clamp_f32_inplace(&current_value, min, max);
-  // }
-  
-  F32 thumb_container_width = slider_box_rect.width;
-  F32 max_thumb_offset      = thumb_container_width;
-  F32 value_ratio           = (current_value - min) / (max - min);
-  clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
-  F32 thumb_offset = max_thumb_offset * value_ratio;
+  F32 new_value = current_value;
+  UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
 
   B32 moved_slider = false;
-  if (slider_actions.is_down)
+  if (slider_box_data.found)
   {
-    V2F32 mouse_pos = ui_get_mouse_pos();
-    thumb_offset = mouse_pos.x - slider_box_rect.x;
-    moved_slider = true;
-    ui_set_active_box(slider_box);
-  }
-  else 
-  {
-    ui_reset_active_box_match(slider_box);
-  }
-  clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
-
-  UI_Parent(slider_box)
-  {
-    ui_set_next_size_x(ui_px(thumb_offset));
-    ui_set_next_size_y(ui_px(slider_style->height));
-    // ui_set_next_corner_radius(slider_style->corner_r);
-    ui_set_next_b_color(slider_style->slided_part_color);
-    UI_Box* thumb_box = ui_box_make(Str8{}, 0);
-  }
-
-  // todo:
-  UI_Parent(slider_box)
-  {
-    ui_set_next_flags(UI_Box_flag__floating);
-    UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) 
-    UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
+    F32 thumb_container_width = slider_box_data.on_screen_rect.width;
+    F32 max_thumb_offset      = thumb_container_width;
+    F32 value_ratio           = (current_value - min) / (max - min);
+    clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
+    F32 thumb_offset = max_thumb_offset * value_ratio;
+  
+    UI_Parent(slider_box)
     {
-      // ui_set_next_text_color(slider_style->text_color);
-      // ui_set_next_font_size(slider_style->font_size);
-      ui_label_f(slider_style->fmt_str, current_value);
+      ui_set_next_size_x(ui_px(thumb_offset));
+      ui_set_next_size_y(ui_px(slider_style->height));
+      // ui_set_next_corner_radius(slider_style->corner_r);
+      ui_set_next_b_color(slider_style->slided_part_color);
+      UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), 0);
+    }
+  
+    UI_Parent(slider_box)
+    {
+      ui_set_next_flags(UI_Box_flag__floating);
+      UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) 
+      UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
+      {
+        // ui_set_next_text_color(slider_style->text_color);
+        // ui_set_next_font_size(slider_style->font_size);
+        ui_label_f(slider_style->fmt_str, current_value);
+      }
+    }
+  
+    // if (slider_actions.is_hovered)
+    // {
+    //   current_value += slider_actions.wheel_move;
+    //   clamp_f32_inplace(&current_value, min, max);
+    // }
+    
+    if (slider_actions.is_down)
+    {
+      // ui_set_active_box(slider_box);
+      V2F32 mouse_pos = ui_get_mouse_pos();
+      thumb_offset = mouse_pos.x - slider_box_data.on_screen_rect.x;
+      moved_slider = true;
+    }
+    else 
+    {
+      // ui_reset_active_box_match(slider_box);
+    }
+    clamp_f32_inplace(&thumb_offset, 0.0f, max_thumb_offset);
+  
+    if (moved_slider)
+    {
+      new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
+      if (f32_is_nan(new_value)) { BP; }
     }
   }
 
-  F32 new_value = current_value;
-  if (moved_slider)
-  {
-    new_value = lerp_f32(min, max, (thumb_offset / max_thumb_offset));
-  }
-  return new_value;
+  if (out_opt_new_value) { *out_opt_new_value = new_value; }
+
+  return moved_slider;
 }
 
+// - Color pickers
+void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);
+void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv);
 
+void __ui_color_picker_sv_square_draw_func(UI_Box* box);
+void __ui_color_picker_h_draw_func(UI_Box* box);
+
+///////////////////////////////////////////////////////////
+// - Other old code
+//
 // // - Text input field 
 // U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 
 // U64 __ui_move_with_control_right(Str8 str, U64 current_pos);

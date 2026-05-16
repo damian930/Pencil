@@ -37,6 +37,8 @@ struct D_Command_node {
 
 struct D_Command_batch {
   D_Command_type command_type;
+  ID3D11RenderTargetView* rtv;
+  Rect scissor_rect;
 
   // Fat stuct data
   ID3D11Texture2D* texture;
@@ -58,7 +60,7 @@ struct __D_Rect_builder {
   Rect rect;
   V4F32 corner_colors[UV__COUNT];
 
-  __D_Rect_builder* (*color_fp) (V4F32 colors_fp);
+  __D_Rect_builder* (*color) (V4F32 colors);
 
   void (*add) ();
   D_Command (*get) ();
@@ -67,8 +69,11 @@ struct __D_Rect_builder {
 struct D_State {
   Arena* arena_for_draw_commands;
   D_Command_batch_list command_batch_list;
-
+ 
+  // Some state, nothing specific yet
   __D_Rect_builder rect_builder;
+  ID3D11RenderTargetView* current_rtv;
+  Rect current_scissor_rect;
 };
 
 
@@ -95,5 +100,9 @@ __D_Rect_builder* d_draw_rect(Rect rect);
 void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness);
 void d_add_rect_command(Rect rect, V4F32 color);
 void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
+
+// - Misc
+void d_set_render_target(ID3D11RenderTargetView* rtv);
+void d_set_scissor_rect(Rect rect);
 
 #endif

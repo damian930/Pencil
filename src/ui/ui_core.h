@@ -193,7 +193,7 @@ struct UI_Context {
   F32 mouse_y;
 
   // todo: Maybe dont call this "active", but rather "exclusive"
-  Str8 currently_active_box_id; // This is for semantic ui meaning
+  // Str8 currently_active_box_id; // This is for semantic ui meaning
   
   // === todo: I dont know how to explaine this fully even to myself at this moment --> this is for inputs, not semantic meaning 
   Str8 currently_interacted_with_box_id;
@@ -279,16 +279,17 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
 void ui_layout_box(UI_Box* root, Axis2 axis);
 
 // - Active box stuff
+// note: This is more like "interacted with box" and not active
 B32 ui_is_active_id(Str8 box_id);
-void ui_set_active_id(Str8 box_id);
-void ui_reset_active_id_match(Str8 box_id);
+// void ui_set_active_id(Str8 box_id);
+// void ui_reset_active_id_match(Str8 box_id);
 //
 B32 ui_is_active_box(UI_Box* box);
-void ui_set_active_box(UI_Box* box);
-void ui_reset_active_box_match(UI_Box* box);
+// void ui_set_active_box(UI_Box* box);
+// void ui_reset_active_box_match(UI_Box* box);
 //
 B32 ui_has_active();
-void ui_reset_active();
+// void ui_reset_active();
 
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);

@@ -128,9 +128,13 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   UI_Box* box = ArenaPush(arena, UI_Box);
   box->flags                   = flags;
   box->layout_axis             = ui_get_layout_axis();   
+  if (f32_is_nan(ui_peek_size_x().value)) { BP; }
+
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
   
+  if (f32_is_nan(box->semantic_size[Axis2__x].value)) { BP; }
+
   box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
 
   if (flags & UI_Box_flag__has_background)    { box->shape_style.color  = ui_get_color();  }
@@ -203,7 +207,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   arena_clear(arena);
   
   // Copying these since they are allocated on old build arenas
-  ctx->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_active_box_id);
+  // ctx->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_active_box_id);
   ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_interacted_with_box_id);
 
   __ui_push_defaults_onto_stacks();
@@ -240,6 +244,7 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
     case UI_Size_kind__px:
     {
       root->final_on_screen_size.v[axis] = root->semantic_size[axis].value;
+      if (f32_is_nan(root->final_on_screen_size.v[axis])) { BP; }
     } break;
 
     case UI_Size_kind__text:
@@ -335,6 +340,7 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
           F32 p_to_to_keep = child->semantic_size[axis].strictness;
           F32 p_to_give_out = 1.0f - p_to_to_keep;
           F32 size_to_give_out = child_size * p_to_give_out;
+          if (f32_is_nan(size_to_give_out)) { BP; }
           children_size_to_maybe_give_out += size_to_give_out;
         }
         F32 root_size = root->final_on_screen_size.v[axis];
@@ -372,9 +378,6 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
 
     } break;
   }
-
-  
-
 }
 
 void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
@@ -506,9 +509,11 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis)
 void ui_layout_box(UI_Box* root, Axis2 axis)
 { 
   ui_do_sizing_for_fixed_sized_box(root, axis);
+  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
   ui_do_sizing_for_parent_dependant_box(root, axis);
+  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
   ui_do_sizing_for_child_dependant_box(root, axis);
-
+  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
   ui_do_layout_fixing(root, axis);
 
   ui_do_relative_parent_offsets_for_box(root, axis);
@@ -589,47 +594,47 @@ UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id)
 
 B32 ui_is_active_id(Str8 box_id)
 {
-  return str8_match(ui_get_context()->currently_active_box_id, box_id, 0); 
+  return str8_match(ui_get_context()->currently_interacted_with_box_id, box_id, 0); 
 }
 
-void ui_set_active_id(Str8 box_id)
-{
-  UI_Context* context = ui_get_context();
-  context->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), box_id);
-}
+// void ui_set_active_id(Str8 box_id)
+// {
+//   UI_Context* context = ui_get_context();
+//   context->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), box_id);
+// }
 
-void ui_reset_active_id_match(Str8 box_id)
-{
-  UI_Context* context = ui_get_context();
-  if (str8_match(context->currently_active_box_id, box_id, 0)) {
-    ui_reset_active();
-  }
-}
+// void ui_reset_active_id_match(Str8 box_id)
+// {
+//   UI_Context* context = ui_get_context();
+//   if (str8_match(context->currently_active_box_id, box_id, 0)) {
+//     ui_reset_active();
+//   }
+// }
 
 B32 ui_is_active_box(UI_Box* box)
 {
   return ui_is_active_id(box->id);
 }
 
-void ui_set_active_box(UI_Box* box)
-{
-  return ui_set_active_id(box->id);
-}
+// void ui_set_active_box(UI_Box* box)
+// {
+//   return ui_set_active_id(box->id);
+// }
 
-void ui_reset_active_box_match(UI_Box* box)
-{
-  ui_reset_active_id_match(box->id);
-}
+// void ui_reset_active_box_match(UI_Box* box)
+// {
+//   ui_reset_active_id_match(box->id);
+// }
 
 B32 ui_has_active()
 {
-  return str8_match(ui_get_context()->currently_active_box_id, Str8{}, 0);
+  return str8_match(ui_get_context()->currently_interacted_with_box_id, Str8{}, 0);
 }
 
-void ui_reset_active()
-{
-  ui_get_context()->currently_active_box_id = Str8{};
-}
+// void ui_reset_active()
+// {
+//   ui_get_context()->currently_active_box_id = Str8{};
+// }
 
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
@@ -676,6 +681,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     {
       if (os_mouse_button_went_down(Mouse_button__Left)) // todo: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
       {
+        // New box is interacted, so setting the state for it
         Assert(!was_down);
         Assert(ctx->currently_interacted_with_box_id.count == 0); 
         Assert(ctx->currently_interacted_with_box__is_down == false);
@@ -790,8 +796,8 @@ void ui_auto_pop_layout_axis_stack()  { UI_Context* ctx = ui_get_context(); _UI_
 Axis2 ui_peek_layout_axis()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
 Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
 
-void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
-void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
+void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); if (f32_is_nan(v.value)) { BP; } _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
+void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); if (f32_is_nan(v.value)) { BP; } _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
 void ui_pop_size_x()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 void ui_auto_pop_size_x_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 UI_Size ui_peek_size_x()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }

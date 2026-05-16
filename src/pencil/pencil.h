@@ -5,10 +5,14 @@
 #include "os/win32.h"
 
 struct Draw_record {
-  ID3D11RenderTargetView* texture_before_we_affected; // This is allocated when done drawing
-  ID3D11RenderTargetView* texture_after_we_affected;  // This is allocated when done drawing
+  // These are allocated when dont drawing
+  ID3D11Texture2D*        texture_before_we_affected;
+  ID3D11Texture2D*        texture_after_we_affected;
+  ID3D11RenderTargetView* texture_before_we_affected_rtv;  
+  ID3D11RenderTargetView* texture_after_we_affected_rtv;   
 
-  // These are also used for draw record free list
+  // These are used in general to have a list of drawings 
+  // and are also used for managing a free list 
   Draw_record* next;
   Draw_record* prev;
 };
@@ -18,13 +22,15 @@ struct Pencil_state {
   Arena* frame_arena;
   
   U32 pen_size;
-  V4F32 pen_color;
+  V4F32 pen_color_hsva;
   U32 eraser_size;
 
   U32 draw_texures_width;
   U32 draw_texures_height;
-  ID3D11RenderTargetView* draw_texture_always_fresh; 
-  ID3D11RenderTargetView* draw_texture_not_that_fresh;
+  ID3D11Texture2D*        draw_texture_always_fresh;
+  ID3D11Texture2D*        draw_texture_not_that_fresh;
+  ID3D11RenderTargetView* draw_texture_always_fresh_rtv; 
+  ID3D11RenderTargetView* draw_texture_not_that_fresh_rtv;
 
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
@@ -52,6 +58,9 @@ struct Pencil_state {
   // 
   B32 signal_swap_to_eraser;
   B32 signal_swap_to_pen;
+  //
+  B32 signal_new_pen_color_hsva;
+  V4F32 new_pen_color_hsva;
 
   // Misc
   // Font font_texture_for_ui;

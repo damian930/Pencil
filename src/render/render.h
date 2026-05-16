@@ -100,8 +100,6 @@ struct D3D_Program {
 
 struct D3D_State {
   // These we get at initialisation
-  //
-  // State
   IDXGIFactory2*       dxgi_factory;
   IDXGIAdapter*        dxgi_adapter;
   ID3D11Device*        device;
@@ -114,8 +112,7 @@ struct D3D_State {
   //
   ID3D11Texture2D*        frame_buffer_texture;
   ID3D11RenderTargetView* frame_buffer_rtv;
-  
-  // Draw programs
+  //
   ID3D11Buffer* rect_program_ia_buffer;
   ID3D11Buffer* rect_program_uniform_buffer;
   D3D_Program   rect_program;
@@ -123,6 +120,9 @@ struct D3D_State {
   ID3D11Buffer* texture_program_ia_buffer;
   ID3D11Buffer* texture_program_uniform_buffer;
   D3D_Program   texture_program;
+  
+  // Per frame stuff
+  V2F32 viewport_dims;
 
   // -----------------------------
   // Debug stuff for layer
@@ -155,7 +155,8 @@ void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11R
 
 // - Other
 ID3D11RenderTargetView* r_get_frame_buffer_rtv();
-ID3D11RenderTargetView* r_make_texture(U32 width, U32 height);
+ID3D11Texture2D* r_make_texture(U32 width, U32 height);
+ID3D11RenderTargetView* r_rtv_from_texture(ID3D11Texture2D* texture);
 D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv);
 V2F32 r_get_texture_dims(ID3D11Texture2D* rtv);
 D3D_Program r_program_from_file(const WCHAR* shader_program_file, 
@@ -170,7 +171,8 @@ void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
 ID3D11Texture2D* r_load_texture_from_file(Str8 file_name);
 ID3D11Texture2D* r_load_texture_from_image(Image image);
 void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
-void r_scissoring_set(Rect rect);
-void r_scissoring_clear();
+V2F32 r_get_viewport_dims();
+// void r_scissoring_set(Rect rect);
+// void r_scissoring_clear();
 
 #endif

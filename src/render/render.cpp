@@ -271,7 +271,7 @@ void r_render_begin(V2F32 vp_dims)
   D3D_State* d3d = r_get_state();
 
   // Resizing the frame buffer
-  if (vp_dims.x != 0.0f && vp_dims.y != 0.0f)
+  if (vp_dims.x != 0.0f && vp_dims.y != 0.0f && !v2f32_match(d3d->viewport_dims, vp_dims))
   {
     V2F32 window_dims = os_get_client_area_dims();
     d3d->frame_buffer_texture->Release();
@@ -279,6 +279,7 @@ void r_render_begin(V2F32 vp_dims)
     d3d->swap_chain->ResizeBuffers(0, (UINT)window_dims.x, (UINT)window_dims.y, DXGI_FORMAT_UNKNOWN, 0);
     d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
     d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
+    d3d->viewport_dims = window_dims;
   }
 }
 
@@ -370,13 +371,16 @@ void r_submit(D_Command_batch_list* command_batch_list)
       d3d->context->RSSetViewports(1, &vp);
     }
 
-    d3d->context->OMSetRenderTargets(1, &d3d->frame_buffer_rtv, Null);
     d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U);
   }
 
   // Working with batches
   for (D_Command_batch* batch = command_batch_list->first; batch; batch = batch->next_batch)
   {
+    d3d->context->OMSetRenderTargets(1, &batch->rtv, Null);
+    
+    d3d->context->RSSetScissorRects(0, 0);
+
     if (batch->command_type == D_Command_type__Rect)
     {
       d3d->context->IASetInputLayout(d3d->rect_program.input_layout);
@@ -634,10 +638,10 @@ ID3D11RenderTargetView* r_get_frame_buffer_rtv()
   return r_get_state()->frame_buffer_rtv;
 }
 
-ID3D11RenderTargetView* r_make_texture(U32 width, U32 height)
+// note: This makes a texture that is for rendering into and rendering with
+ID3D11Texture2D* r_make_texture(U32 width, U32 height)
 {
   D3D_State* d3d = r_get_state();
-
   ID3D11Texture2D* texture = 0;
   {
     D3D11_TEXTURE2D_DESC desc = {};
@@ -653,14 +657,15 @@ ID3D11RenderTargetView* r_make_texture(U32 width, U32 height)
     HRESULT hr = d3d->device->CreateTexture2D(&desc, Null, &texture);
     Handle(hr == S_OK);
   }
+  return texture;
+}
 
+ID3D11RenderTargetView* r_rtv_from_texture(ID3D11Texture2D* texture)
+{
+  D3D_State* d3d = r_get_state();
   ID3D11RenderTargetView* rtv = 0;
-  {
-    HRESULT hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &rtv);
-    Handle(hr == S_OK);
-  }
-
-  texture->Release();
+  HRESULT hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)texture, 0, &rtv);
+  Handle(hr == S_OK);
   return rtv;
 }
 
@@ -919,6 +924,12 @@ void r_copy_from_texture_to_texture(
   d3d->context->CopyResource(dest_resource, src_resource);
 }
 
+V2F32 r_get_viewport_dims()
+{
+  return r_get_state()->viewport_dims;
+}
+
+/*
 void r_scissoring_set(Rect rect)
 {
   D3D_State* d3d = r_get_state();
@@ -947,7 +958,9 @@ void r_scissoring_set(Rect rect)
   new_rasterizer_state->Release();
   old_rasterizer_state->Release();
 }
+*/
 
+/*
 void r_scissoring_clear()
 {
   D3D_State* d3d = r_get_state();
@@ -969,5 +982,6 @@ void r_scissoring_clear()
   new_rasterizer_state->Release();
   old_rasterizer_state->Release();
 }
+*/
 
 #endif

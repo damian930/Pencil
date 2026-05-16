@@ -51,8 +51,8 @@ UI_Actions ui_button(Str8 str) // todo: Remove the fucking rli events from there
   ui_push_size_y(ui_text_size());
   UI_Box* box = ui_box_make(str, UI_Box_flag__has_background|UI_Box_flag__has_text_contents);
   UI_Actions actions = ui_actions_from_box(box);
-  if (actions.is_down) { ui_set_active_box(box); }
-  else if (!actions.is_down) { ui_reset_active_box_match(box); } // todo: This shoud also check if it is active, cause then if we just down on the button it will reset the global active state
+  // if (actions.is_down) { ui_set_active_box(box); }
+  // else if (!actions.is_down) { ui_reset_active_box_match(box); } // todo: This shoud also check if it is active, cause then if we just down on the button it will reset the global active state
   return actions;
 }
 
@@ -126,13 +126,170 @@ struct _UI_Color_picker_h_data {
   Axis2 axis;
 };
 
-void _ui_color_picker_sv_square_draw_func(UI_Box* box)
+void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32* out_opt_new_sat, F32* out_opt_new_val)
+{
+  // note:
+  // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
+  // the value goes bottom-up in the color picker
+  // the saturation goes left-right in the color picker
+  // the bottom left and right are black
+  // the top left is right
+  // the top right is the purest version of the color. This is represented by hue, but in the rgb worls this
+  // would have to be rgb_from_hsv(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
+  // saturated and brigth color for a shade of color, which is specified by the hue, which is a 0->360* or
+  // 0->1.0f value of the hsv color pallet. 
+
+  // note: Plan on how the state works here:
+  // 1) Do the ui based on the current state of the data
+  //    - Draw the picker based on the provider prev color
+  // 2) Based on the inputs, update the data and just give the new data to the user, keep the old one
+  //    - Based on mouse pos + color picker dims, get the new color, return to the user
+  
+  // Setting up the color picke box
+  ui_set_next_size_x(size_x);
+  ui_set_next_size_y(size_y);
+  UI_Box* color_picker_box = ui_box_make(id, 0);
+
+  V4F32 pure_hsv = v4f32(hsva.hue, 1.0f, 1.0f, 1.0f);
+
+  _UI_Color_picker_sv_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_sv_data);
+  draw_data->colors[UV__00] = white(); 
+  draw_data->colors[UV__01] = black();
+  draw_data->colors[UV__10] = rgb_from_hsv(pure_hsv);
+  draw_data->colors[UV__11] = black();
+  ui_box_set_custom_draw(color_picker_box, __ui_color_picker_sv_square_draw_func, draw_data);
+  
+  UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
+  V2F32 mouse          = ui_get_mouse_pos();
+  F32 circle_diameter  = 15.0f;
+
+  F32 circle_x_offset = 0.0f;
+  F32 circle_y_offset = 0.0f;
+  if (box_data.found)
+  {
+    // Reverse lerp
+    F32 x_t = hsva.saturation;
+    F32 y_t = hsva.value ;
+    clamp_f32_inplace(&x_t, 0.0f, 1.0f);
+    clamp_f32_inplace(&y_t, 0.0f, 1.0f);
+
+    circle_x_offset = (box_data.on_screen_rect.width * x_t) - (circle_diameter / 2.0f);
+    circle_y_offset = (box_data.on_screen_rect.height * (1.0f - y_t)) - (circle_diameter / 2.0f);
+  }
+
+  // Color picker tree
+  UI_Parent(color_picker_box)
+  {
+    UI_Col() 
+    {
+      ui_spacer(ui_px(circle_y_offset));
+      UI_Row()
+      {
+        ui_spacer(ui_px(circle_x_offset));
+
+        ui_set_next_size_x(ui_px(circle_diameter));
+        ui_set_next_size_y(ui_px(circle_diameter));
+        ui_set_next_corner_r(ui_corner_r_all(1));
+        ui_set_next_border(4, white());
+        ui_set_next_softness(1.5f);
+        UI_Box* circle_picker = ui_box_make(Str8{}, 0);
+      }
+    }
+  }
+
+  // Updating the colors 
+  F32 new_sat = hsva.saturation;
+  F32 new_val = hsva.value;
+  UI_Actions actions = ui_actions_from_box(color_picker_box);
+  if (!actions.is_down) {
+    // ui_reset_active_box_match(color_picker_box); 
+    os_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
+  }
+  else {
+    // ui_set_active_box(color_picker_box);
+    os_set_cursor(OS_Cursor__hand);
+    
+    if (box_data.found)
+    {
+      F32 picker_relative_x = (mouse.x - box_data.on_screen_rect.x) / (box_data.on_screen_rect.width);
+      F32 picker_relative_y = 1.0f - ((mouse.y - box_data.on_screen_rect.y) / (box_data.on_screen_rect.height)); // Flipping the Y since color picker is bottom_left->up and the screen is top_left->down
+      clamp_f32_inplace(&picker_relative_x, 0.0f, 1.0f);
+      clamp_f32_inplace(&picker_relative_y, 0.0f, 1.0f);
+
+      // Getting the color for the realative mouse pos
+      new_sat = picker_relative_x;
+      new_val = picker_relative_y;
+    }
+  }
+  if (out_opt_new_sat) { *out_opt_new_sat = new_sat; }
+  if (out_opt_new_val) { *out_opt_new_val = new_val; }
+}
+
+void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv)
+{
+  ui_set_next_size_x(size_x);
+  ui_set_next_size_y(size_y);
+  UI_Box* color_picker_box = ui_box_make(id, 0);
+
+  _UI_Color_picker_h_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_h_data);
+  draw_data->axis = direction;
+  ui_box_set_custom_draw(color_picker_box, __ui_color_picker_h_draw_func, draw_data);
+
+  UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
+  V2F32 box_origin     = rect_get_origin(box_data.on_screen_rect);
+  V2F32 box_dims       = rect_get_dims(box_data.on_screen_rect);
+
+  F32 thumb_width  = 10.0f;
+  F32 thumb_offset = 0.0f;
+  if (box_data.found)
+  { 
+    thumb_offset = hue * box_dims.v[direction] - (thumb_width / 2.0f);
+  }
+
+  UI_Parent(color_picker_box)
+  {
+    UI_Stack(direction)
+    {
+      ui_spacer(ui_px(thumb_offset));
+
+      if (box_dims.x != 0.0f)
+      {
+        ui_set_next_size_x(ui_px(thumb_width));
+        ui_set_next_size_y(ui_px(box_dims.v[axis2_other(direction)]));
+      }
+      ui_set_next_corner_r(ui_corner_r_all(0.25));
+      ui_set_next_border(4, white());
+      UI_Box* thumb = ui_box_make({}, 0);
+    }
+  }
+
+  F32 new_hue = hue;
+  UI_Actions actions = ui_actions_from_box(color_picker_box);
+  if (!actions.is_down)
+  {
+    // ui_reset_active_box_match(color_picker_box);
+  }
+  else if (actions.is_down)
+  {
+    // ui_set_active_box(color_picker_box);
+    if (box_data.found)
+    {
+      F32 mouse_pos_rel = ui_get_mouse_pos().v[direction] - box_origin.v[direction] - (thumb_width / 2.0f);
+      new_hue = mouse_pos_rel / box_dims.v[direction];
+      clamp_f32_inplace(&new_hue, 0.0f, 1.0f);
+    }
+  }
+
+  if (out_opt_new_color_hsv) { *out_opt_new_color_hsv = new_hue; }
+}
+
+void __ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_data* data = (_UI_Color_picker_sv_data*)box->custom_draw_data;
   d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {}, {});
 }
 
-void _ui_color_picker_h_draw_func(UI_Box* box)
+void __ui_color_picker_h_draw_func(UI_Box* box)
 {
   _UI_Color_picker_h_data* data = (_UI_Color_picker_h_data*)box->custom_draw_data;
 
@@ -184,161 +341,6 @@ void _ui_color_picker_h_draw_func(UI_Box* box)
 
     hue_section_start += hue_section_length;
   }
-}
-
-void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val)
-{
-  // note:
-  // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
-  // the value goes bottom-up in the color picker
-  // the saturation goes left-right in the color picker
-  // the bottom left and right are black
-  // the top left is right
-  // the top right is the purest version of the color. This is represented by hue, but in the rgb worls this
-  // would have to be rgb_from_hsv(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
-  // saturated and brigth color for a shade of color, which is specified by the hue, which is a 0->360* or
-  // 0->1.0f value of the hsv color pallet. 
-
-  // note: Plan on how the state works here:
-  // 1) Do the ui based on the current state of the data
-  //    - Draw the picker based on the provider prev color
-  // 2) Based on the inputs, update the data and just give the new data to the user, keep the old one
-  //    - Based on mouse pos + color picker dims, get the new color, return to the user
-  
-  // Setting up the color picke box
-  ui_set_next_size_x(size_x);
-  ui_set_next_size_y(size_y);
-  UI_Box* color_picker_box = ui_box_make(id, 0);
-
-  V4F32 pure_hsv = v4f32(hsv.hue, 1.0f, 1.0f, 1.0f);
-
-  _UI_Color_picker_sv_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_sv_data);
-  draw_data->colors[UV__00] = white(); 
-  draw_data->colors[UV__01] = black();
-  draw_data->colors[UV__10] = rgb_from_hsv(pure_hsv);
-  draw_data->colors[UV__11] = black();
-  ui_box_set_custom_draw(color_picker_box, _ui_color_picker_sv_square_draw_func, draw_data);
-  
-  UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
-  V2F32 mouse          = ui_get_mouse_pos();
-  F32 circle_diameter  = 15.0f;
-
-  F32 circle_x_offset = 0.0f;
-  F32 circle_y_offset = 0.0f;
-  if (box_data.found)
-  {
-    // Reverse lerp
-    F32 x_t = hsv.saturation;
-    F32 y_t = hsv.value ;
-    clamp_f32_inplace(&x_t, 0.0f, 1.0f);
-    clamp_f32_inplace(&y_t, 0.0f, 1.0f);
-
-    circle_x_offset = (box_data.on_screen_rect.width * x_t) - (circle_diameter / 2.0f);
-    circle_y_offset = (box_data.on_screen_rect.height * (1.0f - y_t)) - (circle_diameter / 2.0f);
-  }
-
-  // Color picker tree
-  UI_Parent(color_picker_box)
-  {
-    UI_Col() 
-    {
-      ui_spacer(ui_px(circle_y_offset));
-      UI_Row()
-      {
-        ui_spacer(ui_px(circle_x_offset));
-
-        ui_set_next_size_x(ui_px(circle_diameter));
-        ui_set_next_size_y(ui_px(circle_diameter));
-        ui_set_next_corner_r(ui_corner_r_all(1));
-        ui_set_next_border(4, white());
-        ui_set_next_softness(1.5f);
-        UI_Box* circle_picker = ui_box_make({}, 0);
-      }
-    }
-  }
-
-  // Updating the colors 
-  F32 new_sat = hsv.saturation;
-  F32 new_val = hsv.value;
-  UI_Actions actions = ui_actions_from_box(color_picker_box);
-  if (!actions.is_down) {
-    os_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
-    ui_reset_active_box_match(color_picker_box); 
-  }
-  else {
-    os_set_cursor(OS_Cursor__hand);
-    
-    if (box_data.found)
-    {
-      F32 picker_relative_x = (mouse.x - box_data.on_screen_rect.x) / (box_data.on_screen_rect.width);
-      F32 picker_relative_y = 1.0f - ((mouse.y - box_data.on_screen_rect.y) / (box_data.on_screen_rect.height)); // Flipping the Y since color picker is bottom_left->up and the screen is top_left->down
-      clamp_f32_inplace(&picker_relative_x, 0.0f, 1.0f);
-      clamp_f32_inplace(&picker_relative_y, 0.0f, 1.0f);
-
-      // Getting the color for the realative mouse pos
-      new_sat = picker_relative_x;
-      new_val = picker_relative_y;
-    }
-  }
-  if (out_opt_new_sat) { *out_opt_new_sat = new_sat; }
-  if (out_opt_new_val) { *out_opt_new_val = new_val; }
-}
-
-void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv)
-{
-  ui_set_next_size_x(size_x);
-  ui_set_next_size_y(size_y);
-  UI_Box* color_picker_box = ui_box_make(id, 0);
-
-  _UI_Color_picker_h_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_h_data);
-  draw_data->axis = direction;
-  ui_box_set_custom_draw(color_picker_box, _ui_color_picker_h_draw_func, draw_data);
-
-  UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
-  V2F32 box_origin     = rect_get_origin(box_data.on_screen_rect);
-  V2F32 box_dims       = rect_get_dims(box_data.on_screen_rect);
-
-  F32 thumb_width  = 10.0f;
-  F32 thumb_offset = 0.0f;
-  if (box_data.found)
-  { 
-    thumb_offset = hue * box_dims.v[direction] - (thumb_width / 2.0f);
-  }
-
-  UI_Parent(color_picker_box)
-  {
-    UI_Stack(direction)
-    {
-      ui_spacer(ui_px(thumb_offset));
-
-      if (box_dims.x != 0.0f)
-      {
-        ui_set_next_size_x(ui_px(thumb_width));
-        ui_set_next_size_y(ui_px(box_dims.v[axis2_other(direction)]));
-      }
-      ui_set_next_corner_r(ui_corner_r_all(0.25));
-      ui_set_next_border(4, white());
-      UI_Box* thumb = ui_box_make({}, 0);
-    }
-  }
-
-  F32 new_hue = hue;
-  UI_Actions actions = ui_actions_from_box(color_picker_box);
-  if (!actions.is_down)
-  {
-    ui_reset_active_box_match(color_picker_box);
-  }
-  else if (actions.is_down)
-  {
-    if (box_data.found)
-    {
-      F32 mouse_pos_rel = ui_get_mouse_pos().v[direction] - box_origin.v[direction] - (thumb_width / 2.0f);
-      new_hue = mouse_pos_rel / box_dims.v[direction];
-      clamp_f32_inplace(&new_hue, 0.0f, 1.0f);
-    }
-  }
-
-  if (out_opt_new_color_hsv) { *out_opt_new_color_hsv = new_hue; }
 }
 
 // ///////////////////////////////////////////////////////////

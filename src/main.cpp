@@ -39,7 +39,7 @@ abstract.
 #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -123,8 +123,6 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
     Rect scissor_rect = parent_scissor_rect;
-    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y) { NotImplemented(); }
-    /*
     if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
     {
       RangeF2V32 default_scissor_box = {};
@@ -134,8 +132,6 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
       RangeF2V32 new_scissor_bbox = default_scissor_box;
       
-      // if (root->flags & UI_Box_flag__dont_draw_overflow_y) { BP; }
-  
       // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
       // so a child cant make a scissor larger than the parent and then have its children
       // drawn, though the parent has no overflow flag spcefied.
@@ -190,24 +186,21 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       }
   
       scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-      r_scissoring_set(scissor_rect);
+      d_set_scissor_rect(scissor_rect);
     }
-    */
   
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
       ui_draw_box(child, scissor_rect);
     }
   
-    /*
     // No longer scissoring
     if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
     {
       if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-        r_scissoring_set(parent_scissor_rect); 
+        d_set_scissor_rect(parent_scissor_rect); 
       }
     }
-    */
   }
 
 }
@@ -325,15 +318,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.arena = arena_alloc(Megabytes(64));
     P.frame_arena = arena_alloc(Megabytes(64));
   
-    P.pen_size    = 10;
-    P.pen_color   = yellow();
-    P.eraser_size = 20;
+    P.pen_size       = 10;
+    P.pen_color_hsva = hsv_from_rgb(yellow());
+    P.eraser_size    = 20;
 
     P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
     P.draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
   
-    P.draw_texture_always_fresh   = r_make_texture(P.draw_texures_width, P.draw_texures_height);
-    P.draw_texture_not_that_fresh = r_make_texture(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_always_fresh       = r_make_texture(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_not_that_fresh     = r_make_texture(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_always_fresh_rtv   = r_rtv_from_texture(P.draw_texture_always_fresh);
+    P.draw_texture_not_that_fresh_rtv = r_rtv_from_texture(P.draw_texture_not_that_fresh);
   }
 
   // todo: Do better with this here
@@ -377,7 +372,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
   // Fake for loop for testing
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
-  // r_clear_rtv(P.draw_texture_always_fresh, yellow_f());
+  // r_clear_rtv(P.draw_texture_always_fresh_rtv, yellow_f());
 
   // Testing and working on font provider
   FP_Font font = {};
@@ -414,15 +409,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
     */
-
-    // UI and Application update 
-    {
-      // pencil_do_ui(&P, font);
-      // pencil_update(&P, !ui_has_active());
-      // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
-      // else { ReleaseCapture(); }
+    
+    { // UI and Application update 
+      pencil_do_ui(&P, font);
+      pencil_update(&P, !ui_has_active());
     }
 
+    /*
     ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
     {
       UI_Col()
@@ -448,12 +441,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       }
     }
     ui_end_build();
-
-    // Rendering
-    {
-      // pencil_render(&P);
-      // ui_draw();
-      d_draw_rect(rect_make(100, 200, 500, 500))->color_fp(orange())->add();
+    */
+    
+    { // Rendering
+      pencil_render(&P);
+      ui_draw();
     }
     
     r_submit(d_get_batch_list());

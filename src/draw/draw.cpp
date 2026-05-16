@@ -47,7 +47,7 @@ void d_init()
 {
   __d_g_state.arena_for_draw_commands = arena_alloc(Gigabytes(1));
 
-  __d_g_state.rect_builder.color_fp = __d_builder_func_color;
+  __d_g_state.rect_builder.color = __d_builder_func_color;
   
   __d_g_state.rect_builder.add = __d_builder_func_add;
   __d_g_state.rect_builder.get = __d_builder_func_get;
@@ -68,6 +68,10 @@ void d_begin_batching()
   
   draw_state->command_batch_list = {};
   arena_clear(draw_state->arena_for_draw_commands); 
+
+  V2F32 vp_dims = r_get_viewport_dims();
+  draw_state->current_rtv          = r_get_frame_buffer_rtv();
+  draw_state->current_scissor_rect = rect_make(0.0f, 0.0f, vp_dims.x, vp_dims.y);
 }
 
 void d_end_batching() { /*Nothing here*/ }
@@ -81,6 +85,8 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
 
   D_Command_batch* new_batch = ArenaPush(arena, D_Command_batch);
   new_batch->command_type = command_type;
+  new_batch->rtv          = draw_state->current_rtv;
+  new_batch->scissor_rect = draw_state->current_scissor_rect;
   new_batch->texture      = texture;
   
   QueuePushBack_Name(&draw_state->command_batch_list, new_batch, first, last, next_batch);
@@ -93,8 +99,12 @@ D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID
 {
   D_State* draw_state = d_get_state();
   D_Command_batch* batch = draw_state->command_batch_list.last;
-  if (batch == 0 || batch->command_type != command_type || batch->texture != texture)
-  {
+  if ( batch == 0 
+    || batch->rtv != draw_state->current_rtv 
+    || batch->command_type != command_type  
+    || batch->texture != texture
+    || !rect_match(batch->scissor_rect, draw_state->current_scissor_rect)
+  ) {
     batch = d_add_new_batch(command_type, texture);
   }
   return batch;
@@ -157,6 +167,19 @@ void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_re
   command.u.texture_c.text_color = text_color;
 
   d_add_command_to_batch(batch, command);
+}
+
+///////////////////////////////////////////////////////////
+// - Misc
+//
+void d_set_render_target(ID3D11RenderTargetView* rtv)
+{
+  d_get_state()->current_rtv = rtv;
+}
+
+void d_set_scissor_rect(Rect rect)
+{
+  d_get_state()->current_scissor_rect = rect;
 }
 
 

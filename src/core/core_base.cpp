@@ -99,8 +99,8 @@ F32 f32_nan()
 	u.f32 = ~0;
 	return (F32)u.f32;
 }
-
 B32 f32_is_nan(F32 f)
+
 {
 	union { U32 u32; F32 f32; } u;
 	u.f32 = f;
@@ -198,6 +198,11 @@ V2F32 rect_get_origin(Rect rect)
 V2F32 rect_get_dims(Rect rect)
 {
 	return v2f32(rect.width, rect.height);
+}
+
+B32 rect_match(Rect r1, Rect r2)
+{ 
+	return (r1.x == r2.x && r1.y == r2.y && r1.width == r2.width && r1.height == r2.height);
 }
 
 B32 is_point_inside_rect(F32 x, F32 y, Rect r)
