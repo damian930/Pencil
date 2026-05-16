@@ -26,6 +26,9 @@ abstract.
 #include "render/render.h"
 #include "render/render.cpp"
 
+#include "draw/draw.h"
+#include "draw/draw.cpp"
+
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
 
@@ -449,7 +452,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // Rendering
     {
       // pencil_render(&P);
-      ui_draw();
+      // ui_draw();
+      d_draw_rect(rect_make(100, 200, 500, 500))->color_fp(orange())->add();
     }
     
     r_submit(d_get_batch_list());

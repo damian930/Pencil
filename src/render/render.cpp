@@ -6,6 +6,8 @@
 
 #include "render.h"
 
+#include "draw/draw.h"
+
 // todo: Remove this from this layer
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
