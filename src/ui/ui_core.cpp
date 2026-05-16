@@ -136,6 +136,7 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   if (flags & UI_Box_flag__has_background)    { box->shape_style.color  = ui_get_color();  }
   if (flags & UI_Box_flag__has_borders)       { box->shape_style.border = ui_get_border(); }
   if (flags & UI_Box_flag__has_corner_radius) { box->shape_style.corner_r = ui_get_corner_r(); }
+  box->shape_style.softness = ui_get_softness();
 
   if (flags & UI_Box_flag__has_text_contents)
   {
@@ -833,6 +834,14 @@ UI_Border_style ui_peek_border()                        { UI_Context* ctx = ui_g
 UI_Border_style ui_get_border()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node) }
 void ui_push_border(F32 width, V4F32 color)             { ui_push_border_no_flag(width, color); }
 void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_flag(width, color); ui_add_flags_to_next(UI_Box_flag__has_borders); }
+
+void ui_pop_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, softness_stack, UI_Softness_node) }
+void ui_auto_pop_softness()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, softness_stack, UI_Softness_node) }
+F32 ui_peek_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, softness_stack, UI_Softness_node) }
+F32 ui_get_softness()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, softness_stack, UI_Softness_node) }
+void ui_push_softness(F32 softness)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, softness_stack, UI_Softness_node, softness) }
+void ui_set_next_softness(F32 softness) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, softness_stack, UI_Softness_node, softness) }
+
 
 // --
 

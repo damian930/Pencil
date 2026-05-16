@@ -85,10 +85,8 @@ UI_Corner_radius_style ui_corner_r_all(F32 f)
   return v;   
 }
 
-// struct UI_Border_width_node { F32 v; UI_Border_width_node* next; };
-// struct UI_Border_width_stack { UI_Border_width_node* first; U64 count; B32 pop_after_first_use; };
-// struct UI_Border_color_node { V4F32 v; UI_Border_color_node* next; };
-// struct UI_Border_color_stack { UI_Border_color_node* first; U64 count; B32 pop_after_first_use; };
+struct UI_Softness_node { F32 v; UI_Softness_node* next; };
+struct UI_Softness_stack { UI_Softness_node* first; U64 count; B32 pop_after_first_use; };
 
 // todo: If this is used, then move it out somewhere from here
 struct UI_Border_style {
@@ -146,6 +144,7 @@ struct UI_Box {
     V4F32 color; 
     UI_Corner_radius_style corner_r;
     UI_Border_style border;
+    F32 softness;
   } shape_style;
 
   struct {
@@ -154,10 +153,6 @@ struct UI_Box {
     F32 font_size;      
     V4F32 text_color;
   } text_style;
-
-  // Some more extensions
-  // Texture2D texture_to_draw;
-  // V2F32 clip_offset; 
 
   UI_Box_custom_draw_func_type custom_draw_func;
   void* custom_draw_data;
@@ -219,7 +214,8 @@ struct UI_Context {
   // Shape style stacks
   UI_Color_stack         color_stack;
   UI_Corner_radius_stack corner_radius_stack;
-  UI_Border_style_stack border_style_stack;
+  UI_Border_style_stack  border_style_stack;
+  UI_Softness_stack      softness_stack;
 
   // Text style stacks
   UI_Text_color_stack text_color_stack;
@@ -255,12 +251,6 @@ Arena* ui_get_build_arena();
 F32 ui_get_mouse_x();
 F32 ui_get_mouse_y();
 V2F32 ui_get_mouse_pos();
-
-// - Text measure function stuff
-// void ui_set_text_measuring_function(UI_text_measuring_ft* fp);
-// UI_text_measuring_ft* ui_get_text_measuring_function();
-// V2F32 ui_measure_text(Str8 str);
-// V2F32 ui_measure_text_ex(Str8 str, Font font, F32 font_size);
 
 // - Context 
 void ui_init();
@@ -355,6 +345,13 @@ UI_Border_style ui_get_border();
 void ui_push_border(F32 width, V4F32 color);
 void ui_set_next_border(F32 width, V4F32 color);
 
+void ui_pop_softness();
+void ui_auto_pop_softness();
+F32 ui_peek_softness();
+F32 ui_get_softness();
+void ui_push_softness(F32 softness);
+void ui_set_next_softness(F32 softness);
+
 // note: These add flags as well to the next, might need a version for no flag style scopes
 #define UI_Color(v)             DeferLoop(ui_push_b_color(v),           ui_pop_color())
 #define UI_Border(width, color) DeferLoop(ui_push_border(width, color), ui_pop_border())
@@ -405,7 +402,8 @@ void __ui_clear_style_stacks()
   
   ctx->color_stack         = {};
   ctx->corner_radius_stack = {};
-  ctx->border_style_stack = {};
+  ctx->border_style_stack  = {};
+  ctx->softness_stack      = {};
 
   ctx->text_color_stack = {};
   ctx->text_font_stack  = {};
@@ -426,8 +424,9 @@ void __ui_push_defaults_onto_stacks()
 
   // todo: Change this to be transparent or settable by the outiside on build
   ui_push_color(v4f32(0.0f, 0.0f, 0.0f, 0.0f)); 
-  // ui_push_corner_radius(0.0f);
-  // ui_push_border({ 0.0f, V4F32{0.0f, 0.0f, 0.0f, 0.0f} });
+  ui_push_corner_r(ui_corner_r_all(0.0f));
+  ui_push_border(0.0f, black());
+  ui_push_softness(2.0f);
 
   ui_push_text_color(white());
   // ui_push_font(GetFontDefault()); // todo: Not the biggest fan of this line here

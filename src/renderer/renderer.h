@@ -55,8 +55,9 @@ struct D3D_Rect_instance_data {
   F32 corner_radius_11;
 
   F32 border_thickness;
+  F32 softness;
 
-  F32 _padding_[3];
+  F32 _padding_[2];
 };
 
 struct D3D_Rect_unifrom_data {
@@ -185,6 +186,7 @@ struct D_Rect_command {
   V4F32 vertex_color[UV__COUNT];
   F32 corner_radius[UV__COUNT];
   F32 border_thickness;
+  F32 softness;
 };
 
 struct D_Texture_command {
@@ -278,7 +280,7 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
   batch->count += 1;
 }
 
-void d_add_rect_command_ex(Rect rect, V4F32 corner_color[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness)
+void d_add_rect_command_ex(Rect rect, V4F32 corner_color[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness)
 {
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
@@ -292,6 +294,7 @@ void d_add_rect_command_ex(Rect rect, V4F32 corner_color[UV__COUNT], V4F32 corne
   D_Command command = {};
   command.u.rect_c.rect             = rect;
   command.u.rect_c.border_thickness = border_thickness;
+  command.u.rect_c.softness         = softness;
   for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = corner_color[i]; }
   for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = corner_radiuses.v[i]; }
   d_add_command_to_batch(batch, command);
@@ -300,7 +303,7 @@ void d_add_rect_command_ex(Rect rect, V4F32 corner_color[UV__COUNT], V4F32 corne
 void d_add_rect_command(Rect rect, V4F32 color)
 {
   V4F32 colors[UV__COUNT] = { color, color, color, color };
-  d_add_rect_command_ex(rect, colors, {}, {});
+  d_add_rect_command_ex(rect, colors, {}, {}, {});
 }
 
 void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
