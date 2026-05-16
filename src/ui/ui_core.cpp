@@ -183,7 +183,7 @@ UI_Box* ui_get_parent()
   return ui_get_context()->current_parent_box;
 }
 
-void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_y)
+void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 {
   Assert(IsMemZero(_ui_g_clip_offset_stub));
   _ui_g_clip_offset_stub = {};
@@ -193,8 +193,8 @@ void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_
   // Resetting the prev build state
   __ui_clear_style_stacks();
   ctx->prev_frame_root_box = ctx->root_box;
-  ctx->root_box = &_ui_g_zero_box;
-  ctx->current_parent_box = &_ui_g_zero_box;
+  ctx->root_box            = &_ui_g_zero_box;
+  ctx->current_parent_box  = &_ui_g_zero_box;
   arena_clear(ctx->style_stacks_arena);
 
   // Creating the new build state
@@ -208,16 +208,16 @@ void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_
 
   __ui_push_defaults_onto_stacks();
 
-  ui_set_next_size_x(ui_px(window_width));
-  ui_set_next_size_y(ui_px(window_height));
+  ui_set_next_size_x(ui_px(window_dims.x));
+  ui_set_next_size_y(ui_px(window_dims.y));
   UI_Box* box = ui_box_make(Str8FromC("## __UI ROOT ELEMENT ID __"), 0);
   ui_push_parent(box);
 
   ctx->current_parent_box = box;
   ctx->root_box = box;
 
-  ctx->mouse_x = mouse_x;
-  ctx->mouse_y = mouse_y;
+  ctx->mouse_x = mouse_pos.x;
+  ctx->mouse_y = mouse_pos.y;
 }
 
 void ui_end_build()

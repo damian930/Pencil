@@ -128,6 +128,32 @@ U64 range_s64_count(RangeS64 range)
 	return count;
 }
 
+RangeF32 range_f32_make(F32 min, F32 max)
+{
+  RangeF32 range = {};
+  range.min = min;
+  range.max = max;
+  return range;
+}
+
+F32 range_f32_length(RangeF32 range)
+{
+  F32 length = range.max - range.min;
+  return length;
+}
+
+B32 range_f32_within(RangeF32 range, F32 v)
+{
+  B32 result = (range.min <= v && v < range.max);
+  return result;
+}
+
+B32 range_f32_is_valid(RangeF32 range)
+{
+  B32 result = (range.min <= range.max);
+  return result;
+}
+
 RangeU64 range_u64_make(U64 min, U64 max)
 {
 	RangeU64 range = {};
@@ -164,12 +190,12 @@ Rect rect_make(F32 x, F32 y, F32 width, F32 height)
 	return rect;
 }
 
-V2F32 rect_origin(Rect rect)
+V2F32 rect_get_origin(Rect rect)
 {
 	return v2f32(rect.x, rect.y);
 }
 
-V2F32 rect_dims(Rect rect)
+V2F32 rect_get_dims(Rect rect)
 {
 	return v2f32(rect.width, rect.height);
 }

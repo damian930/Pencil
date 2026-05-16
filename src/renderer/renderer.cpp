@@ -472,10 +472,10 @@ void r_submit(D_Command_batch_list* command_batch_list)
         for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
         {
           D3D_Texture_instance_data instance_data = {};
-          instance_data.dest_rect_origin = rect_origin(node->command.u.texture_c.dest_rect);
-          instance_data.dest_rect_size   = rect_dims(node->command.u.texture_c.dest_rect);
-          instance_data.src_rect_origin  = rect_origin(node->command.u.texture_c.src_rect);
-          instance_data.src_rect_size    = rect_dims(node->command.u.texture_c.src_rect);
+          instance_data.dest_rect_origin = rect_get_origin(node->command.u.texture_c.dest_rect);
+          instance_data.dest_rect_size   = rect_get_dims(node->command.u.texture_c.dest_rect);
+          instance_data.src_rect_origin  = rect_get_origin(node->command.u.texture_c.src_rect);
+          instance_data.src_rect_size    = rect_get_dims(node->command.u.texture_c.src_rect);
           instance_data.src_texture_dims = r_get_texture_dims(batch->texture);
           instance_data.is_text_texture  = node->command.u.texture_c.is_text;
           instance_data.text_color       = node->command.u.texture_c.text_color;

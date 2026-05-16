@@ -78,10 +78,7 @@ struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop
 UI_Corner_radius_style ui_corner_r_all(F32 f) 
 { 
   UI_Corner_radius_style v = {};
-  v.r.v[UV__00] = f;
-  v.r.v[UV__01] = f;
-  v.r.v[UV__10] = f;
-  v.r.v[UV__11] = f;
+  for EachEnum(i, UV, UV__00, UV__COUNT) { v.r.v[i] = f; }
   return v;   
 }
 
@@ -269,7 +266,7 @@ UI_Box* ui_get_parent();
 #define UI_Parent(box) DeferLoop(ui_push_parent(box), ui_pop_parent())
 
 // - Build
-void ui_begin_build(F32 window_width, F32 window_height, F32 mouse_x, F32 mouse_y);
+void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos);
 void ui_end_build();
 
 // - UI agothirm

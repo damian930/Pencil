@@ -118,17 +118,75 @@ void ui_wrapper_end()
 ///////////////////////////////////////////////////////////
 // - Color pickers
 //
-struct _UI_Color_picker_sv_square_data {
+struct _UI_Color_picker_sv_data {
   V4F32 colors[UV__COUNT];
+};
+
+struct _UI_Color_picker_h_data {
+  Axis2 axis;
 };
 
 void _ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
-  _UI_Color_picker_sv_square_data* data = (_UI_Color_picker_sv_square_data*)box->custom_draw_data;
+  _UI_Color_picker_sv_data* data = (_UI_Color_picker_sv_data*)box->custom_draw_data;
   d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {}, {});
 }
 
-void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 color_hsv, V4F32* out_opt_new_color_hsv)
+void _ui_color_picker_h_draw_func(UI_Box* box)
+{
+  _UI_Color_picker_h_data* data = (_UI_Color_picker_h_data*)box->custom_draw_data;
+
+  // Itteration over the 6 color section of hue
+  F32 hue_section_start  = 0.0f;
+  F32 hue_section_length = 1.0f / 6.0f;
+  for EachIndex(i, 6)
+  {
+    V4F32 rgb_for_section_start = rgb_from_hsv(v4f32(hue_section_start, 1.0f, 1.0f, 1.0f));
+    V4F32 rgb_for_section_end   = rgb_from_hsv(v4f32(hue_section_start + hue_section_length, 1.0f, 1.0f, 1.0f));
+    
+    V4F32 colors[UV__COUNT] = {};
+    colors[UV__00] = data->axis == Axis2__x ? rgb_for_section_start : rgb_for_section_start;
+    colors[UV__10] = data->axis == Axis2__x ? rgb_for_section_end   : rgb_for_section_start;
+    colors[UV__01] = data->axis == Axis2__x ? rgb_for_section_start : rgb_for_section_end;
+    colors[UV__11] = data->axis == Axis2__x ? rgb_for_section_end   : rgb_for_section_end;
+    
+    V4F32 corner_r = {};
+    if (i == 0) 
+    { 
+      UV corner = (data->axis == Axis2__x ? UV__01 : UV__10);
+      corner_r.v[UV__00] =  box->shape_style.corner_r.r.v[UV__00]; 
+      corner_r.v[corner] = box->shape_style.corner_r.r.v[corner];
+    }
+    else if (i == 5)
+    {
+      UV corner = (data->axis == Axis2__x ? UV__10 : UV__01);
+      corner_r.v[UV__11] =  box->shape_style.corner_r.r.v[UV__11]; 
+      corner_r.v[corner] = box->shape_style.corner_r.r.v[corner];
+    }
+
+    Rect rect = {};
+    {
+      V2F32 box_p    = rect_get_origin(box->final_on_screen_rect);
+      V2F32 box_dims = rect_get_dims(box->final_on_screen_rect);
+  
+      V2F32 rect_p = {};
+      rect_p.v[data->axis]              = hue_section_start * box_dims.v[data->axis] + box_p.v[data->axis]; 
+      rect_p.v[axis2_other(data->axis)] = box_p.v[axis2_other(data->axis)];
+      
+      V2F32 rect_dims = {};
+      rect_dims.v[data->axis]              = hue_section_length * box_dims.v[data->axis];
+      rect_dims.v[axis2_other(data->axis)] = box_dims.v[axis2_other(data->axis)];
+
+      rect = rect_make(rect_p.x, rect_p.y, rect_dims.x, rect_dims.y);
+    }
+
+    d_add_rect_command_ex(rect, colors, corner_r, {}, box->shape_style.softness);
+
+    hue_section_start += hue_section_length;
+  }
+}
+
+void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val)
 {
   // note:
   // this picker is for sv, meaning for saturation and value, these are hsv values, not rgb
@@ -152,12 +210,12 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   ui_set_next_size_y(size_y);
   UI_Box* color_picker_box = ui_box_make(id, 0);
 
-  V4F32 pure_color_hsv = v4f32(color_hsv.hue, 1.0f, 1.0f, 1.0f);
+  V4F32 pure_hsv = v4f32(hsv.hue, 1.0f, 1.0f, 1.0f);
 
-  _UI_Color_picker_sv_square_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_sv_square_data);
+  _UI_Color_picker_sv_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_sv_data);
   draw_data->colors[UV__00] = white(); 
   draw_data->colors[UV__01] = black();
-  draw_data->colors[UV__10] = rgb_from_hsv(pure_color_hsv);
+  draw_data->colors[UV__10] = rgb_from_hsv(pure_hsv);
   draw_data->colors[UV__11] = black();
   ui_box_set_custom_draw(color_picker_box, _ui_color_picker_sv_square_draw_func, draw_data);
   
@@ -170,8 +228,8 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   if (box_data.found)
   {
     // Reverse lerp
-    F32 x_t = color_hsv.saturation;
-    F32 y_t = color_hsv.value ;
+    F32 x_t = hsv.saturation;
+    F32 y_t = hsv.value ;
     clamp_f32_inplace(&x_t, 0.0f, 1.0f);
     clamp_f32_inplace(&y_t, 0.0f, 1.0f);
 
@@ -200,7 +258,8 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   }
 
   // Updating the colors 
-  V4F32 new_color_hsv = color_hsv;
+  F32 new_sat = hsv.saturation;
+  F32 new_val = hsv.value;
   UI_Actions actions = ui_actions_from_box(color_picker_box);
   if (!actions.is_down) {
     os_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
@@ -217,11 +276,69 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
       clamp_f32_inplace(&picker_relative_y, 0.0f, 1.0f);
 
       // Getting the color for the realative mouse pos
-      new_color_hsv.saturation = picker_relative_x;
-      new_color_hsv.value      = picker_relative_y;
+      new_sat = picker_relative_x;
+      new_val = picker_relative_y;
     }
   }
-  if (out_opt_new_color_hsv) { *out_opt_new_color_hsv = new_color_hsv; }
+  if (out_opt_new_sat) { *out_opt_new_sat = new_sat; }
+  if (out_opt_new_val) { *out_opt_new_val = new_val; }
+}
+
+void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv)
+{
+  ui_set_next_size_x(size_x);
+  ui_set_next_size_y(size_y);
+  UI_Box* color_picker_box = ui_box_make(id, 0);
+
+  _UI_Color_picker_h_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_h_data);
+  draw_data->axis = direction;
+  ui_box_set_custom_draw(color_picker_box, _ui_color_picker_h_draw_func, draw_data);
+
+  UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
+  V2F32 box_origin     = rect_get_origin(box_data.on_screen_rect);
+  V2F32 box_dims       = rect_get_dims(box_data.on_screen_rect);
+
+  F32 thumb_width  = 10.0f;
+  F32 thumb_offset = 0.0f;
+  if (box_data.found)
+  { 
+    thumb_offset = hue * box_dims.v[direction] - (thumb_width / 2.0f);
+  }
+
+  UI_Parent(color_picker_box)
+  {
+    UI_Stack(direction)
+    {
+      ui_spacer(ui_px(thumb_offset));
+
+      if (box_dims.x != 0.0f)
+      {
+        ui_set_next_size_x(ui_px(thumb_width));
+        ui_set_next_size_y(ui_px(box_dims.v[axis2_other(direction)]));
+      }
+      ui_set_next_corner_r(ui_corner_r_all(0.25));
+      ui_set_next_border(4, white());
+      UI_Box* thumb = ui_box_make({}, 0);
+    }
+  }
+
+  F32 new_hue = hue;
+  UI_Actions actions = ui_actions_from_box(color_picker_box);
+  if (!actions.is_down)
+  {
+    ui_reset_active_box_match(color_picker_box);
+  }
+  else if (actions.is_down)
+  {
+    if (box_data.found)
+    {
+      F32 mouse_pos_rel = ui_get_mouse_pos().v[direction] - box_origin.v[direction] - (thumb_width / 2.0f);
+      new_hue = mouse_pos_rel / box_dims.v[direction];
+      clamp_f32_inplace(&new_hue, 0.0f, 1.0f);
+    }
+  }
+
+  if (out_opt_new_color_hsv) { *out_opt_new_color_hsv = new_hue; }
 }
 
 // ///////////////////////////////////////////////////////////

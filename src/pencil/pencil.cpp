@@ -6,6 +6,9 @@
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
+
 Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
 {
   Draw_record* result = 0;
@@ -193,7 +196,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
       U64 h = P->draw_texures_height;
       
       // Clearing the texture
-      r_clear_rtv(P->draw_texture_always_fresh, transparent_f());
+      r_clear_rtv(P->draw_texture_always_fresh, transparent());
   
       // Storing the prev texture state
       r_copy_from_texture_to_texture(P->current_record->texture_before_we_affected, P->draw_texture_not_that_fresh);
@@ -298,155 +301,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   __active_draw_update_routine_end__: {};
 }
 
-void pencil_ui_hsv_slider_gradient_background_draw(UI_Box* box)
-{
-  r_draw_hsv_gradient_rect(ui_get_context()->draw_rtv, box->final_on_screen_rect, false);
-}
-
-struct UI_Color_picker_draw_data {
-  V4F32 top_color;
-};
-
-void ui_color_picker_draw_func(UI_Box* picker_box)
-{
-  UI_Color_picker_draw_data* data = (UI_Color_picker_draw_data*)picker_box->custom_draw_data;
-
-  V3F32 hsv = hsv_from_rgb(rgb_from_rgba(data->top_color));
-  V3F32 pure_hsv = hsv;
-  pure_hsv.saturation = 1.0f;
-  pure_hsv.value = 1.0f;
-  V3F32 pure_rgb = rgb_from_hsv(pure_hsv);
-  V4F32 pure_rgb4 = v4f32(pure_rgb.r, pure_rgb.g, pure_rgb.b, 1.0f);
-
-  ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-  r_draw_gradient_rect(frame_buffer, picker_box->final_on_screen_rect, pure_rgb4);
-  frame_buffer->Release();
-}
-
-// todo: Remove this here
-V3F32 ui_color_picker(Str8 id, UI_Size size_x, UI_Size size_y, V3F32 in_top_color, V3F32 old_color)
-{
-  V3F32 new_color = old_color;
-
-  Arena* arena = ui_get_build_arena();
-  UI_Color_picker_draw_data* data = ArenaPush(arena, UI_Color_picker_draw_data);
-  data->top_color = rgba_from_rgb(in_top_color, 1.0f);
-
-  ui_set_next_size_x(size_x);
-  ui_set_next_size_y(size_y);
-  UI_Box* color_picker_box = ui_box_make(id, 0);
-  color_picker_box->custom_draw_func = ui_color_picker_draw_func;
-  color_picker_box->custom_draw_data = data; 
-
-  UI_Actions actions = ui_actions_from_box(color_picker_box);
-  UI_Box_data box_data = ui_get_box_data_prev_frame(id);
-
-  static F32 norm_rel_x = 0.0f;
-  static F32 norm_rel_y = 0.0f;
-
-  if (actions.is_down && box_data.found)
-  {
-    V2F32 pos = ui_get_mouse_pos();
-    
-    F32 rel_x = pos.x - box_data.on_screen_rect.x;
-    norm_rel_x = rel_x / box_data.on_screen_rect.width;
-    
-    F32 rel_y = pos.y - box_data.on_screen_rect.y;
-    norm_rel_y = rel_y / box_data.on_screen_rect.height;
-  }
-  clamp_f32_inplace(&norm_rel_x, 0.0f, 1.0f);
-  clamp_f32_inplace(&norm_rel_y, 0.0f, 1.0f);
-  
-  V3F32 hsv = hsv_from_rgb(in_top_color);
-  V3F32 pure_hsv = hsv;
-  pure_hsv.saturation = 1.0f;
-  pure_hsv.value = 1.0f;
-  V3F32 pure_rgb = rgb_from_hsv(pure_hsv);
-  V4F32 pure_rgb4 = v4f32(pure_rgb.r, pure_rgb.g, pure_rgb.b, 1.0f);
-    
-  V3F32 top_color = v3f32(lerp_f32(1.0f, pure_rgb4.r, norm_rel_x), lerp_f32(1.0f, pure_rgb4.g, norm_rel_x), lerp_f32(1.0f, pure_rgb4.b, norm_rel_x));
-  new_color = v3f32(lerp_f32(top_color.r, 0.0f, norm_rel_y), lerp_f32(top_color.g, 0.0f, norm_rel_y), lerp_f32(top_color.b, 0.0f, norm_rel_y)); 
-  
-  UI_Parent(color_picker_box)
-  {
-    ui_set_next_flags(UI_Box_flag__floating);
-    ui_set_next_size_x(size_x);
-    ui_set_next_size_x(size_y);
-    UI_Box* picker_circle_wrapper = ui_box_make(Str8{}, 0);
-    UI_Parent(picker_circle_wrapper)
-    {
-      UI_Col()
-      {
-        ui_spacer(ui_px(norm_rel_y * box_data.on_screen_rect.height));
-        UI_Row()
-        {
-          ui_spacer(ui_px(norm_rel_x * box_data.on_screen_rect.width));
-  
-          ui_set_next_size_x(ui_px(25));
-          ui_set_next_size_y(ui_px(25));
-          ui_set_next_border(2, white_f());
-          UI_Box* picker_circle = ui_box_make(Str8{}, 0);
-        }
-      }
-    }
-  }
-
-  return new_color;
-}
-
-F32 pencil_ui_hsv_slider(Str8 slider_id, UI_Size size_x, UI_Size size_y, F32 current_hue)
-{
-  ui_set_next_size_x(size_x);
-  ui_set_next_size_y(size_y);
-  UI_Box* slider_box = ui_box_make(slider_id, 0);
-
-  UI_Actions slider_actions = ui_actions_from_box(slider_box);
-
-  UI_Parent(slider_box)
-  {
-    // The hsv gradient background
-    ui_set_next_flags(UI_Box_flag__floating);
-    ui_set_next_size_x(size_x);
-    ui_set_next_size_y(size_y);
-    UI_Box* gradient_background_box = ui_box_make(Str8FromC("hsv gradient background box id"), 0);
-    gradient_background_box->custom_draw_func = pencil_ui_hsv_slider_gradient_background_draw;
-
-    // The slider part 
-    UI_Box_data slider_box_data = ui_get_box_data_prev_frame(slider_box->id);
-    if (slider_box_data.found)
-    {
-      if (slider_actions.is_down) { 
-        ui_set_active_box(slider_box); 
-        F32 mouse_pos_inside_gradient = (ui_get_mouse_y() - slider_box_data.on_screen_rect.y);
-        current_hue = mouse_pos_inside_gradient / slider_box_data.on_screen_rect.height;
-      }
-      else { ui_reset_active_box_match(slider_box); }
-      clamp_f32_inplace(&current_hue, 0.0f, 1.0f);
-      
-      F32 current_pos = slider_box_data.on_screen_rect.height * current_hue;
-
-      F32 thumb_size = 25.0f;
-      F32 thumb_origin = current_pos - thumb_size/2.0f;
-
-      ui_set_next_flags(UI_Box_flag__floating);
-      ui_set_next_size_x(size_x);
-      ui_set_next_size_y(size_y);
-      UI_Box* thumb_wrapper = ui_box_make({}, 0);
-      UI_Parent(thumb_wrapper)
-      {
-        ui_spacer(ui_px(thumb_origin));
-
-        ui_set_next_border(-3, white_f());
-        ui_set_next_size_x(size_x);
-        ui_set_next_size_y(ui_px(thumb_size));
-        UI_Box* thumb = ui_box_make({}, 0);
-      }
-    }
-  }
-
-  return current_hue;
-}
-
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 { 
@@ -479,7 +333,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
     {
       ui_set_next_size_x(ui_p_of_p(1, 1));
       ui_set_next_size_y(ui_px(10));
-      ui_set_next_b_color(red_f());
+      ui_set_next_b_color(red());
       UI_Box* top_border = ui_box_make(Str8{}, 0);
 
       ui_set_next_size_x(ui_p_of_p(1, 0));
@@ -489,7 +343,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
       ui_set_next_size_x(ui_p_of_p(1, 1));
       ui_set_next_size_y(ui_px(10));
-      ui_set_next_b_color(red_f());
+      ui_set_next_b_color(red());
       UI_Box* bottom_border = ui_box_make(Str8{}, 0);
     }
 
@@ -505,7 +359,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
   {
     ui_set_next_size_x(ui_children_sum());
     ui_set_next_size_y(ui_children_sum());
-    ui_set_next_b_color(black_f());
+    ui_set_next_b_color(black());
     UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
     
     UI_Parent(brush_box)
@@ -513,7 +367,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
       ui_set_next_size_x(ui_px(500));
       ui_set_next_size_y(ui_px(50));
       ui_set_next_layout_axis(Axis2__x);
-      ui_set_next_b_color(blue_f());
+      ui_set_next_b_color(blue());
       UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), 0);
 
       UI_Parent(menu_name_box)
@@ -535,24 +389,23 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
       ui_spacer(ui_px(50));
 
-      // /*
       UI_Row()
       {
-        static V3F32 final_color_as_hsv = hsv_from_rgb(v3f32(0, 0, 1));
+        static V4F32 hsv = hsv_from_rgb(blue());
 
-        F32 new_hue = pencil_ui_hsv_slider(Str8FromC("hsv slider id"), ui_px(150), ui_px(350), final_color_as_hsv.hue);
-        final_color_as_hsv.hue = new_hue;
+        F32 new_hsv = 0.0f;
+        ui_color_picker_h(Str8FromC("Hue picker"), ui_px(150), ui_px(350), Axis2__x, hsv.hue, &new_hsv);
+        hsv.hue = new_hsv;
 
         ui_spacer(ui_px(25));
 
-        V3F32 rgb = rgb_from_hsv(final_color_as_hsv);
-        V3F32 top_color = rgb_from_hsv(v3f32(final_color_as_hsv.hue, 1.0f, 1.0f));
-        V3F32 new_rgb = ui_color_picker(Str8FromC("Color picker id"), ui_px(150), ui_px(150), top_color, rgb);
-        final_color_as_hsv = hsv_from_rgb(new_rgb);
+        F32 new_sat = 0.0f;
+        F32 new_val = 0.0f;
+        ui_color_picker_sv(Str8FromC("SV picker"), ui_px(150), ui_px(150), hsv, &new_sat, &new_val);
+        hsv.saturation = new_sat;
+        hsv.value      = new_val;
 
-        // ID3D11RenderTargetView* frame_buffer = r_get_frame_buffer_rtv();
-        // r_clear_rtv(frame_buffer, new_final_color);
-        // frame_buffer->Release();
+        r_clear_frame_buffer(rgb_from_hsv(hsv));
 
         ui_spacer(ui_px(25));
 
@@ -579,7 +432,6 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
         // todo: slider for blue color value
         // todo: slider for alpha color value
       }
-      // */
 
       // todo: Eraser button
     }
@@ -592,6 +444,9 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
 void pencil_render(const Pencil_state* P)
 {
+  ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color;
+  d_add_texture_command()
+
   ID3D11RenderTargetView* frame_buffer_rtv = r_get_frame_buffer_rtv();
   Rect rect = rect_make(0, 0, r_get_texture_dims(P->draw_texture_always_fresh).x, r_get_texture_dims(P->draw_texture_always_fresh).y);
   r_draw_texture(

@@ -115,7 +115,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   
     if (root->flags & UI_Box_flag__has_text_contents)
     {
-      r_draw_text(root->text_style.text, rect_origin(rect), root->text_style.font, root->text_style.text_color); 
+      r_draw_text(root->text_style.text, rect_get_origin(rect), root->text_style.font, root->text_style.text_color); 
     }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
@@ -412,46 +412,46 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
     */
 
-    // pencil_do_ui(&P, font);
-    // pencil_update(&P, !ui_has_active());
-    // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
-    // else { ReleaseCapture(); }
-    // pencil_render(&P);
-
-    static V4F32 frame_color_hsv = hsv_from_rgb(red());
-
-    r_clear_frame_buffer(rgb_from_hsv(frame_color_hsv));
-    // r_clear_frame_buffer(black());
-
-    ui_begin_build(os_get_client_area_dims().x, os_get_client_area_dims().y, os_get_mouse_pos().x, os_get_mouse_pos().y);
+    // UI and Application update 
     {
-      // ui_set_next_size_x(ui_px(100));
-      // ui_set_next_size_y(ui_px(100));
-      // ui_set_next_border(5, green());
-      // ui_set_next_b_color(blue());
-      // ui_set_next_corner_r(ui_corner_r_all(1));
-      // UI_Box* rect_box = ui_box_make({}, {});
+      // pencil_do_ui(&P, font);
+      // pencil_update(&P, !ui_has_active());
+      // if (P.is_mid_drawing) { SetCapture(win32_state->window.handle); }
+      // else { ReleaseCapture(); }
+    }
 
-      // ui_spacer(ui_px(50));
-
-      // ui_set_next_b_color(blue());
-      // UI_PaddedBox(ui_px(25), Axis2__x)
+    ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
+    {
+      UI_Col()
       {
-        V4F32 color = blue();
-        V4F32 hsv = hsv_from_rgb(color);
-        hsv.value = 1;
-        hsv.saturation = 1;
-        V4F32 pure_color = rgb_from_hsv(hsv);
-  
-        V4F32 new_color_hsv = {};
-        ui_color_picker_sv_square(Str8FromC("Color picker"), ui_px(500), ui_px(500), frame_color_hsv, &new_color_hsv);
-        frame_color_hsv = new_color_hsv;
+        static V4F32 hsv = hsv_from_rgb(blue());
+
+        F32 new_hsv = 0.0f;
+        ui_color_picker_h(Str8FromC("Hue picker"), ui_px(150), ui_px(350), Axis2__x, hsv.hue, &new_hsv);
+        hsv.hue = new_hsv;
+
+        ui_spacer(ui_px(25));
+
+        F32 new_sat = 0.0f;
+        F32 new_val = 0.0f;
+        ui_color_picker_sv(Str8FromC("SV picker"), ui_px(150), ui_px(150), hsv, &new_sat, &new_val);
+        hsv.saturation = new_sat;
+        hsv.value      = new_val;
+
+        r_clear_frame_buffer(rgb_from_hsv(hsv));
+
+        ui_spacer(ui_px(25));
+
       }
     }
     ui_end_build();
 
-    ui_draw();
-
+    // Rendering
+    {
+      // pencil_render(&P);
+      ui_draw();
+    }
+    
     r_submit(d_get_batch_list());
 
     d_end_batching();

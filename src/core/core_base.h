@@ -502,6 +502,15 @@ tu_specific B32 range_u64_is_valid(RangeU64 range);
 
 #define Address(var) (U64)(&(var))
 
+struct RangeF32 {
+	F32 min;
+	F32 max;
+};
+tu_specific RangeF32 range_f32_make(F32 min, F32 max);
+tu_specific F32 range_f32_length(RangeF32 range);
+tu_specific B32 range_f32_within(RangeF32 range, F32 v);
+tu_specific B32 range_f32_is_valid(RangeF32 range);
+
 // Thanks to AIG for this awesome text generation ))
 global const U64 bit_0  = (1ULL << 0);
 global const U64 bit_1  = (1ULL << 1);
@@ -635,8 +644,8 @@ struct Rect {
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
-tu_specific V2F32 rect_origin(Rect rect);
-tu_specific V2F32 rect_dims(Rect rect);
+tu_specific V2F32 rect_get_origin(Rect rect);
+tu_specific V2F32 rect_get_dims(Rect rect);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);

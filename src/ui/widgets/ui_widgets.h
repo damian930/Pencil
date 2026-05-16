@@ -17,8 +17,9 @@ void ui_label_f(const char* fmt, ...);
 // - Layout stack
 void ui_layout_stack_begin(Axis2 axis); // todo: Call these like a layout stack
 void ui_layout_stack_end();
-#define UI_Row() DeferLoop(ui_layout_stack_begin(Axis2__x), ui_layout_stack_end())
-#define UI_Col() DeferLoop(ui_layout_stack_begin(Axis2__y), ui_layout_stack_end())
+#define UI_Stack(axis) DeferLoop(ui_layout_stack_begin(axis), ui_layout_stack_end())
+#define UI_Row() UI_Stack(Axis2__x)
+#define UI_Col() UI_Stack(Axis2__y)
 
 // - Padded box
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
