@@ -4,8 +4,8 @@
 #include "ui/ui_core.h"
 
 // todo: Remove this dependancy from here
-#include "renderer/renderer.h"
-#include "renderer/renderer.cpp"
+#include "render/render.h"
+#include "render/render.cpp"
 
 // - Simple widgets
 // void ui_label_c(const char* c_str);

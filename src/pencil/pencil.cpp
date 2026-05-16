@@ -262,6 +262,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
+        d_add_rect_command()
         r_draw_circle(P->draw_texture_always_fresh, x, y, pen_size, color, P->is_erasing_mode);
       }
     }
@@ -445,7 +446,6 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 void pencil_render(const Pencil_state* P)
 {
   ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color;
-  d_add_texture_command()
 
   ID3D11RenderTargetView* frame_buffer_rtv = r_get_frame_buffer_rtv();
   Rect rect = rect_make(0, 0, r_get_texture_dims(P->draw_texture_always_fresh).x, r_get_texture_dims(P->draw_texture_always_fresh).y);

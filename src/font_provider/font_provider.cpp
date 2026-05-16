@@ -27,8 +27,8 @@
 #include "os/win32.cpp"
 
 // todo: Move this into .h
-#include "renderer/renderer.h"
-#include "renderer/renderer.cpp"
+#include "render/render.h"
+#include "render/render.cpp"
 
 // todo: Use this "stbtt_PackSetSkipMissingCodepoints"
 

@@ -23,8 +23,8 @@ abstract.
 #include "os/win32.h"
 #include "os/win32.cpp"
 
-#include "renderer/renderer.h"
-#include "renderer/renderer.cpp"
+#include "render/render.h"
+#include "render/render.cpp"
 
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
