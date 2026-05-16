@@ -116,6 +116,12 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   float4 bottom_color = lerp(pixel_input.vertex_color[UV__01], pixel_input.vertex_color[UV__11], pos_norm.x);
   float4 final_color  = lerp(top_color, bottom_color, pos_norm.y);
 
+  // todo: Smooth the outside of the rect
+  // -
+  // todo: Smooth the inside of the rect after border
+  //       The last 2 might be done all the time, but just doing the smoo the with the rect bound
+  //       and then with the rect bound + border_width, i might be wrong
+
   {
     float radius_in_px = pixel_input.corner_radius * max(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0;
     float sdf          = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
@@ -124,26 +130,19 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
     {
       discard;
     }
-    else if (0.0 > sdf && sdf >= -pixel_input.border_thickness)
+    else if (-pixel_input.border_thickness <= sdf && sdf < 0.0)
     {
       final_color = float4(1, 1, 1, 1);
-    }
-    else 
-    {
-      // Just leaving the color how it is
-    }
-  
-    if (sdf < 0.0)
-    {
-      sdf *= -1.0;
-      float smoothed = smoothstep(0.0, pixel_input.softness, sdf);
+      float smoothed = smoothstep(0.0, pixel_input.softness, -sdf);
       final_color.a *= smoothed; 
     }
 
+    if (-pixel_input.border_thickness <= sdf && sdf <= -(pixel_input.border_thickness - pixel_input.softness))
+    {
+      float smoothed = smoothstep(pixel_input.border_thickness, pixel_input.border_thickness-pixel_input.softness, -sdf);
+      final_color.a *= smoothed; 
+    }
   }
-
-
-  // todo: Add smooth step here for a better transition
 
   return final_color;
 }
