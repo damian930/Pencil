@@ -849,5 +849,17 @@ Str8 str8_from_wstr(Arena* arena, WCHAR* wstr)
   return str;
 }
 
+void os_set_cursor(OS_Cursor cursor)
+{
+  HCURSOR cursor_handle = {};
+  switch (cursor) 
+  {
+    default:                    { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
+    case OS_Cursor__arrow: { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
+    case OS_Cursor__hand:  { cursor_handle = LoadCursor(Null, IDC_HAND);  } break;
+  }
+  SetCursor(cursor_handle);
+}
+
 
 #endif

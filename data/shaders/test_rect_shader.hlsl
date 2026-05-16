@@ -116,12 +116,6 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   float4 bottom_color = lerp(pixel_input.vertex_color[UV__01], pixel_input.vertex_color[UV__11], pos_norm.x);
   float4 final_color  = lerp(top_color, bottom_color, pos_norm.y);
 
-  // todo: Smooth the outside of the rect
-  // -
-  // todo: Smooth the inside of the rect after border
-  //       The last 2 might be done all the time, but just doing the smoo the with the rect bound
-  //       and then with the rect bound + border_width, i might be wrong
-
   {
     float radius_in_px = pixel_input.corner_radius * max(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0;
     float sdf          = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);

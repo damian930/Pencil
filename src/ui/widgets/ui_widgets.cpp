@@ -163,7 +163,7 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   
   UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
   V2F32 mouse          = ui_get_mouse_pos();
-  F32 circle_diameter  = 100.0f;
+  F32 circle_diameter  = 15.0f;
 
   F32 circle_x_offset = 0.0f;
   F32 circle_y_offset = 0.0f;
@@ -191,10 +191,9 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
 
         ui_set_next_size_x(ui_px(circle_diameter));
         ui_set_next_size_y(ui_px(circle_diameter));
-        ui_set_next_corner_r(ui_corner_r_all(0.25f));
-        ui_set_next_corner_r(ui_corner_r_all(0.25f));
-        ui_set_next_border(5, white());
-        ui_set_next_softness(2);
+        ui_set_next_corner_r(ui_corner_r_all(1));
+        ui_set_next_border(4, white());
+        ui_set_next_softness(1.5f);
         UI_Box* circle_picker = ui_box_make({}, 0);
       }
     }
@@ -203,9 +202,12 @@ void ui_color_picker_sv_square(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 co
   // Updating the colors 
   V4F32 new_color_hsv = color_hsv;
   UI_Actions actions = ui_actions_from_box(color_picker_box);
-  if (!actions.is_down) { ui_reset_active_box_match(color_picker_box); }
+  if (!actions.is_down) {
+    os_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
+    ui_reset_active_box_match(color_picker_box); 
+  }
   else {
-    ui_set_active_box(color_picker_box); 
+    os_set_cursor(OS_Cursor__hand);
     
     if (box_data.found)
     {

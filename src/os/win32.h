@@ -240,9 +240,13 @@ void os_sleep(U64 ms);
 // U64 os_get_keyboard_subsequent_repeat_delay();
 
 // - Misc
+enum OS_Cursor : U32{
+  OS_Cursor__arrow, 
+  OS_Cursor__hand, 
+};
+
 Str8 os_get_path_to_system_fonts();
 Str8 str8_from_wstr(Arena* arena, WCHAR* wstr);
-
-
+void os_set_cursor(OS_Cursor cursor);
 
 #endif
