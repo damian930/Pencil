@@ -72,6 +72,7 @@ void d_begin_batching()
   V2F32 vp_dims = r_get_viewport_dims();
   draw_state->current_rtv          = r_get_frame_buffer_rtv();
   draw_state->current_scissor_rect = rect_make(0.0f, 0.0f, vp_dims.x, vp_dims.y);
+  draw_state->current_blend_kind   = D3D_Blend_kind__alpha;
 }
 
 void d_end_batching() { /*Nothing here*/ }
@@ -83,11 +84,22 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
 
+  // note:
+  // If this static assert fails, that mean that the batch struct has changed. 
+  // To resolve the assert, go see what field in the struct you have that you dont set here to 
+  // the new batch, set that field. Then manually change the value you compare agains sizeof
+  // to be able to assert the next time. 
+  // Why is it important?
+  // It is important to now have bugs, since to have batches working we have to change the code in couple 
+  // of places after we add settings to the Batch struct. This place is 1 of them. 
+  StaticAssert(sizeof(D_Command_batch) == 80);
+
   D_Command_batch* new_batch = ArenaPush(arena, D_Command_batch);
   new_batch->command_type = command_type;
+  new_batch->texture      = texture;
   new_batch->rtv          = draw_state->current_rtv;
   new_batch->scissor_rect = draw_state->current_scissor_rect;
-  new_batch->texture      = texture;
+  new_batch->blend_kind   = draw_state->current_blend_kind;
   
   QueuePushBack_Name(&draw_state->command_batch_list, new_batch, first, last, next_batch);
   draw_state->command_batch_list.count += 1;
@@ -97,6 +109,16 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
 
 D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID3D11Texture2D* texture)
 {
+  // note:
+  // If this static assert fails, that mean that the batch struct has changed. 
+  // To resolve the assert, go see what field in the struct you have that you dont set here to 
+  // the new batch, set that field. Then manually change the value you compare agains sizeof
+  // to be able to assert the next time. 
+  // Why is it important?
+  // It is important to now have bugs, since to have batches working we have to change the code in couple 
+  // of places after we add settings to the Batch struct. This place is 1 of them. 
+  StaticAssert(sizeof(D_Command_batch) == 80);
+  
   D_State* draw_state = d_get_state();
   D_Command_batch* batch = draw_state->command_batch_list.last;
   if ( batch == 0 
@@ -104,6 +126,7 @@ D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID
     || batch->command_type != command_type  
     || batch->texture != texture
     || !rect_match(batch->scissor_rect, draw_state->current_scissor_rect)
+    || batch->blend_kind != draw_state->current_blend_kind
   ) {
     batch = d_add_new_batch(command_type, texture);
   }
@@ -182,5 +205,9 @@ void d_set_scissor_rect(Rect rect)
   d_get_state()->current_scissor_rect = rect;
 }
 
+void d_set_blend(D3D_Blend_kind blend_kind)
+{
+  d_get_state()->current_blend_kind = blend_kind;
+}
 
 #endif

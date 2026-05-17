@@ -136,6 +136,7 @@ struct UI_Box {
   UI_Box_flags flags;
   Axis2 layout_axis;
   UI_Size semantic_size[Axis2__COUNT];
+  B32 _do_grow_out_of_parent_on_p_of_p[Axis2__COUNT];
 
   struct {
     V4F32 color; 
@@ -201,6 +202,9 @@ struct UI_Context {
   B32 currently_interacted_with_box__left_box_while_was_down;
 
   Arena* style_stacks_arena; // Per build
+
+  // note: This is new, so not sure about his
+  OS_Cursor cursor;
 
   // Default style stacks
   UI_Box_flgas_stack     flags_stack;
@@ -302,6 +306,9 @@ UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id);
 // - Actions
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
 UI_Actions ui_actions_from_id(Str8 id);
+
+// - Misc
+void ui_set_cursor(OS_Cursor cursor);
 
 // - Style stack operations for default settings
 void ui_add_flags(UI_Box_flags flags);   void ui_add_flags_to_next(UI_Box_flags flags);

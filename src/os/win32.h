@@ -248,5 +248,6 @@ enum OS_Cursor : U32{
 Str8 os_get_path_to_system_fonts();
 Str8 str8_from_wstr(Arena* arena, WCHAR* wstr);
 void os_set_cursor(OS_Cursor cursor);
+OS_Cursor os_get_cursor();
 
 #endif

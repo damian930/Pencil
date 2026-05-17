@@ -39,16 +39,18 @@ struct D_Command_batch {
   D_Command_type command_type;
   ID3D11RenderTargetView* rtv;
   Rect scissor_rect;
+  D3D_Blend_kind blend_kind;
 
   // Fat stuct data
   ID3D11Texture2D* texture;
-  
+
   D_Command_node* first_command_node;
   D_Command_node* last_command_node;
   U64 count;
 
   D_Command_batch* next_batch; 
 };  
+#define __D_COMMAND_BATCH_SIZE_TEST 80
 
 struct D_Command_batch_list {
   D_Command_batch* first;
@@ -74,8 +76,8 @@ struct D_State {
   __D_Rect_builder rect_builder;
   ID3D11RenderTargetView* current_rtv;
   Rect current_scissor_rect;
+  D3D_Blend_kind current_blend_kind;
 };
-
 
 // - Internal builder functions
 __D_Rect_builder* __d_builder_func_color(V4F32 color);
@@ -104,5 +106,6 @@ void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_re
 // - Misc
 void d_set_render_target(ID3D11RenderTargetView* rtv);
 void d_set_scissor_rect(Rect rect);
+void d_set_blend(D3D_Blend_kind blend_kind);
 
 #endif

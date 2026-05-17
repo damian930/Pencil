@@ -98,6 +98,11 @@ struct D3D_Program {
   ID3D11InputLayout* input_layout;
 };
 
+enum D3D_Blend_kind {
+  D3D_Blend_kind__alpha,
+  D3D_Blend_kind__no_blend,
+};
+
 struct D3D_State {
   // These we get at initialisation
   IDXGIFactory2*       dxgi_factory;
@@ -172,7 +177,5 @@ ID3D11Texture2D* r_load_texture_from_file(Str8 file_name);
 ID3D11Texture2D* r_load_texture_from_image(Image image);
 void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
 V2F32 r_get_viewport_dims();
-// void r_scissoring_set(Rect rect);
-// void r_scissoring_clear();
 
 #endif

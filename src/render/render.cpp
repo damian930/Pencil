@@ -370,16 +370,17 @@ void r_submit(D_Command_batch_list* command_batch_list)
       vp.MaxDepth = 1.0f;
       d3d->context->RSSetViewports(1, &vp);
     }
-
-    d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U);
   }
 
   // Working with batches
   for (D_Command_batch* batch = command_batch_list->first; batch; batch = batch->next_batch)
   {
     d3d->context->OMSetRenderTargets(1, &batch->rtv, Null);
-    
     d3d->context->RSSetScissorRects(0, 0);
+    
+    if (0)                                                  {}
+    else if (batch->blend_kind == D3D_Blend_kind__alpha)    { d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U); }
+    else if (batch->blend_kind == D3D_Blend_kind__no_blend) { d3d->context->OMSetBlendState(Null, Null, ~0U); }
 
     if (batch->command_type == D_Command_type__Rect)
     {
@@ -498,7 +499,6 @@ void r_submit(D_Command_batch_list* command_batch_list)
   
     d3d->context->DrawInstanced(4, (UINT)batch->count, 0, 0);
   }
-
 }
 
 ///////////////////////////////////////////////////////////

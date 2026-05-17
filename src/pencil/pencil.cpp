@@ -184,6 +184,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   {
     dont_start_drawing_this_frame = true;
 
+    // todo: This is always 0 for some reason, some wrong with the list, fix it dude
     if (P->current_record != 0)
     {
       Draw_record* record = P->current_record;
@@ -242,7 +243,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   if (os_key_went_down(Key__Tab))
   {
     P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
-    // ui_reset_active_id_match(P->brush_menu_ui_id);
   }
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
@@ -266,26 +266,26 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     {
       V4F32 color_rgba = rgb_from_hsv(P->pen_color_hsva);
       F32 pen_size = (F32)P->pen_size;
+      d_set_render_target(P->draw_texture_always_fresh_rtv);
+      d_set_blend(D3D_Blend_kind__alpha);
       if (P->is_erasing_mode) { 
         color_rgba = v4f32(0.0f, 0.0f, 0.0f, 0.0f); 
         pen_size = (F32)P->eraser_size;
+        d_set_blend(D3D_Blend_kind__no_blend);
       }
 
       F32 dx = new_pos.x - prev_pos.x;
       F32 dy = new_pos.y - prev_pos.y;
       F32 length = sqrtf(dx * dx + dy * dy);
       U64 steps = (U64)length;
+
       for (U64 i = 0; i <= steps; i++) 
       {
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
-        d_set_render_target(P->draw_texture_always_fresh_rtv);
-        // Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness
         V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
         d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 4);
-        
-        // d_draw_rect(rect_make(x, y, pen_size, pen_size))->color(color_rgba)->add();
       }
     }
 
@@ -378,145 +378,273 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
     UI_Box* right_border = ui_box_make(Str8{}, 0);
   }
 
-  // todo: Make this not limited, bur rather grow
-  UI_PaddedBox(ui_px(100), Axis2__y)
+  static F32 x_offset = 0.0f;
+  static F32 y_offset = 0.0f;
+  static F32 inside_menu_mouse_rel_x = 0.0f;
+  static F32 inside_menu_mouse_rel_y = 0.0f;
+
   UI_Parent(content_inner)
   {
-    ui_set_next_size_x(ui_children_sum());
-    ui_set_next_size_y(ui_children_sum());
-    ui_set_next_b_color(black());
-    UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
-    
-    UI_Parent(brush_box)
+    UI_Row()
     {
-      ui_set_next_size_x(ui_px(500));
-      ui_set_next_size_y(ui_px(50));
-      ui_set_next_layout_axis(Axis2__x);
-      ui_set_next_b_color(blue());
-      UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), 0);
+      ui_spacer(ui_px(x_offset));
 
-      UI_Parent(menu_name_box)
+      UI_Col()
       {
-        // notes:
-        // Here i need to center the label
-        // I could i either make a flag in the ui core that would center the text box in the end on y or x.
-        // I could just wrap it up all the time, this would not be theat great, since we would not be able 
-        // to handle cases when the parent is children sizes, for that i could introduce a new size
-        // that would limit the p_of_p to not expend pass the immediate parent, so it would be like
-        // clayes grow in a way
+        ui_spacer(ui_px(y_offset));
+        
+        ui_set_next_size_x(ui_children_sum());
+        ui_set_next_size_y(ui_children_sum());
+        ui_set_next_b_color(taupe());
+        UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
 
-        ui_spacer(ui_px(10));
-        ui_label(Str8FromC("Brushes"));
-
-        // ui_spacer(ui_p_of_p(1, 0));
-        // ui_spacer(ui_p_of_p(1, 0));
-      }
-
-      // todo: Using these just cause i am not sure about what else to use yet
-      ui_set_next_size_x(ui_px(500));
-      ui_set_next_size_x(ui_px(500));
-      // ui_set_next_b_color(orange());
-      UI_Box* box_with_color_ui = ui_box_make(Str8FromC("Box with color change_ui"), 0);
-      
-      UI_Parent(box_with_color_ui)
-      UI_PaddedBox(ui_px(7), Axis2__x)
-      {
-        F32 new_hsv = 0.0f;
-        ui_color_picker_h(Str8FromC("Hue picker"), ui_px(50), ui_px(150), Axis2__y, P->pen_color_hsva.hue, &new_hsv);
-  
-        ui_spacer(ui_px(10));
-  
-        F32 new_sat = 0.0f;
-        F32 new_val = 0.0f;
-        // if (P->pen_color_hsva)
-        ui_color_picker_sv(Str8FromC("SV picker"), ui_px(150), ui_px(150), P->pen_color_hsva, &new_sat, &new_val);
-  
-        V4F32 new_color_hsv = v4f32(new_hsv, new_sat, new_val, P->pen_color_hsva.a);
-        if (!v4f32_match(new_color_hsv, P->pen_color_hsva))
+        UI_Parent(brush_box)
         {
-          P->signal_new_pen_color_hsva = true;
-          P->new_pen_color_hsva = new_color_hsv;
-        }
-
-        ui_spacer(ui_px(10));
-
-        UI_Col()
-        {
-          UI_Slider_style slider_style = {};
-          slider_style.width = 150;
-          slider_style.height = 40;
-          slider_style.fmt_str = "%.0f";
-          slider_style.slided_part_color = pink();
-          
-          V4F32 new_rga_value_0_255 = {};
-          new_rga_value_0_255.r = pen_color_rgba.r * 255.0f;
-          new_rga_value_0_255.g = pen_color_rgba.g * 255.0f;
-          new_rga_value_0_255.b = pen_color_rgba.b * 255.0f;
-          new_rga_value_0_255.a = pen_color_rgba.a * 255.0f;
-
-          B32 interacted = false;
-
-          F32 new_r = 0.0f, new_g = 0.0f, new_b = 0.0f, new_a = 0.0f;
-          ui_spacer(ui_px(10));
-          interacted |= ui_slider(Str8FromC("Slider for red color id"),   &slider_style, pen_color_rgba.r * 255.0f, 0.0f, 255.0f, &new_r);
-          ui_spacer(ui_px(10));
-          interacted |= ui_slider(Str8FromC("Slider for green color id"), &slider_style, pen_color_rgba.g * 255.0f, 0.0f, 255.0f, &new_g);
-          ui_spacer(ui_px(10));
-          interacted |= ui_slider(Str8FromC("Slider for blue color id"),  &slider_style, pen_color_rgba.b * 255.0f, 0.0f, 255.0f, &new_b);
-          ui_spacer(ui_px(10));
-          interacted |= ui_slider(Str8FromC("Slider for alpha color id"), &slider_style, pen_color_rgba.a * 255.0f, 0.0f, 255.0f, &new_a);
-
-          new_rga_value_0_255.r = new_r;
-          new_rga_value_0_255.g = new_g;
-          new_rga_value_0_255.b = new_b;
-          new_rga_value_0_255.a = new_a;
-
-          new_rga_value_0_255.r /= 255.0f;
-          new_rga_value_0_255.g /= 255.0f;
-          new_rga_value_0_255.b /= 255.0f;
-          new_rga_value_0_255.a /= 255.0f;
-
-          if (interacted)
+          Str8 menu_name_box_id = Str8FromC("Brush box menu name box id");
+          UI_Actions menu_name_actions = ui_actions_from_id(menu_name_box_id);
+        
+          if (!menu_name_actions.was_down && menu_name_actions.is_down)
           {
-            V4F32 new_hsva = hsv_from_rgb(new_rga_value_0_255);
-            P->signal_new_pen_color_hsva = true;
-            P->new_pen_color_hsva = new_hsva;
-          }        
+            UI_Box_data content_inner_data = ui_get_box_data_prev_frame_from_box(content_inner);
+            V2F32 content_inner_p = rect_get_origin(content_inner_data.on_screen_rect);
+  
+            inside_menu_mouse_rel_x = (ui_get_mouse_x() - content_inner_p.x) - x_offset;
+            inside_menu_mouse_rel_y = (ui_get_mouse_y() - content_inner_p.y) - y_offset;
+          }
+          else if (menu_name_actions.is_down)
+          {
+            UI_Box_data content_inner_box = ui_get_box_data_prev_frame_from_box(content_inner);
+            x_offset = ui_get_mouse_x() - content_inner_box.on_screen_rect.x - inside_menu_mouse_rel_x;
+            y_offset = ui_get_mouse_y() - content_inner_box.on_screen_rect.y - inside_menu_mouse_rel_y;
+          }
+          else {
+            inside_menu_mouse_rel_x = 0.0f;
+            inside_menu_mouse_rel_y = 0.0f;
+          }
+
+          // if (menu_name_actions.is_hovered) { ui_set_cursor(OS_Cursor__hand); }
+          if (menu_name_actions.is_hovered) { ui_set_next_b_color(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color(blue()); }
+          ui_set_next_size_x(ui_px(200));
+          ui_set_next_size_y(ui_px(40));
+          ui_set_next_layout_axis(Axis2__x);
+          UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), 0);
+
+
+          UI_Parent(menu_name_box)
+          {
+            UI_PaddedBoxEx(ui_px(7), ui_px(0), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
+            {
+              ui_label(Str8FromC("Brushes"));
+            }
+          }
+
+          if (P->show_brush_ui_menu)
+          {
+            ui_spacer(ui_px(7));
+            
+            if (!P->is_erasing_mode)  
+            {
+              ui_set_next_size_x(ui_px(200));
+              ui_set_next_size_y(ui_px(40 + 14));
+              ui_set_next_layout_axis(Axis2__x);
+              UI_Box* pen_size_box = ui_box_make(Str8FromC("Box with color change_ui"), 0);
+
+              UI_Parent(pen_size_box)
+              {
+                UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
+                {
+                  UI_Slider_style slider_style = {};
+                  slider_style.size_x = ui_p_of_p(1.0, 0.0);
+                  slider_style.size_y = ui_px(40);
+                  slider_style.fmt_str = "%.0f";
+                  slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
+                  slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
+                  slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
+    
+                  F32 new_pen_size = 0.0f;
+                  B32 interacted = ui_slider(Str8FromC("Pen size slider id"), &slider_style, (F32)P->pen_size, 1.0f, 100.0f, &new_pen_size);
+                  if (interacted)
+                  {
+                    P->signal_new_pen_size = true;
+                    P->new_pen_size = (U32)new_pen_size;
+                  }
+
+                  ui_spacer(ui_px(7));
+                  
+                  ui_label_f("Pen size");
+                }
+              }
+
+              ui_set_next_size_x(ui_px(200));
+              ui_set_next_size_y(ui_px(200));
+              UI_Box* box_with_color_ui = ui_box_make(Str8FromC("Box with color change_ui"), 0);
+
+              UI_Parent(box_with_color_ui)
+              UI_PaddedBox(ui_px(7), Axis2__x)
+              {
+                UI_Col()
+                {
+                  UI_Row()
+                  {
+                    F32 new_hsv = 0.0f;
+                    ui_color_picker_h(Str8FromC("Hue picker"), ui_p_of_p(1.0f, 0.1f), ui_p_of_p(1.0f, 0.3f), Axis2__y, P->pen_color_hsva.hue, &new_hsv);
+              
+                    ui_spacer(ui_px(10));
+              
+                    F32 new_sat = 0.0f;
+                    F32 new_val = 0.0f;
+                    ui_color_picker_sv(Str8FromC("SV picker"), ui_p_of_p(1.0f, 0.2f), ui_p_of_p(1.0f, 0.3f), P->pen_color_hsva, &new_sat, &new_val);
+              
+                    V4F32 new_color_hsv = v4f32(new_hsv, new_sat, new_val, P->pen_color_hsva.a);
+                    if (!v4f32_match(new_color_hsv, P->pen_color_hsva))
+                    {
+                      P->signal_new_pen_color_hsva = true;
+                      P->new_pen_color_hsva = new_color_hsv;
+                    }
+            
+                    ui_spacer(ui_px(10));
+            
+                    ui_set_next_size_x(ui_p_of_p(1.0f, 0.2f));
+                    ui_set_next_size_y(ui_p_of_p(1.0f, 0.3f));
+                    ui_set_next_layout_axis(Axis2__y);
+                    UI_Parent(ui_box_make(Str8{}, 0))
+                    {
+                      UI_Slider_style slider_style = {};
+                      slider_style.size_x = ui_p_of_p(1.0f, 0.1f);
+                      slider_style.size_y = ui_p_of_p(1.0f, 0.1f);
+                      slider_style.fmt_str = "%.0f";
+                      slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
+                      slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
+                      slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
+    
+                      V4F32 new_rga_value_0_255 = {};
+                      new_rga_value_0_255.r = pen_color_rgba.r * 255.0f;
+                      new_rga_value_0_255.g = pen_color_rgba.g * 255.0f;
+                      new_rga_value_0_255.b = pen_color_rgba.b * 255.0f;
+                      new_rga_value_0_255.a = pen_color_rgba.a * 255.0f;
+            
+                      B32 interacted = false;
+            
+                      F32 new_r = 0.0f, new_g = 0.0f, new_b = 0.0f, new_a = 0.0f;
+                      interacted |= ui_slider(Str8FromC("Slider for red color id"),   &slider_style, pen_color_rgba.r * 255.0f, 0.0f, 255.0f, &new_r);
+                      ui_spacer(ui_px(10));
+                      interacted |= ui_slider(Str8FromC("Slider for green color id"), &slider_style, pen_color_rgba.g * 255.0f, 0.0f, 255.0f, &new_g);
+                      ui_spacer(ui_px(10));
+                      interacted |= ui_slider(Str8FromC("Slider for blue color id"),  &slider_style, pen_color_rgba.b * 255.0f, 0.0f, 255.0f, &new_b);
+                      ui_spacer(ui_px(10));
+                      interacted |= ui_slider(Str8FromC("Slider for alpha color id"), &slider_style, pen_color_rgba.a * 255.0f, 0.0f, 255.0f, &new_a);
+            
+                      new_rga_value_0_255.r = new_r;
+                      new_rga_value_0_255.g = new_g;
+                      new_rga_value_0_255.b = new_b;
+                      new_rga_value_0_255.a = new_a;
+            
+                      new_rga_value_0_255.r /= 255.0f;
+                      new_rga_value_0_255.g /= 255.0f;
+                      new_rga_value_0_255.b /= 255.0f;
+                      new_rga_value_0_255.a /= 255.0f;
+            
+                      if (interacted)
+                      {
+                        V4F32 new_hsva = hsva_from_rgba(new_rga_value_0_255);
+                        P->signal_new_pen_color_hsva = true;
+                        P->new_pen_color_hsva = new_hsva;
+                      }        
+                    }
+                  }
+        
+                  ui_spacer(ui_px(10));
+        
+                  ui_set_next_size_x(ui_p_of_p(1.0f, 0.1f));
+                  ui_set_next_size_y(ui_p_of_p(0.05f, 0.0f));
+                  ui_set_next_b_color(pen_color_rgba);
+                  UI_Box* color_rect_box = ui_box_make(Str8{}, 0);
+                }
+              }
+    
+              UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_px(0), ui_px(0), Axis2__x)
+              {
+                Str8 button_id = Str8FromC("Eraser##Button id");
+                UI_Actions actions = ui_actions_from_id(button_id);
+                if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                ui_set_next_corner_r(ui_corner_r_all(0.15f));
+                UI_Box* button_box = ui_box_make(button_id, 0);
+
+                UI_Parent(button_box)
+                UI_PaddedBox(ui_px(10), Axis2__x)
+                {
+                  ui_label_f("Eraser");
+                }
+
+                if (actions.is_clicked)
+                {
+                  P->signal_swap_to_eraser = true;
+                }
+              }
+
+              ui_spacer(ui_px(7));
+            }
+            else 
+            {
+              UI_PaddedBox(ui_px(7), Axis2__y)
+              {
+                // Eraser size slider + text next to it
+                ui_label_f("Eraser size");
+                
+                ui_spacer(ui_px(3));
+                UI_Slider_style slider_style = {};
+                slider_style.size_x = ui_px(60);
+                slider_style.size_y = ui_px(40);
+                slider_style.fmt_str = "%.0f";
+                slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
+                slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
+                slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
+  
+                F32 new_eraser_size = 0.0f;
+                B32 interacted = ui_slider(Str8FromC("Slider for eraser size id"), &slider_style, (F32)P->eraser_size, 1.0f, 100.0f, &new_eraser_size);
+                if (interacted)
+                {
+                  P->signal_new_eraser_size = true;
+                  P->new_eraser_size = (U32)new_eraser_size;
+                }
+  
+                ui_spacer(ui_px(7));
+  
+                {
+                  Str8 button_id = Str8FromC("Brush##Button id");
+                  UI_Actions actions = ui_actions_from_id(button_id);
+                  if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                  else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                  else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                  ui_set_next_corner_r(ui_corner_r_all(0.15f));
+                  UI_Box* button_box = ui_box_make(button_id, 0);
+  
+                  UI_Parent(button_box)
+                  UI_PaddedBox(ui_px(10), Axis2__x)
+                  {
+                    ui_label_f("Brush");
+                  }
+
+                  if (actions.is_clicked)
+                  {
+                    P->signal_swap_to_pen = true;
+                  }
+                }
+
+              }
+            }
+          }
         }
-      
-
       }
-      // UI_Row()
-      // {
-
-      //   ui_spacer(ui_px(25));
-
-      //   UI_Col()
-      //   {
-      //     // ui_label_f("hue: %f", new_hue);
-      //     // ui_label_f("%f", final_color_as_hsv.r);
-      //     // ui_label_f("%f", final_color_as_hsv.g);
-      //     // ui_label_f("%f", final_color_as_hsv.b);
-      //     // ui_label_f("hue: %f", new_hue);
-      //     // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).r);//(U32)(final_color.r * 255.0f));
-      //     // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).g);//(U32)(final_color.g * 255.0f));
-      //     // ui_label_f("%f", rgb_from_hsv(final_color_as_hsv).b);//(U32)(final_color.b * 255.0f));
-      //   }
-
-        // final_color.r = new_final_color.r;
-        // final_color.g = new_final_color.g;
-        // final_color.b = new_final_color.b;
-
-        // todo: HSV vertical slider picker
-        // todo: rgb picker based on the hsv value
-        // todo: slider for red color value
-        // todo: slider for green color value
-        // todo: slider for blue color value
-        // todo: slider for alpha color value
-      // }
-
-      // todo: Eraser button
     }
+
+
+    // else // Do the eraser menu
+    // {
+    //   ui_label_f("THIS AT SOME POINT WILL BE THE MENU FOR THE ERASER");
+    // }
   }
 
   ui_end_build();

@@ -22,9 +22,14 @@ void ui_layout_stack_end();
 #define UI_Col() UI_Stack(Axis2__y)
 
 // - Padded box
+void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis);
+void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis);
+void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
+void ui_padded_box_end(UI_Size size, Axis2 final_box_axis);
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
 void ui_padded_box_end(UI_Size size);
-#define UI_PaddedBox(size, axis) DeferLoop(ui_padded_box_begin(size, axis), ui_padded_box_end(size))
+#define UI_PaddedBox(size, axis)                       DeferLoop(ui_padded_box_begin(size, axis), ui_padded_box_end(size, axis))
+#define UI_PaddedBoxEx(left, right, top, bottom, axis) DeferLoop(ui_padded_box_begin_ex(left, top, axis), ui_padded_box_end_ex(right, bottom, axis))
 
 // - Wrapper
 void ui_wrapper_begin(Axis2 axis);
@@ -33,9 +38,8 @@ void ui_wrapper_end();
 
 // - Slider
 struct UI_Slider_style {
-  F32 width;
-  F32 height;
-  // F32 corner_r;
+  UI_Size size_x;
+  UI_Size size_y;
   const char* fmt_str;
   
   V4 hover_color;
@@ -49,14 +53,10 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
 
-  if (slider_actions.is_hovered) {
-    ui_set_next_b_color(slider_style->hover_color);
-  } else {
-    ui_set_next_b_color(slider_style->no_hover_color);
-  }
-  ui_set_next_size_x(ui_px(slider_style->width));
-  ui_set_next_size_y(ui_px(slider_style->height));
-  // ui_set_next_corner_radius(slider_style->corner_r);
+  if (slider_actions.is_hovered) { ui_set_next_b_color(slider_style->hover_color);} 
+  else                           { ui_set_next_b_color(slider_style->no_hover_color); }
+  ui_set_next_size_x(slider_style->size_x);
+  ui_set_next_size_y(slider_style->size_y);
   ui_set_next_layout_axis(Axis2__x);
   UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow); // todo: Why do we have no draw overflow flag here
 
@@ -75,8 +75,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     UI_Parent(slider_box)
     {
       ui_set_next_size_x(ui_px(thumb_offset));
-      ui_set_next_size_y(ui_px(slider_style->height));
-      // ui_set_next_corner_radius(slider_style->corner_r);
+      ui_set_next_size_y(ui_px(slider_box_data.on_screen_rect.height));
       ui_set_next_b_color(slider_style->slided_part_color);
       UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), 0);
     }

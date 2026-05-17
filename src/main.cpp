@@ -202,7 +202,6 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       }
     }
   }
-
 }
 
 void ui_draw()
@@ -319,7 +318,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.frame_arena = arena_alloc(Megabytes(64));
   
     P.pen_size       = 10;
-    P.pen_color_hsva = hsv_from_rgb(yellow());
+    P.pen_color_hsva = hsva_from_rgba(yellow());
     P.eraser_size    = 20;
 
     P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
@@ -414,37 +413,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       pencil_do_ui(&P, font);
       pencil_update(&P, !ui_has_active());
     }
-
-    /*
-    ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
-    {
-      UI_Col()
-      {
-        static V4F32 hsv = hsv_from_rgb(blue());
-
-        F32 new_hsv = 0.0f;
-        ui_color_picker_h(Str8FromC("Hue picker"), ui_px(150), ui_px(350), Axis2__x, hsv.hue, &new_hsv);
-        hsv.hue = new_hsv;
-
-        ui_spacer(ui_px(25));
-
-        F32 new_sat = 0.0f;
-        F32 new_val = 0.0f;
-        ui_color_picker_sv(Str8FromC("SV picker"), ui_px(150), ui_px(150), hsv, &new_sat, &new_val);
-        hsv.saturation = new_sat;
-        hsv.value      = new_val;
-
-        r_clear_frame_buffer(rgb_from_hsv(hsv));
-
-        ui_spacer(ui_px(25));
-
-      }
-    }
-    ui_end_build();
-    */
     
     { // Rendering
+      r_clear_frame_buffer(transparent());
       pencil_render(&P);
+      d_set_render_target(r_get_frame_buffer_rtv());
       ui_draw();
     }
     

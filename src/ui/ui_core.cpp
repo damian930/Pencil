@@ -200,7 +200,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   ctx->root_box            = &_ui_g_zero_box;
   ctx->current_parent_box  = &_ui_g_zero_box;
   arena_clear(ctx->style_stacks_arena);
-
+  
   // Creating the new build state
   ctx->build_generation += 1;
   Arena* arena = ui_get_build_arena();
@@ -222,6 +222,8 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 
   ctx->mouse_x = mouse_pos.x;
   ctx->mouse_y = mouse_pos.y;
+
+  ctx->cursor = os_get_cursor();
 }
 
 void ui_end_build()
@@ -231,6 +233,8 @@ void ui_end_build()
   UI_Context* ctx = ui_get_context();
   ui_layout_box(ctx->root_box, Axis2__x);
   ui_layout_box(ctx->root_box, Axis2__y);
+
+  os_set_cursor(ctx->cursor);
 
   ProfileFuncEnd();
 }
@@ -261,7 +265,6 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 
 void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
 {
-  
   switch (root->semantic_size[axis].kind)
   {
     default: { } break;
@@ -281,16 +284,6 @@ void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
       }
       root->final_on_screen_size.v[axis] = parent->final_on_screen_size.v[axis] * root->semantic_size[axis].value;
     } break;
-
-    // case UI_Size_kind__em:
-    // {
-    //   UI_Box* parent = root->parent;
-    //   for (;;parent = parent->parent)
-    //   {
-    //     if (parent->text_style.font_size != 0.0f) { break; }
-    //   }
-    //   root->final_on_screen_size.v[axis] = parent->text_style.font_size * root->semantic_size[axis].value;
-    // } break;
   }
 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
@@ -302,14 +295,10 @@ void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
 void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
 {
   // Setting up sizes for children
- 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) {
     ui_do_sizing_for_child_dependant_box(child, axis);
   }
   
-  // todo: Floating dont contribute to parent elements
-  //       But still have to fit within
-
   switch (root->semantic_size[axis].kind)
   {
     default: { } break;
@@ -636,6 +625,7 @@ B32 ui_has_active()
 //   ui_get_context()->currently_active_box_id = Str8{};
 // }
 
+// todo: This seems like it could be done at the start of the build since there is no dinamic data used here 
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
   // todo: I dont know how to make this be nicer in the api yet
@@ -731,6 +721,14 @@ UI_Actions ui_actions_from_id(Str8 id)
   UI_Box* box = ui_get_box_prev_frame(id);
   if (!ui_box_is_zero(box)) { actions = ui_actions_from_box(box); }
   return actions;
+}
+
+///////////////////////////////////////////////////////////
+// - Misc
+//
+void ui_set_cursor(OS_Cursor cursor)
+{
+  ui_get_context()->cursor = cursor;
 }
 
 ///////////////////////////////////////////////////////////

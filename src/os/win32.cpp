@@ -726,7 +726,7 @@ LRESULT win32_proc(
           case VK_TAB:     { key = Key__Tab;     } break;
         }
       }
-      // Assert(key != Key__NONE);
+      Assert(key != Key__NONE);
 
       // Unwrapping the message data
       B32 went_down = false;
@@ -854,11 +854,25 @@ void os_set_cursor(OS_Cursor cursor)
   HCURSOR cursor_handle = {};
   switch (cursor) 
   {
-    default:                    { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
+    default:               { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
     case OS_Cursor__arrow: { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
     case OS_Cursor__hand:  { cursor_handle = LoadCursor(Null, IDC_HAND);  } break;
   }
   SetCursor(cursor_handle);
+}
+
+OS_Cursor os_get_cursor()
+{
+  HCURSOR cursor_handle = GetCursor();
+  Handle(cursor_handle != Null);
+
+  HCURSOR win32_arrow = LoadCursor(Null, IDC_ARROW);
+  HCURSOR win32_hand  = LoadCursor(Null, IDC_HAND);
+
+  OS_Cursor cursor = OS_Cursor__arrow;
+  if      (cursor_handle == win32_arrow) { cursor = OS_Cursor__arrow; }
+  else if (cursor_handle == win32_hand)  { cursor = OS_Cursor__hand; }
+  return cursor;
 }
 
 

@@ -794,6 +794,8 @@ V4U8 yellow_u()      { return v4u8(255, 255, 0, 255);   }
 V4U8 pink_u()        { return v4u8(255, 0, 255, 255);   }
 V4U8 teal_u()        { return v4u8(0, 128, 128, 255);   }
 V4U8 orange_u()      { return v4u8(252, 102, 0, 255);   }
+V4U8 taupe_u()       { return v4u8(146, 124, 102, 255); }
+
 V4U8 change_alpha_u(V4U8 color, U8 new_a) { color.a = new_a; return color; }
 
 #define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.r/255.0f, (F32)uc.g/255.0f, (F32)uc.b/255.0f, (F32)uc.a/255.0f)
@@ -808,6 +810,7 @@ V4F32 yellow()       { return _U_COLOR_TO_F_COLOR(yellow_u());      }
 V4F32 pink()         { return _U_COLOR_TO_F_COLOR(pink_u());        }  
 V4F32 teal()         { return _U_COLOR_TO_F_COLOR(teal_u());        }  
 V4F32 orange()       { return _U_COLOR_TO_F_COLOR(orange_u());      }  
+V4F32 taupe()        { return _U_COLOR_TO_F_COLOR(taupe_u());       }  
 V4F32 change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
 F32 f32_round(F32 f) { return roundf(f); }
@@ -817,7 +820,7 @@ V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
 V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
 
 // note: Claude did this 
-V4F32 hsv_from_rgb(V4F32 rgb)
+V4F32 hsva_from_rgba(V4F32 rgb)
 {
     V4F32 hsv = v4f32(0.0f, 0.0f, 0.0f, rgb.a);
 
@@ -836,10 +839,9 @@ V4F32 hsv_from_rgb(V4F32 rgb)
         }
     }
     F32 delta = max - min;
-
-    if (max == 0.0f || delta == 0.0f) { return hsv; }
-
+		
     hsv.value = max;
+    if (max == 0.0f || delta == 0.0f) { return hsv; }
     hsv.saturation = delta / max;
 
     if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
@@ -905,7 +907,7 @@ V4F32 rgb_from_hsv(V4F32 hsv)
 
 V4F32 purify_rgb(V4F32 rgb)
 {
-	V4F32 hsv      = hsv_from_rgb(rgb);
+	V4F32 hsv      = hsva_from_rgba(rgb);
 	hsv.saturation = 1.0f;
 	hsv.value      = 1.0f;
 	V4F32 pure_rgb = rgb_from_hsv(hsv);

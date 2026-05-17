@@ -57,6 +57,7 @@ struct Pencil_state {
   U32 new_eraser_size;
   // 
   B32 signal_swap_to_eraser;
+  //
   B32 signal_swap_to_pen;
   //
   B32 signal_new_pen_color_hsva;
@@ -66,7 +67,6 @@ struct Pencil_state {
   // Font font_texture_for_ui;
   // V2U64 last_screen_dims;
   B32 show_brush_ui_menu;
-  Str8 brush_menu_ui_id;
 };
 
 struct Draw_record_registration_result {

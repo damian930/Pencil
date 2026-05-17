@@ -78,35 +78,42 @@ void ui_layout_stack_end()
 ///////////////////////////////////////////////////////////
 // - Padded box
 //
-void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis)
+void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis)
 {
-  // Str8 id = ui_get_next_id();
-  ui_layout_stack_begin(axis2_other(final_box_axis));
-  ui_spacer(size);
+  Axis2 outer_axis = axis2_other(final_box_axis);
+  ui_layout_stack_begin(outer_axis);
+  ui_spacer((outer_axis == Axis2__x ? left_size : top_size));
   ui_layout_stack_begin(final_box_axis);
-  ui_spacer(size);
+  ui_spacer((final_box_axis == Axis2__x ? left_size : top_size));
 }
 
-void ui_padded_box_end(UI_Size size)
+void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis)
 {
-  ui_spacer(size);
+  ui_spacer((final_box_axis == Axis2__x ? right_size : bottom_size));
   ui_layout_stack_end();
-  ui_spacer(size);
+  ui_spacer((axis2_other(final_box_axis) == Axis2__x ? right_size : bottom_size));
   ui_layout_stack_end();
+}
+
+void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis)
+{
+  ui_padded_box_begin_ex(size, size, final_box_axis);
+}
+
+void ui_padded_box_end(UI_Size size, Axis2 final_box_axis)
+{
+  ui_padded_box_end_ex(size, size, final_box_axis);
 }
 
 ///////////////////////////////////////////////////////////
 // - Wrapper
 //
-// todo: How do we set the axis here, do we got the stack way or parameter way ???
 void ui_wrapper_begin(Axis2 axis)
 {
-  // Str8 id = ui_get_next_id();
-  Str8 id = {};
   ui_set_next_size_x(ui_children_sum());
   ui_set_next_size_y(ui_children_sum());
   ui_set_next_layout_axis(axis);
-  UI_Box* wrapper = ui_box_make(id, 0);
+  UI_Box* wrapper = ui_box_make(Str8{}, 0);
   ui_push_parent(wrapper);
 }
 
@@ -203,11 +210,11 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   UI_Actions actions = ui_actions_from_box(color_picker_box);
   if (!actions.is_down) {
     // ui_reset_active_box_match(color_picker_box); 
-    os_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
+    // ui_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
   }
   else {
     // ui_set_active_box(color_picker_box);
-    os_set_cursor(OS_Cursor__hand);
+    // ui_set_cursor(OS_Cursor__hand);
     
     if (box_data.found)
     {
@@ -251,12 +258,8 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
     UI_Stack(direction)
     {
       ui_spacer(ui_px(thumb_offset));
-
-      if (box_dims.x != 0.0f)
-      {
-        ui_set_next_size_x(ui_px(thumb_width));
-        ui_set_next_size_y(ui_px(box_dims.v[axis2_other(direction)]));
-      }
+      if (direction == Axis2__x)      { ui_set_next_size_x(ui_px(thumb_width)); ui_set_next_size_y(ui_px(box_dims.v[Axis2__y])); }
+      else if (direction == Axis2__y) { ui_set_next_size_y(ui_px(thumb_width)); ui_set_next_size_x(ui_px(box_dims.v[Axis2__x]));}
       ui_set_next_corner_r(ui_corner_r_all(0.25));
       ui_set_next_border(4, white());
       UI_Box* thumb = ui_box_make({}, 0);
