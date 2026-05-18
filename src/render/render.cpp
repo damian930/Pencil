@@ -132,6 +132,22 @@ void r_init()
 
   // Swap chain
   {
+    // get DXGI device from D3D11 device
+    IDXGIDevice* dxgiDevice;
+    hr = ID3D11Device_QueryInterface(device, &IID_IDXGIDevice, (void**)&dxgiDevice);
+    AssertHR(hr);
+
+    // get DXGI adapter from DXGI device
+    IDXGIAdapter* dxgiAdapter;
+    hr = IDXGIDevice_GetAdapter(dxgiDevice, &dxgiAdapter);
+    AssertHR(hr);
+
+    // get DXGI factory from DXGI adapter
+    IDXGIFactory2* factory;
+    hr = IDXGIAdapter_GetParent(dxgiAdapter, &IID_IDXGIFactory2, (void**)&factory);
+    AssertHR(hr);
+
+    B32 is_transparent = false;
     DXGI_SWAP_CHAIN_DESC1 desc = {};
     desc.Width       = 69;
     desc.Height      = 69;
@@ -140,12 +156,12 @@ void r_init()
     desc.SampleDesc  = { 1, 0 };
     desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
     desc.BufferCount = 2;
-    desc.Scaling     = DXGI_SCALING_STRETCH;//DXGI_SCALING_NONE; // todo: Learn what these do
+    desc.Scaling     = (is_transparent ? DXGI_SCALING_STRETCH : DXGI_SCALING_NONE); // todo: Learn what these do
     desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    desc.AlphaMode   = DXGI_ALPHA_MODE_PREMULTIPLIED;//DXGI_ALPHA_MODE_UNSPECIFIED;
+    desc.AlphaMode   = (is_transparent ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_UNSPECIFIED);
     desc.Flags       = 0;
-    hr = dxgi_factory->CreateSwapChainForComposition(d3d_device, &desc, Null, &d3d->swap_chain);
-    // hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, win32_state->window_handle, &desc, Null, Null, &d3d->swap_chain);
+    if (is_transparent) { hr = dxgi_factory->CreateSwapChainForComposition(d3d_device, &desc, Null, &d3d->swap_chain); }
+    else                { hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, os_get_state()->window.handle, &desc, Null, Null, &d3d->swap_chain); }
     HR(hr);
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
@@ -719,6 +735,11 @@ D3D_Program r_program_from_file(const WCHAR* shader_program_file,
 ) {
   D3D_State* d3d = r_get_state();
 
+  UINT flags = 0;
+  #if DEBUG_MODE
+  flags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+  #endif
+
   // V shader compilation
   ID3DBlob* v_blob = 0;
   {
@@ -726,7 +747,7 @@ D3D_Program r_program_from_file(const WCHAR* shader_program_file,
 
     HRESULT hr = D3DCompileFromFile(
       shader_program_file, Null, Null,
-      "vs_main", "vs_5_0", Null, Null, &v_blob, &error_blob
+      "vs_main", "vs_5_0", flags, Null, &v_blob, &error_blob
     );
 
     if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }
@@ -740,7 +761,7 @@ D3D_Program r_program_from_file(const WCHAR* shader_program_file,
   
     HRESULT hr = D3DCompileFromFile(
       shader_program_file, Null, Null,
-      "ps_main", "ps_5_0", Null, Null, &p_blob, &error_blob
+      "ps_main", "ps_5_0", flags, Null, &p_blob, &error_blob
     );
 
     if (error_blob != 0) { OutputDebugStringA((char*)error_blob->GetBufferPointer()); }

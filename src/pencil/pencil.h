@@ -78,8 +78,8 @@ void pencil_render(const Pencil_state* P);
 void pencil_do_ui(Pencil_state* P, FP_Font font);
 
 // - Other
-// Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P);
 Draw_record_registration_result register_new_draw_record(Pencil_state* P);
+Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P);
 //
 #if DEBUG_MODE
 void __debug_export_current_record_images(const Pencil_state* P);

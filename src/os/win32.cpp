@@ -733,7 +733,7 @@ LRESULT win32_proc(
           case VK_TAB:     { key = Key__Tab;     } break;
         }
       }
-      Assert(key != Key__NONE);
+      // Assert(key != Key__NONE);
 
       // Unwrapping the message data
       B32 went_down = false;

@@ -194,7 +194,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     {
       V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
       F32 pen_size = (F32)P->pen_size;
-      d_set_render_target(P->draw_texture_always_fresh_rtv);
+      // d_set_render_target(P->draw_texture_always_fresh_rtv);
       d_set_blend(D3D_Blend_kind__alpha);
       if (P->is_erasing_mode) { 
         d_set_blend(D3D_Blend_kind__no_blend);
@@ -212,10 +212,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
+        color_rgba.a = 0.25;
         V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
+        pen_size *= 10;
         x -= pen_size / 2.0f;
         y -= pen_size / 2.0f;
-        d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 10, {});
+        d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 2.0f, {});
       }
     }
   }
@@ -540,27 +542,6 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 ///////////////////////////////////////////////////////////
 // - Other
 //
-// note: This is private for register_new_draw_record
-Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P)
-{
-  Assert(!P->is_mid_drawing);
-
-  Draw_record* result = 0;
-  if (P->first_free_draw_record)
-  {
-    result = P->first_free_draw_record;
-    DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
-    *result = Draw_record{};
-  }
-  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
-  {
-    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
-    P->count_of_pool_draw_records_in_use += 1;
-    *result = Draw_record{};
-  }
-  return result;
-}
-
 // todo: I dont know how i feel about this having positioning logic for the list and the name is not showing that
 Draw_record_registration_result register_new_draw_record(Pencil_state* P)
 {
@@ -632,7 +613,28 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P)
 
   return result;
 }
- 
+
+// note: This is private for register_new_draw_record
+Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P)
+{
+  Assert(!P->is_mid_drawing);
+
+  Draw_record* result = 0;
+  if (P->first_free_draw_record)
+  {
+    result = P->first_free_draw_record;
+    DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
+    *result = Draw_record{};
+  }
+  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
+  {
+    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
+    P->count_of_pool_draw_records_in_use += 1;
+    *result = Draw_record{};
+  }
+  return result;
+}
+
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 #if DEBUG_MODE
 void __debug_export_current_record_images(const Pencil_state* P)

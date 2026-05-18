@@ -218,7 +218,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // Layers we allocate for the runtime 
   allocate_thread_context();
   os_init();
-  r_init();
+  // r_init(); // NOTE: Since is is connected to the window directly at init and not later, i have to init it after i have a window, its not great, but for now like this
   d_init();
   fp_init();
   ui_init();
@@ -329,6 +329,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     HandleLater(succ);
   }
 
+  r_init();
+
   ///////////////////////////////////////////////////////////
   // - App loop
   //
@@ -427,17 +429,23 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     */
     
     { // UI and Application update 
-      pencil_do_ui(&P, font);
-      pencil_update(&P, !ui_has_active());
+      // pencil_do_ui(&P, font);
+      // pencil_update(&P, !ui_has_active());
     }
     
     { // Rendering
-      r_clear_frame_buffer(transparent());
-      pencil_render(&P);
-      
-      d_set_blend(D3D_Blend_kind__alpha);
-      d_set_render_target(r_get_frame_buffer_rtv());
-      ui_draw();
+      // r_clear_frame_buffer(transparent());
+      r_clear_frame_buffer(red());
+
+      // pencil_render(&P);
+
+      V4F32 corner_colors[UV__COUNT] = { yellow(), yellow(), yellow(), yellow() };
+      d_add_rect_command_ex(rect_make(50, 50, 100, 100), corner_colors, v4f32(1, 1, 1, 1), 0, 2.0f, {});
+
+
+      // d_set_blend(D3D_Blend_kind__alpha);
+      // d_set_render_target(r_get_frame_buffer_rtv());
+      // ui_draw();
     }
     
     r_submit(d_get_batch_list());

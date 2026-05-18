@@ -38,8 +38,6 @@ struct PixelInput {
   float2 rect_origin     : RECT_ORIGIN;
   float2 rect_dims       : RECT_DIMS;
 
-  float rect_border_thickness : RECT_BORDER_THICK;
-  
   float corner_radius      : CORNER_R;
   float4 border_color      : RECT_BORDER_COLOR;
   float border_thickness   : BORDER_THICH;
