@@ -113,7 +113,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       for EachEnum(i, UV, UV__00, UV__COUNT) { corner_colors[i] = root->shape_style.color; }
       V4F32 corner_radiuses = {};
       for EachArrElement(i, corner_radiuses.v) { corner_radiuses.v[i] = root->shape_style.corner_r.r.v[i]; }
-      d_add_rect_command_ex(rect, corner_colors, corner_radiuses, root->shape_style.border.width, root->shape_style.softness);
+      d_add_rect_command_ex(rect, corner_colors, corner_radiuses, root->shape_style.border.width, root->shape_style.softness, root->shape_style.border.color);
     }
   
     if (root->flags & UI_Box_flag__has_text_contents)
@@ -210,6 +210,9 @@ void ui_draw()
   ui_draw_box(ctx->root_box, Rect{});
 }
 
+#define APP_WINDOW_NAME      "Pencil"
+#define APP_MUTEX_NAME_WIN32 "Pencil mutex that has a name that no one will ever know aobut. Last week was the kevin harts roast, shane did good."
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   // Layers we allocate for the runtime 
@@ -219,6 +222,23 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   d_init();
   fp_init();
   ui_init();
+
+  { // Making sure that the app is not being run more than once
+    HANDLE mutex_h = CreateMutexA(Null, false, APP_MUTEX_NAME_WIN32);
+    if (GetLastError() == ERROR_ALREADY_EXISTS)
+    {
+      // Get the window of that application and return
+      HWND window_h = FindWindowA(Null, APP_WINDOW_NAME);
+      if (window_h)
+      {
+        SetForegroundWindow(window_h);
+        if (IsIconic(window_h)) { // todo: What does this do ?
+          ShowWindow(window_h, SW_RESTORE);
+        }
+        return 0;
+      }
+    }
+  }
 
   // todo: Try to read a file that is longer than 4 gigs
   // todo: Try to write a file that is longer than 4 gigs
@@ -314,7 +334,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //
   Pencil_state P = {}; 
   {
-    P.arena = arena_alloc(Megabytes(64));
     P.frame_arena = arena_alloc(Megabytes(64));
   
     P.pen_size       = 10;
@@ -324,10 +343,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
     P.draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
   
-    P.draw_texture_always_fresh       = r_make_texture(P.draw_texures_width, P.draw_texures_height);
-    P.draw_texture_not_that_fresh     = r_make_texture(P.draw_texures_width, P.draw_texures_height);
-    P.draw_texture_always_fresh_rtv   = r_rtv_from_texture(P.draw_texture_always_fresh);
-    P.draw_texture_not_that_fresh_rtv = r_rtv_from_texture(P.draw_texture_not_that_fresh);
+    P.draw_texture_always_fresh     = r_make_texture(P.draw_texures_width, P.draw_texures_height);
+    P.draw_texture_always_fresh_rtv = r_rtv_from_texture(P.draw_texture_always_fresh);
   }
 
   // todo: Do better with this here
@@ -417,6 +434,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     { // Rendering
       r_clear_frame_buffer(transparent());
       pencil_render(&P);
+      
+      d_set_blend(D3D_Blend_kind__alpha);
       d_set_render_target(r_get_frame_buffer_rtv());
       ui_draw();
     }

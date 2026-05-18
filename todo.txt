@@ -1,57 +1,34 @@
-[x] - Do scissoring for rendering an ui when overflow.
-[x] - Make sure that scissoring begin and end work as expected.
-[ ] - Do you have to batch the draw calls and only in the end draw then and then flip via present and commit ?
-      Go see code from november and see if you did that there with opengl.
-[ ] - Redo the rendered so you are fine with how you 
-      allocate and then release all the resources.
-      Might be a good idea to have it be at the start of the 
-      func and then you just release them at the bottom.
-      Since funcs are small, they shoud not crash and just be
-      implemented fine and we good to go.
-      Also start resettinga all the stuff that 
-      each call allocated so you dont have to deal with unwanted sideeffected that are hard to trace 
+Looking into the pencil state and update loop:
+ - Why does count_of_pool_draw_records_in_use inlude the free list, this is error prone,
+      -- This here seems liek the records is a list but with a 0 beeing a possible value when there is no element, but the access pattern is not great, this shoud be changed, either by having some accessors that would close the logic in there, or just by making a better data struct overall.
+   would it be possible to do a different design for this ?
+- The current record might be 0, this might be bad and error prone
+// ----
+
+[ ] - the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
+      and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
+      not_that_fresh texture at the end of draw, instead of the fresh texture at the sta[ ] - Fixrt of draw.
+
 [ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
 [ ] - Remove the non-client arena for the window 
 
-*****
-[ ] - Start doing the ui for the thing.
-      - Do your first ever color picker
-            - Have 4 vertexes per rect 
-*****
-
 [ ] - When drawing have a pen like in cactus image viewer
 
-[ ] - Get path to app_data for later use with files and logs
-[ ] - Add a global mutex or a file to app data to not be able to run the app the second time.
-      Do it so if the app is to be run the second time, just go into the draw mode.
-[ ] -  
-[ ] - Add asserts and error messages to the d3d layer and the os layer when the state is not initialised but used, 
-      like when a render func is used before render_begin is called
-[ ] - 
-[ ] - Start getting a texture from the system each frame and drawing it into the frame buffer
-[ ] - 
- the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
-      and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
-      not_that_fresh texture at the end of draw, instead of the fresh texture at the sta[ ] - Fixrt of draw.
 [ ] - Display the fps on the screen to have it be like in raylib  
-[ ] - There is a bug when i come out of the screen while holding the mouse down 
-      and then release it outside the screen and then come back to the screen,
-      it still has the mouse down state for some reason. 
-[ ] - Have ctrl+z when held remove the drawings instead of having to press it a bunch of times
 [ ] - Look into this https://web.archive.org/web/20190913214618/http://www.pjblewis.com/site/posts/2016-04-27-p2-efficient-alpha-blended-windows-directcomposition.html
 [ ] - Start using V memory instead of malloc
 [ ] - https://github.com/mmozeiko/c_d2d_dwrite for DWrite,
       found this in Digital Grove 
 
+[ ] - Fix the bug that the circle that you draw dont get smoothed out at all, but ui does.
+
 Feature ideas:
+- Visible pen size
+- Customisation for shortcuts
 - Screen shot with the back of the desktop
 - Screen shot with just the drawn part
-- Built in color picker for a color on the screen
-- Color picker
 - Arrow
-- Customisation for shortcuts
 - Saving of 
-- Visible pen size
 - Pixel ruller so i dont have to use a website for it
 
 

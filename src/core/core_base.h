@@ -730,6 +730,7 @@ union V4F32 {
 	struct { V2F32 xy; V2F32 zw; };
 	struct { F32 x; V3F32 yzw; };
 	struct { F32 hue; F32 saturation; F32 value; F32 _; };
+	struct { V3F32 hsv; F32 __; };
 };
 typedef V4F32 Vec4;
 typedef V4F32 V4;
@@ -819,46 +820,42 @@ F32 f32_floor(F32 f) { return floorf(f); }
 V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
 V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
 
-// note: Claude did this 
-V4F32 hsva_from_rgba(V4F32 rgb)
+V3F32 hsv_from_rgb(V3F32 rgb) // Claude did this
 {
-    V4F32 hsv = v4f32(0.0f, 0.0f, 0.0f, rgb.a);
+	V3F32 hsv = v3f32(0.0f, 0.0f, 0.0f);
 
-    F32 max = rgb.v[0];
-    F32 min = rgb.v[0];
-    U64 max_channel_index = 0;
-    for (U64 i = 1; i < 3; i += 1)
-    {
-        if (rgb.v[i] > max) {
-            max = rgb.v[i];
-            max_channel_index = i;
-        }
+	F32 max = rgb.v[0];
+	F32 min = rgb.v[0];
+	U64 max_channel_index = 0;
+	for (U64 i = 1; i < 3; i += 1)
+	{
+		if (rgb.v[i] > max) {
+					max = rgb.v[i];
+					max_channel_index = i;
+			}
 
-        if (rgb.v[i] < min) {
-            min = rgb.v[i];
-        }
-    }
-    F32 delta = max - min;
-		
-    hsv.value = max;
-    if (max == 0.0f || delta == 0.0f) { return hsv; }
-    hsv.saturation = delta / max;
+			if (rgb.v[i] < min) {
+					min = rgb.v[i];
+			}
+	}
+	F32 delta = max - min;
+	
+	hsv.value = max;
+	if (max == 0.0f || delta == 0.0f) { return hsv; }
+	hsv.saturation = delta / max;
 
-    if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
-    else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
-    else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
+	if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
+	else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
+	else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
 
-    hsv.hue /= 6.0f;
-    if (hsv.hue < 0.0f) { hsv.hue += 1.0f; }
+	hsv.hue /= 6.0f;
+	if (hsv.hue < 0.0f) { hsv.hue += 1.0f; }
 
-    return hsv;
+	return hsv;
 }
-
-// note: Took this from the raddbg codebase just to have it be working, i dont really care that much about 
-//       where these colors actually come from, what am i, gay or something ?
-V4F32 rgb_from_hsv(V4F32 hsv)
+V3F32 rgb_from_hsv(V3F32 hsv) // This might be from the raddbg codebase
 {
-  F32 h = fmodf(hsv.hue * 360.f, 360.f);
+	F32 h = fmodf(hsv.hue * 360.f, 360.f);
   F32 s = hsv.saturation;
   F32 v = hsv.value;
   
@@ -901,8 +898,18 @@ V4F32 rgb_from_hsv(V4F32 hsv)
     b = x;
   }
   
-  V4F32 rgb = v4f32(r + m, g + m, b + m, hsv.a);
+  V3F32 rgb = v3f32(r + m, g + m, b + m);
   return rgb;
+}
+V4F32 hsva_from_rgba(V4F32 rgba)
+{
+	V3F32 hsv = hsv_from_rgb(rgba.rgb);
+	return v4f32(hsv.hue, hsv.saturation, hsv.value, rgba.a);
+}
+V4F32 rgba_from_hsva(V4F32 hsva)
+{
+	V3F32 rgb = rgb_from_hsv(hsva.hsv);
+	return v4f32(rgb.r, rgb.g, rgb.b, hsva.a);
 }
 
 V4F32 purify_rgb(V4F32 rgb)
@@ -910,7 +917,7 @@ V4F32 purify_rgb(V4F32 rgb)
 	V4F32 hsv      = hsva_from_rgba(rgb);
 	hsv.saturation = 1.0f;
 	hsv.value      = 1.0f;
-	V4F32 pure_rgb = rgb_from_hsv(hsv);
+	V4F32 pure_rgb = rgba_from_hsva(hsv);
 	return pure_rgb;
 }
 

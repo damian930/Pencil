@@ -12,6 +12,7 @@ struct D_Rect_command {
   Rect rect;
   V4F32 vertex_color[UV__COUNT];
   F32 corner_radius[UV__COUNT];
+  V4F32 border_color;
   F32 border_thickness;
   F32 softness;
 };
@@ -99,7 +100,7 @@ void                  d_add_command_to_batch(D_Command_batch* batch, D_Command c
 
 // - Draw commands
 __D_Rect_builder* d_draw_rect(Rect rect);
-void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness);
+void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color);
 void d_add_rect_command(Rect rect, V4F32 color);
 void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
 

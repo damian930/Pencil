@@ -156,7 +156,7 @@ __D_Rect_builder* d_draw_rect(Rect rect)
   return &d_state->rect_builder;
 }
 
-void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness)
+void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color)
 {
   D_State* draw_state    = d_get_state();
   Arena* arena           = draw_state->arena_for_draw_commands;
@@ -164,9 +164,10 @@ void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corn
 
   D_Command command = {};
   command.u.rect_c.rect             = rect;
+  command.u.rect_c.border_color     = border_color;
   command.u.rect_c.border_thickness = border_thickness;
   command.u.rect_c.softness         = softness;
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = corner_colors[i]; }
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i]  = corner_colors[i]; }
   for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = corner_radiuses.v[i]; }
   d_add_command_to_batch(batch, command);
 }
@@ -174,7 +175,7 @@ void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corn
 void d_add_rect_command(Rect rect, V4F32 color)
 {
   V4F32 colors[UV__COUNT] = { color, color, color, color };
-  d_add_rect_command_ex(rect, colors, {}, {}, {});
+  d_add_rect_command_ex(rect, colors, {}, {}, {}, {});
 }
 
 void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)

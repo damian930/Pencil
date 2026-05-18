@@ -63,6 +63,7 @@ VertexToPixel vs_main(CpuToVertex cpu_to_vertex)
 
 float4 ps_main(VertexToPixel vertex_to_pixel) : SV_TARGET
 {
+  // todo: Look into a white texture thing for this to maybe dont have this is_text if here and the pass divergence
   float4 tex_color = texture0.Sample(sampler0, vertex_to_pixel.uv);
   if (vertex_to_pixel.is_text_texture) { tex_color *= vertex_to_pixel.text_color; }      
   return tex_color;

@@ -307,8 +307,9 @@ void os_frame_begin()
     for (U64 i = 0; i < Key__COUNT; i += 1) 
     {
       OS_Key_state* key_state = __os_g_state->key_states + i;
-      key_state->was_down = key_state->is_down;
-      key_state->was_up = key_state->is_up;
+      key_state->was_down    = key_state->is_down;
+      key_state->was_up      = key_state->is_up;
+      key_state->repeat_down = false;
     }
 
     // Setting mouse buttons
@@ -520,6 +521,12 @@ B32 os_key_went_up(Key key)
 {
   OS_Key_state state = os_get_key_state(key);
   return (state.was_down && state.is_up);
+}
+
+B32 os_key_repeat_down(Key key)
+{
+  OS_Key_state state = os_get_key_state(key);
+  return state.repeat_down;
 }
 
 Str8 str8_from_os_key(Key key)
@@ -752,12 +759,14 @@ LRESULT win32_proc(
         Assert(key_state->key == key);
 
         if (went_down) { 
+          if (key_state->was_down) { key_state->repeat_down = true; }  
           key_state->is_down = true;
-          key_state->is_up = false;
+          key_state->is_up   = false;
         }
         else if (went_up) {
-          key_state->is_down = false;
-          key_state->is_up = true;
+          key_state->is_down     = false;
+          key_state->is_up       = true;
+          key_state->repeat_down = false;
         }
       }
 

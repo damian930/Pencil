@@ -5,7 +5,7 @@
 #include "os/win32.h"
 
 struct Draw_record {
-  // These are allocated when dont drawing
+  // These are allocated when done 
   ID3D11Texture2D*        texture_before_we_affected;
   ID3D11Texture2D*        texture_after_we_affected;
   ID3D11RenderTargetView* texture_before_we_affected_rtv;  
@@ -17,8 +17,12 @@ struct Draw_record {
   Draw_record* prev;
 };
 
+struct Draw_record_registration_result {
+  B32 succ;
+  Draw_record* record;  
+};
+
 struct Pencil_state {
-  Arena* arena;
   Arena* frame_arena;
   
   U32 pen_size;
@@ -27,15 +31,14 @@ struct Pencil_state {
 
   U32 draw_texures_width;
   U32 draw_texures_height;
+  // todo: Rename this to be a less complicated name since now we only have 1 of them (no non_fresh_texture)
   ID3D11Texture2D*        draw_texture_always_fresh;
-  ID3D11Texture2D*        draw_texture_not_that_fresh;
   ID3D11RenderTargetView* draw_texture_always_fresh_rtv; 
-  ID3D11RenderTargetView* draw_texture_not_that_fresh_rtv;
 
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
   Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
-  U64 count_of_pool_draw_records_in_use; // This inсludes if they are in the free list
+  U64 count_of_pool_draw_records_in_use; // This inсludes if they are in the free list 
   Draw_record* first_free_draw_record;
   Draw_record* last_free_draw_record;
   
@@ -44,11 +47,11 @@ struct Pencil_state {
   Draw_record* last_record;
   Draw_record* current_record;
 
-  // Stuff for while drawing
   B32 is_mid_drawing;
+  
   B32 is_erasing_mode;
 
-  // Signals (These are just here like this right now)
+  // Signals 
   //
   B32 signal_new_pen_size;
   U32 new_pen_size;
@@ -69,24 +72,15 @@ struct Pencil_state {
   B32 show_brush_ui_menu;
 };
 
-struct Draw_record_registration_result {
-  B32 succ;
-  Draw_record* record;  
-};
+// - Main passes
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse);
+void pencil_render(const Pencil_state* P);
+void pencil_do_ui(Pencil_state* P, FP_Font font);
 
-void draw_rect(
-  const Pencil_state* P,
-  D3D_State* d3d, ID3D11RenderTargetView* render_target,  
-  F32 x, F32 y, F32 width, F32 height, V4U8 color
-);
-
-Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P);
-Draw_record_registration_result register_new_draw_record(Pencil_state* P, D3D_State* d3d, B32 is_ui_capturing_mouse);
-void copy_from_texture_to_texture(D3D_State* d3d, ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
-
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, D3D_State* d3d);
-void pencil_render(const Pencil_state* P, D3D_State* d3d);
-
+// - Other
+// Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P);
+Draw_record_registration_result register_new_draw_record(Pencil_state* P);
+//
 #if DEBUG_MODE
 void __debug_export_current_record_images(const Pencil_state* P);
 #endif

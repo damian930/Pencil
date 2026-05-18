@@ -1,10 +1,8 @@
 #ifndef PENCIL_CPP
 #define PENCIL_CPP
 
-#include "pencil.h"
-
-#include "ui/ui_core.h"
-#include "ui/ui_core.cpp"
+#include "os/win32.h"
+#include "os/win32.cpp"
 
 #include "render/render.h"
 #include "render/render.cpp"
@@ -15,84 +13,18 @@
 #include "ui/widgets/ui_widgets.h"
 #include "ui/widgets/ui_widgets.cpp"
 
-Draw_record* get_new_draw_record_from_pool__nullable(Pencil_state* P)
-{
-  Draw_record* result = 0;
-  if (P->first_free_draw_record)
-  {
-    result = P->first_free_draw_record;
-    DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
-    *result = Draw_record{};
-  }
-  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
-  {
-    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
-    P->count_of_pool_draw_records_in_use += 1;
-    *result = Draw_record{};
-  }
-  return result;
-}
+#include "ui/ui_core.h"
+#include "ui/ui_core.cpp"
 
-// todo: Does this really need to care about is_ui_capturing_mouse, or shoud this
-//       be handled by the caller ????
-Draw_record_registration_result register_new_draw_record(Pencil_state* P, B32 is_ui_capturing_mouse)
-{
-  if (P->is_mid_drawing || is_ui_capturing_mouse) { return Draw_record_registration_result{}; }
+#include "pencil.h"
 
-  // Freeing all the records that are in front of the current one
-  if (P->current_record != 0)
-  {
-    for (Draw_record* record = P->last_record; record != 0;) 
-    {
-      if (record == P->current_record) { break; }
-      record->texture_before_we_affected_rtv->Release();
-      record->texture_after_we_affected_rtv->Release();
-      
-      DllPopBack_Name(P, first_record, last_record, next, prev);
-      Draw_record* prev_record = record->prev;
-      
-      *record = Draw_record{};
-      DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
-      
-      record = prev_record;
-    }
-  }
-
-  Draw_record* new_draw_record = get_new_draw_record_from_pool__nullable(P);
-  if (new_draw_record == 0)
-  {
-    Draw_record* oldest_record = P->first_record;
-    DllPopFront_Name(P, first_record, last_record, next, prev);
-    
-    *oldest_record = Draw_record{};
-    DllPushBack_Name(P, oldest_record, first_free_draw_record, last_free_draw_record, next, prev);
-
-    new_draw_record = get_new_draw_record_from_pool__nullable(P);
-  }
-  Assert(new_draw_record != 0); // This has to be true, its an ivariant
-
-  // Adding the new draw record to the draw record queue
-  DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev);  Assert(P->last_record == new_draw_record);
-
-  new_draw_record->texture_before_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
-  new_draw_record->texture_before_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_before_we_affected);
-  HandleLater(new_draw_record->texture_before_we_affected != 0);
-
-  new_draw_record->texture_after_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
-  new_draw_record->texture_after_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_after_we_affected);
-  HandleLater(new_draw_record->texture_after_we_affected != 0);
-
-  P->current_record = new_draw_record;
-
-  Draw_record_registration_result result = {};
-  result.succ = true;
-  result.record = new_draw_record;
-
-  return result;
-}
- 
+///////////////////////////////////////////////////////////
+// - Main passes
+//
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
+  Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
+
   // Handling signals
   {
     if (P->signal_new_pen_size)
@@ -147,12 +79,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
       }
     }
   }
-  
+
+  if (is_ui_capturing_mouse) { return; }
+
   B32 dont_start_drawing_this_frame = false;
 
-  // These are different modes that we might want to change
-  // if (!P->is_mid_drawing && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyDown(KEY_LEFT_SHIFT) && IsKeyPressed(KEY_Z)) 
-  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && os_key_went_down(Key__Z)) 
+  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
   {
     dont_start_drawing_this_frame = true; 
 
@@ -169,18 +101,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     if (next_record)
     {
       ID3D11RenderTargetView* future_texture = next_record->texture_after_we_affected_rtv;
-      
-      // Change the affected part from the fresh texture to the stored old version
-      r_copy_from_texture_to_texture(P->draw_texture_always_fresh_rtv, future_texture);
-
-      // Change the affected part from the not so fresh texture to the stored old version
-      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh_rtv, future_texture);
-
+      r_copy_into_texture_from_texture(P->draw_texture_always_fresh_rtv, future_texture);
       P->current_record = next_record;
     }
   }
   else // User wants to remove the last line they drew
-  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_went_down(Key__Z)) 
+  if (!P->is_mid_drawing && os_key_down(Key__Control) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
   {
     dont_start_drawing_this_frame = true;
 
@@ -189,13 +115,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     {
       Draw_record* record = P->current_record;
       ID3D11RenderTargetView* texture_before_we_affected_rtv = record->texture_before_we_affected_rtv;
-      
-      // Change the affected part from the fresh texture to the stored old version
-      r_copy_from_texture_to_texture(P->draw_texture_always_fresh_rtv, texture_before_we_affected_rtv);
-
-      // Change the affected part from the not so fresh texture to the stored old version
-      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh_rtv, texture_before_we_affected_rtv);
-
+      r_copy_into_texture_from_texture(P->draw_texture_always_fresh_rtv, texture_before_we_affected_rtv);
       P->current_record = P->current_record->prev;
     }
   }
@@ -205,41 +125,48 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     dont_start_drawing_this_frame = true;
 
     // Creating a new current record
-    Draw_record_registration_result record_reg = register_new_draw_record(P, is_ui_capturing_mouse);
+    Draw_record_registration_result record_reg = register_new_draw_record(P);
     if (record_reg.succ)
     {
-      Draw_record* record = record_reg.record;
       P->current_record = record_reg.record;
     
       U64 w = P->draw_texures_width;
       U64 h = P->draw_texures_height;
       
+      // Storing the texture before we clear it
+      r_copy_into_texture_from_texture(P->current_record->texture_before_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+
       // Clearing the texture
       r_clear_rtv(P->draw_texture_always_fresh_rtv, transparent());
-  
-      // Storing the prev texture state
-      r_copy_from_texture_to_texture(P->current_record->texture_before_we_affected_rtv, P->draw_texture_not_that_fresh_rtv);
-  
-      // Storing the new texture state
-      r_copy_from_texture_to_texture(P->current_record->texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
-
-      // Matching the prev texture state to the new one
-      r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh_rtv, P->draw_texture_always_fresh_rtv);
+      
+      // Storing the texture after clearing it
+      r_copy_into_texture_from_texture(P->current_record->texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
     }
   }
   else // User wants to start using the eraser pen 
-  if (!P->is_mid_drawing && os_key_went_up(Key__E))
+  if (!P->is_mid_drawing && os_key_went_down(Key__E))
   {
+    // note: 
+    // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
+    // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
+    // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
+    // This was written on (18th May 2026)
     dont_start_drawing_this_frame = true;
     P->is_erasing_mode = true;
   }
   else // User wants to start using the brush/pen
-  if (!P->is_mid_drawing && os_key_went_up(Key__B))
+  if (!P->is_mid_drawing && os_key_went_down(Key__B))
   {
+    // note: 
+    // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
+    // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
+    // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
+    // This was written on (18th May 2026)
     dont_start_drawing_this_frame = true;
     P->is_erasing_mode = false;
+    // end_frame_event_swap_to_pen = true; 
   } 
-  else
+  else 
   if (os_key_went_down(Key__Tab))
   {
     P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
@@ -247,37 +174,38 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
 
-  if (!P->is_mid_drawing && !is_ui_capturing_mouse && os_mouse_button_down(Mouse_button__Left)) 
+  // Starting a new draw record
+  if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left)) 
   {
-    Draw_record_registration_result record_registation = register_new_draw_record(P, is_ui_capturing_mouse);
+    Draw_record_registration_result record_registation = register_new_draw_record(P);
     if (record_registation.succ)
     {
-      // todo: What is .succ here about, do we need it ???
       P->is_mid_drawing = true;
+      P->current_record = record_registation.record;
     }
   }
   else // Updating active drawing 
   if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left))
   {
-    V2F32 new_pos = os_get_mouse_pos();
+    V2F32 new_pos  = os_get_mouse_pos();
     V2F32 prev_pos = os_get_prev_mouse_pos();
     
     // Drawing a continuos line based on delta
     {
-      V4F32 color_rgba = rgb_from_hsv(P->pen_color_hsva);
+      V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
       F32 pen_size = (F32)P->pen_size;
       d_set_render_target(P->draw_texture_always_fresh_rtv);
       d_set_blend(D3D_Blend_kind__alpha);
       if (P->is_erasing_mode) { 
-        color_rgba = v4f32(0.0f, 0.0f, 0.0f, 0.0f); 
-        pen_size = (F32)P->eraser_size;
         d_set_blend(D3D_Blend_kind__no_blend);
+        color_rgba = transparent(); 
+        pen_size = (F32)P->eraser_size;
       }
 
-      F32 dx = new_pos.x - prev_pos.x;
-      F32 dy = new_pos.y - prev_pos.y;
+      F32 dx     = new_pos.x - prev_pos.x;
+      F32 dy     = new_pos.y - prev_pos.y;
       F32 length = sqrtf(dx * dx + dy * dy);
-      U64 steps = (U64)length;
+      U64 steps  = (U64)length;
 
       for (U64 i = 0; i <= steps; i++) 
       {
@@ -285,98 +213,55 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
         V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
-        d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 4);
+        x -= pen_size / 2.0f;
+        y -= pen_size / 2.0f;
+        d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 10, {});
       }
     }
-
-    // todo: Update this comment here (We no longer use cpu side image)
-    // note: Here is the only time when the cpu side image is not synced to the gpu one. 
-    //       But we do later sync it when we stop drawing.
   }
-  else // Here we finalise the draw recordd that the user have been drawing
+  else // Here we finalise the draw record that the user have been drawing
   if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__Left))
   {
     Assert(P->current_record != 0);
     Assert(P->current_record->texture_after_we_affected_rtv != 0);  // These are expected to already be allocated by this point
     Assert(P->current_record->texture_before_we_affected_rtv != 0); // These are expected to already be allocated by this point
-    
+
     P->is_mid_drawing = false;
 
-    U64 draw_t_width = P->draw_texures_width;
-    U64 draw_t_height = P->draw_texures_height;
-
-    Draw_record* record = P->current_record;
-    ID3D11RenderTargetView* texture_before_we_affected_rtv = record->texture_before_we_affected_rtv;
-    ID3D11RenderTargetView* texture_after_we_affected_rtv  = record->texture_after_we_affected_rtv;
-    
     // note: By this point, the fresh draw texture is the new final version of what the user has draw
-
-    // Storing the prev version of the draw texture 
-    r_copy_from_texture_to_texture(texture_before_we_affected_rtv, P->draw_texture_not_that_fresh_rtv);
+    Draw_record* record = P->current_record;
 
     // Storing the new version of the draw texture
-    r_copy_from_texture_to_texture(texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
-
-    // Updating the prev version of the draw texture to match the new version
-    r_copy_from_texture_to_texture(P->draw_texture_not_that_fresh_rtv, P->draw_texture_always_fresh_rtv);
+    r_copy_into_texture_from_texture(record->texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
   }
 
   __active_draw_update_routine_end__: {};
 }
 
-// todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
+void pencil_render(const Pencil_state* P)
+{
+  Rect rect = {};
+  rect.width  = (F32)P->draw_texures_width;
+  rect.height = (F32)P->draw_texures_height;
+  d_set_render_target(r_get_frame_buffer_rtv());
+  d_add_texture_command(P->draw_texture_always_fresh, rect, rect, false, V4F32{});
+}
+
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 { 
   ProfileFuncBegin();
 
-  V4F32 pen_color_rgba = rgb_from_hsv(P->pen_color_hsva);
+  V4F32 pen_color_rgba = rgba_from_hsva(P->pen_color_hsva);
 
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
 
   ui_push_font(font);
 
-  ui_set_next_border(2, v4f32(1, 0, 0, 1));
-  ui_set_next_size_x(ui_p_of_p(1, 1));
-  ui_set_next_size_y(ui_p_of_p(1, 1));
-  ui_set_next_layout_axis(Axis2__x);
-  UI_Box* top_wrapper = ui_box_make(Str8{}, 0);
-
-  UI_Box* content_inner = 0;
-  UI_Parent(top_wrapper)
-  {
-    ui_set_next_size_x(ui_px(10));
-    ui_set_next_size_y(ui_p_of_p(1, 1));
-    ui_set_next_b_color(v4f32(1, 0, 0, 1));
-    UI_Box* left_border = ui_box_make(Str8{}, 0);
-    
-    ui_set_next_size_x(ui_p_of_p(1, 0));
-    ui_set_next_size_y(ui_p_of_p(1, 0));
-    ui_set_next_layout_axis(Axis2__y);
-    UI_Box* content_outer = ui_box_make(Str8{}, 0);
-
-    UI_Parent(content_outer)
-    {
-      ui_set_next_size_x(ui_p_of_p(1, 1));
-      ui_set_next_size_y(ui_px(10));
-      ui_set_next_b_color(red());
-      UI_Box* top_border = ui_box_make(Str8{}, 0);
-
-      ui_set_next_size_x(ui_p_of_p(1, 0));
-      ui_set_next_size_y(ui_p_of_p(1, 0));
-      ui_set_next_layout_axis(Axis2__y);
-      content_inner = ui_box_make(Str8{}, 0);
-
-      ui_set_next_size_x(ui_p_of_p(1, 1));
-      ui_set_next_size_y(ui_px(10));
-      ui_set_next_b_color(red());
-      UI_Box* bottom_border = ui_box_make(Str8{}, 0);
-    }
-
-    ui_set_next_size_x(ui_px(10));
-    ui_set_next_size_y(ui_p_of_p(1, 1));
-    ui_set_next_b_color(v4f32(1, 0, 0, 1));
-    UI_Box* right_border = ui_box_make(Str8{}, 0);
-  }
+  ui_set_next_size_x(ui_p_of_p(1.0f, 1.0f));
+  ui_set_next_size_y(ui_p_of_p(1.0f, 1.0f));
+  ui_set_next_border(10, red());
+  ui_set_next_softness(0.0f);
+  UI_Box* content_inner = ui_box_make(Str8{}, 0);
 
   static F32 x_offset = 0.0f;
   static F32 y_offset = 0.0f;
@@ -611,7 +496,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                 }
   
                 ui_spacer(ui_px(7));
-  
+
                 {
                   Str8 button_id = Str8FromC("Brush##Button id");
                   UI_Actions actions = ui_actions_from_id(button_id);
@@ -652,15 +537,103 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
   ProfileFuncEnd();
 }
 
-void pencil_render(const Pencil_state* P)
+///////////////////////////////////////////////////////////
+// - Other
+//
+// note: This is private for register_new_draw_record
+Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P)
 {
-  Rect rect = {};
-  rect.width  = (F32)P->draw_texures_width;
-  rect.height = (F32)P->draw_texures_height;
-  d_set_render_target(r_get_frame_buffer_rtv());
-  d_add_texture_command(P->draw_texture_always_fresh, rect, rect, false, V4F32{});
+  Assert(!P->is_mid_drawing);
+
+  Draw_record* result = 0;
+  if (P->first_free_draw_record)
+  {
+    result = P->first_free_draw_record;
+    DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
+    *result = Draw_record{};
+  }
+  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
+  {
+    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
+    P->count_of_pool_draw_records_in_use += 1;
+    *result = Draw_record{};
+  }
+  return result;
 }
 
+// todo: I dont know how i feel about this having positioning logic for the list and the name is not showing that
+Draw_record_registration_result register_new_draw_record(Pencil_state* P)
+{
+  // note:
+  // This routine is not used a lot, but used and is very important to how the state manages the order of
+  // draw records. The issue with it, is that the state does not clear frame based bounds for drawing.
+  // The bounds are cross frame. For this reason i cant have a begin_draw/end_draw api. I cant have a no op 
+  // as well here for reasons. Just assert is bad here since then in release if i mess up, the app will
+  // have invalid state, which is really bad, i would rather noting happend and not invalid state.
+  // I dont like the optional api that much, but since this routine is called right now only 2 times (Today is 18th of May 2026), 
+  // its fine. And aslo removes all the knolage from the caller about when this routine is legal to be called
+  // and leaves that knolage to be used to the routine itself. 
+  if (P->is_mid_drawing) { InvalidCodePath(); return Draw_record_registration_result{}; }
+
+  // Freeing all the records that are in front of the current one
+  if (P->current_record != 0)
+  {
+    // todo: I feel like releasing them here is fine, but i could also just reuse them since they are all the same size
+    //       This would then also mean that i can just prealloc all of them at startup and just reuse by clearing them.
+    //       This would also mean that i can test how many i can allocate up to an upper bound also at the startup. 
+    //       Hm. If this is possible then this shoud be way better, BUT, this might not work when we have 
+    //       handling for screen or task bar resize, which shoud be handled, but for now isnt, so look into this
+    //       when it is.
+    for (Draw_record* record = P->last_record; record != 0;) 
+    {
+      if (record == P->current_record) { break; }
+      record->texture_before_we_affected_rtv->Release();
+      record->texture_after_we_affected_rtv->Release();
+      
+      DllPopBack_Name(P, first_record, last_record, next, prev);
+      Draw_record* prev_record = record->prev;
+      
+      *record = Draw_record{};
+      DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
+      
+      record = prev_record;
+    }
+  }
+
+  Draw_record* new_draw_record = __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(P);
+  if (new_draw_record == 0)
+  {
+    Draw_record* oldest_record = P->first_record;
+    DllPopFront_Name(P, first_record, last_record, next, prev);
+    
+    *oldest_record = Draw_record{};
+    DllPushBack_Name(P, oldest_record, first_free_draw_record, last_free_draw_record, next, prev);
+
+    new_draw_record = __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(P);
+  }
+  Assert(new_draw_record != 0); 
+
+  // Adding the new draw record to the draw record queue
+  DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev); Assert(P->last_record == new_draw_record);
+
+  new_draw_record->texture_before_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_before_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_before_we_affected);
+  HandleLater(new_draw_record->texture_before_we_affected != 0);
+
+  r_copy_into_texture_from_texture(new_draw_record->texture_before_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+
+  new_draw_record->texture_after_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  new_draw_record->texture_after_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_after_we_affected);
+  HandleLater(new_draw_record->texture_after_we_affected != 0);
+
+  Draw_record_registration_result result = {};
+  result.succ = true;
+  result.record = new_draw_record;
+
+  return result;
+}
+ 
+// todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 #if DEBUG_MODE
 void __debug_export_current_record_images(const Pencil_state* P)
 {
@@ -677,12 +650,6 @@ void __debug_export_current_record_images(const Pencil_state* P)
     r_export_texture(P->draw_texture_always_fresh_rtv, Str8FromC("always_fresh_texture.png"));
   }
 
-  // Loading up not_fresh_texture
-  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
-  {
-    r_export_texture(P->draw_texture_not_that_fresh_rtv, Str8FromC("not_always_fresh_texture.png"));
-  }
-  
   // Loading up current texture_after_we_affected_rtv
   if (P->current_record != 0)
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))

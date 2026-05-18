@@ -142,7 +142,7 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   // the bottom left and right are black
   // the top left is right
   // the top right is the purest version of the color. This is represented by hue, but in the rgb worls this
-  // would have to be rgb_from_hsv(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
+  // would have to be rgba_from_hsva(hue, 1.0f, 1.0f), so both value and saturation are 1.0s, this gives the most 
   // saturated and brigth color for a shade of color, which is specified by the hue, which is a 0->360* or
   // 0->1.0f value of the hsv color pallet. 
 
@@ -162,7 +162,7 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   _UI_Color_picker_sv_data* draw_data = ArenaPush(ui_get_build_arena(), _UI_Color_picker_sv_data);
   draw_data->colors[UV__00] = white(); 
   draw_data->colors[UV__01] = black();
-  draw_data->colors[UV__10] = rgb_from_hsv(pure_hsv);
+  draw_data->colors[UV__10] = rgba_from_hsva(pure_hsv);
   draw_data->colors[UV__11] = black();
   ui_box_set_custom_draw(color_picker_box, __ui_color_picker_sv_square_draw_func, draw_data);
   
@@ -289,7 +289,7 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
 void __ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_data* data = (_UI_Color_picker_sv_data*)box->custom_draw_data;
-  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {}, {});
+  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {}, {}, {});
 }
 
 void __ui_color_picker_h_draw_func(UI_Box* box)
@@ -301,8 +301,8 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
   F32 hue_section_length = 1.0f / 6.0f;
   for EachIndex(i, 6)
   {
-    V4F32 rgb_for_section_start = rgb_from_hsv(v4f32(hue_section_start, 1.0f, 1.0f, 1.0f));
-    V4F32 rgb_for_section_end   = rgb_from_hsv(v4f32(hue_section_start + hue_section_length, 1.0f, 1.0f, 1.0f));
+    V4F32 rgb_for_section_start = rgba_from_hsva(v4f32(hue_section_start, 1.0f, 1.0f, 1.0f));
+    V4F32 rgb_for_section_end   = rgba_from_hsva(v4f32(hue_section_start + hue_section_length, 1.0f, 1.0f, 1.0f));
     
     V4F32 colors[UV__COUNT] = {};
     colors[UV__00] = data->axis == Axis2__x ? rgb_for_section_start : rgb_for_section_start;
@@ -340,7 +340,7 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
       rect = rect_make(rect_p.x, rect_p.y, rect_dims.x, rect_dims.y);
     }
 
-    d_add_rect_command_ex(rect, colors, corner_r, {}, box->shape_style.softness);
+    d_add_rect_command_ex(rect, colors, corner_r, {}, box->shape_style.softness, {});
 
     hue_section_start += hue_section_length;
   }

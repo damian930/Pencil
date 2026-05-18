@@ -41,6 +41,7 @@ struct OS_File { U64 u64; };
 ///////////////////////////////////////////////////////////
 // - Events
 // 
+// todo: This does not conform to the code style of this codebase, change the names for these and have Key__A be Key__a instead
 enum Key : U32 {
   Key__NONE,
 
@@ -155,6 +156,8 @@ struct OS_Key_state {
   B8 was_up;
   B8 was_down;
 
+  B8 repeat_down;
+
   B8 is_clicked;
 };
 
@@ -219,6 +222,7 @@ B32 os_key_down(Key key);
 B32 os_key_up(Key key);
 B32 os_key_went_down(Key key);
 B32 os_key_went_up(Key key);
+B32 os_key_repeat_down(Key key);
 Str8 str8_from_os_key(Key key);
 
 // - Inputs for mouse

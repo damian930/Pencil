@@ -54,6 +54,7 @@ struct D3D_Rect_instance_data {
   F32 corner_radius_01;
   F32 corner_radius_11;
 
+  V4F32 border_color;
   F32 border_thickness;
   F32 softness;
 
@@ -175,7 +176,7 @@ Image r_image_from_texture(Arena* arena, ID3D11RenderTargetView* rtv);
 void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
 ID3D11Texture2D* r_load_texture_from_file(Str8 file_name);
 ID3D11Texture2D* r_load_texture_from_image(Image image);
-void r_copy_from_texture_to_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
+void r_copy_into_texture_from_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
 V2F32 r_get_viewport_dims();
 
 #endif

@@ -25,8 +25,8 @@ struct VertexInput {
   float rect_corner_radius_01 : RECT_01_CORNER_RADIUS;
   float rect_corner_radius_11 : RECT_11_CORNER_RADIUS;
   
+  float4 rect_border_color    : RECT_BORDER_COLOR;
   float rect_border_thickness : RECT_BORNER_THICKNESS;
-
   float softness              : SOFTNESS;
 
   uint vertex_id : SV_VertexID;
@@ -40,9 +40,10 @@ struct PixelInput {
 
   float rect_border_thickness : RECT_BORDER_THICK;
   
-  float corner_radius    : CORNER_R;
-  float border_thickness : BORDER_THICH;
-  float softness         : SOFTNESS;
+  float corner_radius      : CORNER_R;
+  float4 border_color      : RECT_BORDER_COLOR;
+  float border_thickness   : BORDER_THICH;
+  float softness           : SOFTNESS;
   
   float4 pos : SV_POSITION;
 };
@@ -98,6 +99,7 @@ PixelInput vs_main(VertexInput vertex_input)
   pixel_input.corner_radius        = rect_vertex_corner_r[vertex_input.vertex_id];
   pixel_input.softness             = vertex_input.softness;
   pixel_input.border_thickness     = vertex_input.rect_border_thickness;
+  pixel_input.border_color         = vertex_input.rect_border_color;
   pixel_input.vertex_color[UV__00] = vertex_input.rect_color_00;
   pixel_input.vertex_color[UV__10] = vertex_input.rect_color_10;
   pixel_input.vertex_color[UV__01] = vertex_input.rect_color_01;
@@ -126,7 +128,7 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
     }
     else if (-pixel_input.border_thickness <= sdf && sdf < 0.0)
     {
-      final_color = float4(1, 1, 1, 1);
+      final_color = pixel_input.border_color;
       float smoothed = smoothstep(0.0, pixel_input.softness, -sdf);
       final_color.a *= smoothed; 
     }
