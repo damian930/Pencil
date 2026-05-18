@@ -186,7 +186,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       }
   
       scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-      d_set_scissor_rect(scissor_rect);
+      d_push_scissor_rect(scissor_rect);
     }
   
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
@@ -198,7 +198,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
     {
       if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-        d_set_scissor_rect(parent_scissor_rect); 
+        d_pop_scissor_rect();
       }
     }
   }
@@ -335,19 +335,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // - App loop
   //
   Pencil_state P = {}; 
-  {
-    P.frame_arena = arena_alloc(Megabytes(64));
-  
-    P.pen_size       = 10;
-    P.pen_color_hsva = hsva_from_rgba(yellow());
-    P.eraser_size    = 20;
-
-    P.draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
-    P.draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
-  
-    P.draw_texture_always_fresh     = r_make_texture(P.draw_texures_width, P.draw_texures_height);
-    P.draw_texture_always_fresh_rtv = r_rtv_from_texture(P.draw_texture_always_fresh);
-  }
+  pencil_init(&P);
 
   // todo: Do better with this here
   //       Here is the link to the resource that explaince this code here and why it is needed
@@ -429,23 +417,14 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     */
     
     { // UI and Application update 
-      // pencil_do_ui(&P, font);
-      // pencil_update(&P, !ui_has_active());
+      pencil_do_ui(&P, font);
+      pencil_update(&P, !ui_has_active());
     }
     
     { // Rendering
-      // r_clear_frame_buffer(transparent());
-      r_clear_frame_buffer(red());
-
-      // pencil_render(&P);
-
-      V4F32 corner_colors[UV__COUNT] = { yellow(), yellow(), yellow(), yellow() };
-      d_add_rect_command_ex(rect_make(50, 50, 100, 100), corner_colors, v4f32(1, 1, 1, 1), 0, 2.0f, {});
-
-
-      // d_set_blend(D3D_Blend_kind__alpha);
-      // d_set_render_target(r_get_frame_buffer_rtv());
-      // ui_draw();
+      r_clear_frame_buffer(transparent());
+      pencil_render(&P);
+      ui_draw();
     }
     
     r_submit(d_get_batch_list());
@@ -458,7 +437,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     B32 vsync = false; 
     r_get_state()->swap_chain->Present(!!vsync, 0);
     HRESULT commit_hr = comp_device->Commit(); 
-    Handle(commit_hr == S_OK);
+    // Handle(commit_hr == S_OK);
 
     F64 frame_end_time_sec = os_get_time_for_timing_sec();
     prev_frame_duration_sec = frame_end_time_sec - frame_start_time_sec;
@@ -472,18 +451,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
     #endif
   }
-
-  // Writting the gathered profiling data
-  { 
-    Data_buffer profile_data = profile_get_data();
-
-    OS_File file = os_file_open(Str8FromC("Profiling_data_file.txt"), OS_File_access__read|OS_File_access__write|OS_File_access__visible_read);
-    B32 succ = os_file_write_end(file, profile_data);
-    os_file_close(&file);
-    Assert(succ);
-  }
-
-  // note: Not releasing stuff here since who cares, the os will release it for us
 
   return 0;
 }

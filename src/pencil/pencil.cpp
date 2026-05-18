@@ -21,6 +21,28 @@
 ///////////////////////////////////////////////////////////
 // - Main passes
 //
+void pencil_init(Pencil_state* P)
+{
+  P->frame_arena = arena_alloc(Megabytes(64));
+
+  P->pen_size       = 10;
+  P->pen_color_hsva = hsva_from_rgba(yellow());
+  P->eraser_size    = 20;
+
+  P->draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
+  P->draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
+
+  P->draw_texture_always_fresh     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  P->draw_texture_always_fresh_rtv = r_rtv_from_texture(P->draw_texture_always_fresh);
+
+  // Putting everything into the free list since we already have a static buffer of draw records
+  for EachIndex(i, DRAW_RECORDS_MAX_COUNT)
+  {
+    Draw_record* record = P->pool_of_draw_records + i;
+    DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
+  }
+}
+
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
   Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
@@ -190,36 +212,35 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     V2F32 new_pos  = os_get_mouse_pos();
     V2F32 prev_pos = os_get_prev_mouse_pos();
     
-    // Drawing a continuos line based on delta
-    {
-      V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
-      F32 pen_size = (F32)P->pen_size;
-      // d_set_render_target(P->draw_texture_always_fresh_rtv);
-      d_set_blend(D3D_Blend_kind__alpha);
-      if (P->is_erasing_mode) { 
-        d_set_blend(D3D_Blend_kind__no_blend);
-        color_rgba = transparent(); 
-        pen_size = (F32)P->eraser_size;
-      }
+    V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
+    F32 pen_size = (F32)P->pen_size;
+    
+    if (P->is_erasing_mode) { 
+      d_push_blend_kind(D3D_Blend_kind__no_blend);
+      color_rgba = transparent(); 
+      pen_size = (F32)P->eraser_size; 
+    }
 
+    D_RenderTarget(P->draw_texture_always_fresh_rtv)
+    {
       F32 dx     = new_pos.x - prev_pos.x;
       F32 dy     = new_pos.y - prev_pos.y;
       F32 length = sqrtf(dx * dx + dy * dy);
       U64 steps  = (U64)length;
 
+      // Drawing a continuos line based on delta
       for (U64 i = 0; i <= steps; i++) 
       {
         F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
-        color_rgba.a = 0.25;
         V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
-        pen_size *= 10;
         x -= pen_size / 2.0f;
         y -= pen_size / 2.0f;
         d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 2.0f, {});
       }
     }
+    if (P->is_erasing_mode) { d_pop_blend_kind(); }
   }
   else // Here we finalise the draw record that the user have been drawing
   if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__Left))
@@ -245,8 +266,10 @@ void pencil_render(const Pencil_state* P)
   Rect rect = {};
   rect.width  = (F32)P->draw_texures_width;
   rect.height = (F32)P->draw_texures_height;
-  d_set_render_target(r_get_frame_buffer_rtv());
-  d_add_texture_command(P->draw_texture_always_fresh, rect, rect, false, V4F32{});
+  // D_Bxlend(D3D_Blend_kind__no_blend) 
+  {
+    d_add_texture_command(P->draw_texture_always_fresh, rect, rect, false, V4F32{});
+  }
 }
 
 void pencil_do_ui(Pencil_state* P, FP_Font font)
@@ -624,12 +647,6 @@ Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_ne
   {
     result = P->first_free_draw_record;
     DllPopFront_Name(P, first_free_draw_record, last_free_draw_record, next, prev);
-    *result = Draw_record{};
-  }
-  else if (P->count_of_pool_draw_records_in_use < DRAW_RECORDS_MAX_COUNT)
-  {
-    result = P->pool_of_draw_records + P->count_of_pool_draw_records_in_use;
-    P->count_of_pool_draw_records_in_use += 1;
     *result = Draw_record{};
   }
   return result;

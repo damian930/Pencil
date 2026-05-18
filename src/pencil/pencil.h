@@ -38,7 +38,7 @@ struct Pencil_state {
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
   Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
-  U64 count_of_pool_draw_records_in_use; // This inсludes if they are in the free list 
+  // U64 count_of_pool_draw_records_in_use; // This inсludes if they are in the free list 
   Draw_record* first_free_draw_record;
   Draw_record* last_free_draw_record;
   
@@ -73,6 +73,7 @@ struct Pencil_state {
 };
 
 // - Main passes
+void pencil_init(Pencil_state* P);
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse);
 void pencil_render(const Pencil_state* P);
 void pencil_do_ui(Pencil_state* P, FP_Font font);

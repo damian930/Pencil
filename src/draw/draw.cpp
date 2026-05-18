@@ -69,10 +69,13 @@ void d_begin_batching()
   draw_state->command_batch_list = {};
   arena_clear(draw_state->arena_for_draw_commands); 
 
-  V2F32 vp_dims = r_get_viewport_dims();
-  draw_state->current_rtv          = r_get_frame_buffer_rtv();
-  draw_state->current_scissor_rect = rect_make(0.0f, 0.0f, vp_dims.x, vp_dims.y);
-  draw_state->current_blend_kind   = D3D_Blend_kind__alpha;
+  draw_state->defaults.blend_kind    = D3D_Blend_kind__alpha;
+  draw_state->defaults.render_target = r_get_frame_buffer_rtv();
+  draw_state->defaults.scissor_rect  = rect_make(0.0f, 0.0f, r_get_viewport_dims().x, r_get_viewport_dims().y);
+
+  draw_state->current_blend_kind_count    = 0;
+  draw_state->current_render_target_count = 0;
+  draw_state->current_scissor_rect_count  = 0;
 }
 
 void d_end_batching() { /*Nothing here*/ }
@@ -97,9 +100,9 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
   D_Command_batch* new_batch = ArenaPush(arena, D_Command_batch);
   new_batch->command_type = command_type;
   new_batch->texture      = texture;
-  new_batch->rtv          = draw_state->current_rtv;
-  new_batch->scissor_rect = draw_state->current_scissor_rect;
-  new_batch->blend_kind   = draw_state->current_blend_kind;
+  new_batch->rtv          = __d_get_current_render_target__defaults();
+  new_batch->scissor_rect = __d_get_current_scissor_rect__default();
+  new_batch->blend_kind   = __d_get_current_blend_kind__defaults();
   
   QueuePushBack_Name(&draw_state->command_batch_list, new_batch, first, last, next_batch);
   draw_state->command_batch_list.count += 1;
@@ -122,11 +125,11 @@ D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID
   D_State* draw_state = d_get_state();
   D_Command_batch* batch = draw_state->command_batch_list.last;
   if ( batch == 0 
-    || batch->rtv != draw_state->current_rtv 
     || batch->command_type != command_type  
-    || batch->texture != texture
-    || !rect_match(batch->scissor_rect, draw_state->current_scissor_rect)
-    || batch->blend_kind != draw_state->current_blend_kind
+    || batch->texture      != texture
+    || batch->rtv          != __d_get_current_render_target__defaults() 
+    || batch->blend_kind   != __d_get_current_blend_kind__defaults()
+    || !rect_match(batch->scissor_rect, __d_get_current_scissor_rect__default())
   ) {
     batch = d_add_new_batch(command_type, texture);
   }
@@ -194,21 +197,106 @@ void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_re
 }
 
 ///////////////////////////////////////////////////////////
-// - Misc
+// - Push/Pops
 //
-void d_set_render_target(ID3D11RenderTargetView* rtv)
+void d_push_blend_kind(D3D_Blend_kind blend_kind)
 {
-  d_get_state()->current_rtv = rtv;
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_blend_kind_count < ArrayCount(draw_state->arr_of_blend_kinds))
+  {
+    D3D_Blend_kind current_blend_kind = __d_get_current_blend_kind__defaults();
+    if (current_blend_kind != blend_kind)
+    {
+      draw_state->arr_of_blend_kinds[draw_state->current_blend_kind_count++] = blend_kind;
+    }
+  }
+  else { InvalidCodePath(); }
 }
 
-void d_set_scissor_rect(Rect rect)
+void d_pop_blend_kind()
 {
-  d_get_state()->current_scissor_rect = rect;
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_blend_kind_count == 0) {  return; }
+  
+  if (draw_state->current_blend_kind_count > 0) { draw_state->current_blend_kind_count -= 1; }
+  if (draw_state->current_blend_kind_count == 0) { d_push_blend_kind(draw_state->defaults.blend_kind); }
 }
 
-void d_set_blend(D3D_Blend_kind blend_kind)
+
+D3D_Blend_kind __d_get_current_blend_kind__defaults()
 {
-  d_get_state()->current_blend_kind = blend_kind;
+  D_State* draw_state = d_get_state();
+  D3D_Blend_kind blend_kind = draw_state->defaults.blend_kind;  
+  if (draw_state->current_blend_kind_count > 0) { 
+    blend_kind = draw_state->arr_of_blend_kinds[draw_state->current_blend_kind_count - 1];
+  } 
+  return blend_kind;
 }
+
+void d_push_render_target(ID3D11RenderTargetView* rtv)
+{
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_render_target_count < ArrayCount(draw_state->arr_of_render_targets))
+  {
+    ID3D11RenderTargetView* current_rtv = __d_get_current_render_target__defaults();
+    if (current_rtv != rtv)
+    {
+      draw_state->arr_of_render_targets[draw_state->current_render_target_count++] = rtv;
+    }
+  }
+  else { InvalidCodePath(); }
+}
+
+void d_pop_render_target()
+{
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_render_target_count == 0) { return; }
+  
+  if (draw_state->current_render_target_count > 0) { draw_state->current_render_target_count -= 1; }
+  if (draw_state->current_render_target_count == 0) { d_push_render_target(draw_state->defaults.render_target); }
+}
+
+ID3D11RenderTargetView* __d_get_current_render_target__defaults()
+{
+  D_State* draw_state = d_get_state();
+  ID3D11RenderTargetView* rtv = draw_state->defaults.render_target;  
+  if (draw_state->current_render_target_count > 0) { 
+    rtv = draw_state->arr_of_render_targets[draw_state->current_render_target_count - 1];
+  } 
+  return rtv;
+}
+
+void d_push_scissor_rect(Rect rect)
+{
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_scissor_rect_count < ArrayCount(draw_state->arr_of_scissor_rects))
+  {
+    Rect current_rect = __d_get_current_scissor_rect__default();
+    if (!rect_match(current_rect, rect)) {
+     draw_state->arr_of_scissor_rects[draw_state->current_scissor_rect_count++] = rect;
+    }
+  }
+  else { InvalidCodePath(); }
+}
+
+void d_pop_scissor_rect()
+{
+  D_State* draw_state = d_get_state();
+  if (draw_state->current_scissor_rect_count == 0) { return; }
+  
+  if (draw_state->current_scissor_rect_count > 0) { draw_state->current_scissor_rect_count -= 1; }
+  if (draw_state->current_scissor_rect_count == 0) { d_push_scissor_rect(draw_state->defaults.scissor_rect); }
+}
+
+Rect __d_get_current_scissor_rect__default()
+{
+  D_State* draw_state = d_get_state();
+  Rect rect = draw_state->defaults.scissor_rect;  
+  if (draw_state->current_scissor_rect_count > 0) { 
+    rect = draw_state->arr_of_scissor_rects[draw_state->current_scissor_rect_count - 1];
+  } 
+  return rect;
+}
+
 
 #endif

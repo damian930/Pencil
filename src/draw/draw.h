@@ -75,9 +75,23 @@ struct D_State {
  
   // Some state, nothing specific yet
   __D_Rect_builder rect_builder;
-  ID3D11RenderTargetView* current_rtv;
-  Rect current_scissor_rect;
-  D3D_Blend_kind current_blend_kind;
+  // Rect current_scissor_rect;
+
+  // Batch setting stacks
+  struct {
+    D3D_Blend_kind blend_kind;
+    ID3D11RenderTargetView* render_target;
+    Rect scissor_rect;
+  } defaults;
+  //
+  D3D_Blend_kind arr_of_blend_kinds[10];
+  U64 current_blend_kind_count;
+  //
+  ID3D11RenderTargetView* arr_of_render_targets[10];
+  U64 current_render_target_count;
+  //
+  Rect arr_of_scissor_rects[10];
+  U64 current_scissor_rect_count;
 };
 
 // - Internal builder functions
@@ -87,8 +101,8 @@ void              __d_builder_func_add();
 
 // - State
 D_State* d_get_state();
-void d_init();
-void d_release();
+void     d_init();
+void     d_release();
 
 // - Batching
 void                  d_begin_batching();
@@ -99,14 +113,26 @@ D_Command_batch*      d_get_or_add_batch_for_settings(D_Command_type command_typ
 void                  d_add_command_to_batch(D_Command_batch* batch, D_Command command);
 
 // - Draw commands
-__D_Rect_builder* d_draw_rect(Rect rect);
-void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color);
-void d_add_rect_command(Rect rect, V4F32 color);
-void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
+__D_Rect_builder* d_draw_rect(Rect           rect);
+void              d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color);
+void              d_add_rect_command(Rect    rect, V4F32 color);
+void              d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
 
-// - Misc
-void d_set_render_target(ID3D11RenderTargetView* rtv);
-void d_set_scissor_rect(Rect rect);
-void d_set_blend(D3D_Blend_kind blend_kind);
+// - Push/Pops 
+void           d_push_blend_kind(D3D_Blend_kind blend_kind);
+void           d_pop_blend_kind();
+D3D_Blend_kind __d_get_current_blend_kind__defaults();
+#define        D_Blend(blend_kind) DeferLoop(d_push_blend_kind(blend_kind), d_pop_blend_kind())
+
+void                    d_push_render_target(ID3D11RenderTargetView* rtv);
+void                    d_pop_render_target();
+ID3D11RenderTargetView* __d_get_current_render_target__defaults();
+#define                 D_RenderTarget(target) DeferLoop(d_push_render_target(target), d_pop_render_target())
+
+void    d_push_scissor_rect(Rect rect);
+void    d_pop_scissor_rect();
+Rect    __d_get_current_scissor_rect__default();
+#define D_ScissorRect(rect) DeferLoop(d_push_scissor_rect(rect), d_pop_scissor_rect())
+
 
 #endif

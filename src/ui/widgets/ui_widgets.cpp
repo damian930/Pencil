@@ -197,6 +197,7 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
         ui_set_next_size_x(ui_px(circle_diameter));
         ui_set_next_size_y(ui_px(circle_diameter));
         ui_set_next_corner_r(ui_corner_r_all(1));
+        // ui_set_next_b_color(white());
         ui_set_next_border(4, white());
         ui_set_next_softness(1.5f);
         UI_Box* circle_picker = ui_box_make(Str8{}, 0);

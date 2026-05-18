@@ -19,9 +19,6 @@
 ::       It does not work properly if there is anything after it, even white spaces.
 :: =====================================================================================================
 
-:: todo:
-:: [ ] - have vcvars all not have to be called every time
-
 @echo off
 setlocal enabledelayedexpansion
 cd /D "%~dp0"

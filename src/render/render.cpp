@@ -76,20 +76,6 @@ void r_init()
   HRESULT hr = S_OK;
   #define HR(hr_value) HandleLater(hr == S_OK) // todo: Remove this 
 
-  // Factory
-  {
-    hr = CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
-    HR(hr);
-  }
-  IDXGIFactory2* dxgi_factory = d3d->dxgi_factory;
-
-  // Adapter
-  {
-    hr = dxgi_factory->EnumAdapters(0, &d3d->dxgi_adapter);
-    HR(hr);
-  }
-  IDXGIAdapter* dxgi_adapter = d3d->dxgi_adapter;
-
   // Device, Context
   {
     D3D_FEATURE_LEVEL levels[] = { D3D_FEATURE_LEVEL_11_1 };
@@ -99,14 +85,12 @@ void r_init()
     #endif
 
     hr = D3D11CreateDevice(
-      dxgi_adapter, D3D_DRIVER_TYPE_UNKNOWN /*D3D_DRIVER_TYPE_HARDWARE*/, Null,  
+      Null, D3D_DRIVER_TYPE_HARDWARE, Null,  
       flags, levels, ArrayCount(levels),
       D3D11_SDK_VERSION, &d3d->device, Null, &d3d->context
     );
     HR(hr);
   }
-  ID3D11Device* d3d_device = d3d->device;
-  ID3D11DeviceContext* d3d_context = d3d->context;   
 
   // Debug
   #if DEBUG_MODE
@@ -133,21 +117,21 @@ void r_init()
   // Swap chain
   {
     // get DXGI device from D3D11 device
-    IDXGIDevice* dxgiDevice;
-    hr = ID3D11Device_QueryInterface(device, &IID_IDXGIDevice, (void**)&dxgiDevice);
-    AssertHR(hr);
+    // todo: Store this inside state
+    IDXGIDevice* dxgi_device = 0;
+    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
+    HR(hr);
 
     // get DXGI adapter from DXGI device
-    IDXGIAdapter* dxgiAdapter;
-    hr = IDXGIDevice_GetAdapter(dxgiDevice, &dxgiAdapter);
-    AssertHR(hr);
+    // todo: Store this inside state
+    hr = dxgi_device->GetAdapter(&d3d->dxgi_adapter);
+    HR(hr);
 
     // get DXGI factory from DXGI adapter
-    IDXGIFactory2* factory;
-    hr = IDXGIAdapter_GetParent(dxgiAdapter, &IID_IDXGIFactory2, (void**)&factory);
-    AssertHR(hr);
+    hr = d3d->dxgi_adapter->GetParent(IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
+    HR(hr);
 
-    B32 is_transparent = false;
+    B32 is_transparent = true;
     DXGI_SWAP_CHAIN_DESC1 desc = {};
     desc.Width       = 69;
     desc.Height      = 69;
@@ -160,8 +144,8 @@ void r_init()
     desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     desc.AlphaMode   = (is_transparent ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_UNSPECIFIED);
     desc.Flags       = 0;
-    if (is_transparent) { hr = dxgi_factory->CreateSwapChainForComposition(d3d_device, &desc, Null, &d3d->swap_chain); }
-    else                { hr = dxgi_factory->CreateSwapChainForHwnd(d3d_device, os_get_state()->window.handle, &desc, Null, Null, &d3d->swap_chain); }
+    if (is_transparent) { hr = d3d->dxgi_factory->CreateSwapChainForComposition(d3d->device, &desc, Null, &d3d->swap_chain); }
+    else                { hr = d3d->dxgi_factory->CreateSwapChainForHwnd(d3d->device, os_get_state()->window.handle, &desc, Null, Null, &d3d->swap_chain); }
     HR(hr);
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
@@ -946,8 +930,8 @@ void r_copy_into_texture_from_texture(
   
   d3d->context->CopyResource(dest_resource, src_resource);
 }
-
 V2F32 r_get_viewport_dims()
+
 {
   return r_get_state()->viewport_dims;
 }
