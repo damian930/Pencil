@@ -182,7 +182,7 @@ typedef double F64;
 #define EachIndex(it, count)                     (U64 it = 0; it < count; it += 1)
 #define EachArrElement(it, static_arr)           (U64 it = 0; i < ArrayCount(static_arr); it += 1)
 #define EachInRange(it, range_min, range_max)    (U64 it = range_min; it < range_max; it += 1)
-#define EachEnum(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)i + 1))	
+#define EachEnum(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)it + 1))	
 
 /* NOTES:
   Stack here is a list that only has the "first" node pointer. Nodes only have the "next" pointer.
@@ -423,6 +423,11 @@ enum Axis2 : U32 {
 	Axis2__COUNT,
 };
 
+// todo: Change this to be 
+// UV__x0y0
+// UV__x1y0
+// UV__x0y1
+// UV__x1y1
 enum UV : U32 {
 	UV__00,    // Top left
 	UV__10,    // Top right

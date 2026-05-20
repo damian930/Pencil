@@ -8,11 +8,11 @@
 #include "render/render.cpp"
 
 // - Simple widgets
-// void ui_label_c(const char* c_str);
-// void ui_label(Str8 str);
+void ui_label_c(const char* c_str);
+void ui_label(Str8 str);
 void ui_label_f(const char* fmt, ...);
-// void ui_spacer(UI_Size size);
-// UI_Actions ui_button(Str8 str, RLI_Event_list* rli_events); // todo: Remove the fucking rli events from there dude
+void ui_spacer(UI_Size size);
+UI_Actions ui_button(Str8 str); 
 
 // - Layout stack
 void ui_layout_stack_begin(Axis2 axis); // todo: Call these like a layout stack
@@ -22,6 +22,7 @@ void ui_layout_stack_end();
 #define UI_Col() UI_Stack(Axis2__y)
 
 // - Padded box
+// todo: I have this here so so much
 void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis);
 void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis);
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
@@ -53,8 +54,8 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
 
-  if (slider_actions.is_hovered) { ui_set_next_b_color(slider_style->hover_color);} 
-  else                           { ui_set_next_b_color(slider_style->no_hover_color); }
+  if (slider_actions.is_hovered) { ui_set_next_b_color_uv(slider_style->hover_color);} 
+  else                           { ui_set_next_b_color_uv(slider_style->no_hover_color); }
   ui_set_next_size_x(slider_style->size_x);
   ui_set_next_size_y(slider_style->size_y);
   ui_set_next_layout_axis(Axis2__x);
@@ -76,7 +77,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     {
       ui_set_next_size_x(ui_px(thumb_offset));
       ui_set_next_size_y(ui_px(slider_box_data.on_screen_rect.height));
-      ui_set_next_b_color(slider_style->slided_part_color);
+      ui_set_next_b_color_uv(slider_style->slided_part_color);
       UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), 0);
     }
   

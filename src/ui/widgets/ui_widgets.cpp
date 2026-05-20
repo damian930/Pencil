@@ -3,15 +3,15 @@
 
 #include "ui/widgets/ui_widgets.h"
 
-// ///////////////////////////////////////////////////////////
-// // - Simple widgets
-// //
-// void ui_label_c(const char* c_str)
-// {
-//   U8* str_data = (U8*)const_cast<char*>(c_str);
-//   Str8 str = str8_manuall(str_data, strlen(c_str));
-//   ui_label(str);
-// }
+///////////////////////////////////////////////////////////
+// - Simple widgets
+//
+// todo:
+// void ui_label_c(const char* c_str);
+// void ui_label(Str8 str);
+// void ui_label_f(const char* fmt, ...);
+// void ui_spacer(UI_Size size);
+// UI_Actions ui_button(Str8 str); 
 
 void ui_label(Str8 str)
 {

@@ -106,10 +106,9 @@ enum D3D_Blend_kind {
 
 struct D3D_State {
   // These we get at initialisation
-  IDXGIFactory2*       dxgi_factory;
-  IDXGIAdapter*        dxgi_adapter;
   ID3D11Device*        device;
   ID3D11DeviceContext* context;
+  IDXGIFactory2*       dxgi_factory;
   // 
   IDXGISwapChain1*        swap_chain;
   ID3D11RasterizerState*  rasterizer_state;

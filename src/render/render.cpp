@@ -116,22 +116,19 @@ void r_init()
 
   // Swap chain
   {
-    // get DXGI device from D3D11 device
-    // todo: Store this inside state
     IDXGIDevice* dxgi_device = 0;
     hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
     HR(hr);
 
-    // get DXGI adapter from DXGI device
-    // todo: Store this inside state
-    hr = dxgi_device->GetAdapter(&d3d->dxgi_adapter);
+    IDXGIAdapter* dxgi_adapter = 0;
+    hr = dxgi_device->GetAdapter(&dxgi_adapter);
     HR(hr);
 
     // get DXGI factory from DXGI adapter
-    hr = d3d->dxgi_adapter->GetParent(IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
+    hr = dxgi_adapter->GetParent(IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
     HR(hr);
 
-    B32 is_transparent = true;
+    B32 is_transparent = false;
     DXGI_SWAP_CHAIN_DESC1 desc = {};
     desc.Width       = 69;
     desc.Height      = 69;
@@ -147,6 +144,9 @@ void r_init()
     if (is_transparent) { hr = d3d->dxgi_factory->CreateSwapChainForComposition(d3d->device, &desc, Null, &d3d->swap_chain); }
     else                { hr = d3d->dxgi_factory->CreateSwapChainForHwnd(d3d->device, os_get_state()->window.handle, &desc, Null, Null, &d3d->swap_chain); }
     HR(hr);
+
+    dxgi_device->Release();
+    dxgi_adapter->Release();
   }
   IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
 

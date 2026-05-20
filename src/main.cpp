@@ -12,6 +12,7 @@ abstract.
 */
 
 #define _CRT_SECURE_NO_WARNINGS
+
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "__third_party/stb/stb_image_write.h"
@@ -35,11 +36,11 @@ abstract.
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
-#include "ui/widgets/ui_widgets.h"
-#include "ui/widgets/ui_widgets.cpp"
+// #include "ui/widgets/ui_widgets.h"
+// #include "ui/widgets/ui_widgets.cpp"
 
-#include "pencil/pencil.h"
-#include "pencil/pencil.cpp"
+// #include "pencil/pencil.h"
+// #include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -103,23 +104,31 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   {
     Rect rect = root->final_on_screen_rect;
   
-    // todo: The flags here dont really coniside with drawing or not drawing of the boxes, i just 
-    //       get the data from the box, so either remove the flags, cause you dont need them,
-    //       or have this be like a builder path for the draw command based on the flags and the
-    //      data stored inside the box rect style
-    if (root->flags & UI_Box_flag__has_background || root->flags & UI_Box_flag__has_borders)
+    // Background
     {
-      V4F32 corner_colors[UV__COUNT] = {}; 
-      for EachEnum(i, UV, UV__00, UV__COUNT) { corner_colors[i] = root->shape_style.color; }
-      V4F32 corner_radiuses = {};
-      for EachArrElement(i, corner_radiuses.v) { corner_radiuses.v[i] = root->shape_style.corner_r.r.v[i]; }
-      d_add_rect_command_ex(rect, corner_colors, corner_radiuses, root->shape_style.border.width, root->shape_style.softness, root->shape_style.border.color);
+      d_draw_rect_build(rect)
+        ->color_uv(root->shape_style.vertex_colors[UV__00], UV__00)
+        ->color_uv(root->shape_style.vertex_colors[UV__01], UV__01)
+        ->color_uv(root->shape_style.vertex_colors[UV__10], UV__10)
+        ->color_uv(root->shape_style.vertex_colors[UV__11], UV__11)
+        //
+        ->corner_r_uv(root->shape_style.corner_r.r[UV__00], UV__00)
+        ->corner_r_uv(root->shape_style.corner_r.r[UV__01], UV__01)
+        ->corner_r_uv(root->shape_style.corner_r.r[UV__10], UV__10)
+        ->corner_r_uv(root->shape_style.corner_r.r[UV__11], UV__11)
+        //
+        ->border(root->shape_style.border.width, root->shape_style.border.color)
+        ->softness(root->shape_style.softness)
+        //
+        ->add();
     }
-  
-    if (root->flags & UI_Box_flag__has_text_contents)
-    {
-      r_draw_text(root->text_style.text, rect_get_origin(rect), root->text_style.font, root->text_style.text_color); 
-    }
+
+    // Text
+    // if (root->flags & UI_Box_flag__has_text_contents && root->text_style.text.count != 0)
+    // {
+      // NotImplemented();
+      // r_draw_text(root->text_style.text, rect_get_origin(rect), root->text_style.font, root->text_style.text_color); 
+    // }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
     Rect scissor_rect = parent_scissor_rect;
@@ -212,6 +221,13 @@ void ui_draw()
 
 #define APP_WINDOW_NAME      "Pencil"
 #define APP_MUTEX_NAME_WIN32 "Pencil mutex that has a name that no one will ever know aobut. Last week was the kevin harts roast, shane did good."
+
+UI_Actions button(Str8 id)
+{
+  UI_Box* box = ui_box_make(id, UI_Box_flag__has_background|UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners);
+  UI_Actions actions = ui_actions_from_box(box);
+  return actions;
+}
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
@@ -334,47 +350,47 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  Pencil_state P = {}; 
-  pencil_init(&P);
+  // Pencil_state P = {}; 
+  // pencil_init(&P);
 
   // todo: Do better with this here
   //       Here is the link to the resource that explaince this code here and why it is needed
   //       https://learn.microsoft.com/en-us/archive/msdn-magazine/2014/june/windows-with-c-high-performance-window-layering-using-the-windows-composition-engine
   // todo: Move this into the renderer
-  #define HR(x) Assert(x == S_OK)
-  IDCompositionDevice* comp_device = 0;
-  {
-    HRESULT hr = {};
+  // #define HR(x) Assert(x == S_OK)
+  // IDCompositionDevice* comp_device = 0;
+  // {
+  //   HRESULT hr = {};
     
-    // todo: Move this out of there
-    D3D_State* d3d = r_get_state();
+  //   // todo: Move this out of there
+  //   D3D_State* d3d = r_get_state();
 
-    IDXGIDevice* dxgi_device    = 0;
-    IDCompositionVisual* visual = 0;
-    IDCompositionTarget* target =  0;
+  //   IDXGIDevice* dxgi_device    = 0;
+  //   IDCompositionVisual* visual = 0;
+  //   IDCompositionTarget* target =  0;
 
-    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
-    HR(hr);
+  //   hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
+  //   HR(hr);
     
-    hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
-    HR(hr);
+  //   hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
+  //   HR(hr);
 
-    hr = comp_device->CreateVisual(&visual);
-    HR(hr);
+  //   hr = comp_device->CreateVisual(&visual);
+  //   HR(hr);
   
-    hr = visual->SetContent((IUnknown*)d3d->swap_chain);
-    HR(hr);
+  //   hr = visual->SetContent((IUnknown*)d3d->swap_chain);
+  //   HR(hr);
     
-    hr = comp_device->CreateTargetForHwnd(win32_state->window.handle, true, &target);
-    HR(hr);
+  //   hr = comp_device->CreateTargetForHwnd(win32_state->window.handle, true, &target);
+  //   HR(hr);
 
-    hr = target->SetRoot(visual);
-    HR(hr);
+  //   hr = target->SetRoot(visual);
+  //   HR(hr);
 
-    // dxgi_device->Release();
-    // visual->Release();
-    // target->Release();
-  }
+  //   // dxgi_device->Release();
+  //   // visual->Release();
+  //   // target->Release();
+  // }
 
   // Fake for loop for testing
   SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
@@ -417,13 +433,54 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     */
     
     { // UI and Application update 
-      pencil_do_ui(&P, font);
-      pencil_update(&P, !ui_has_active());
+      // pencil_do_ui(&P, font);
+      // pencil_update(&P, !ui_has_active());
     }
     
+    ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
+    {
+      ui_push_softness(0.0f);
+
+      ui_set_next_size_x(ui_px(500));
+      ui_set_next_size_y(ui_px(500));
+      ui_set_next_b_color(green());
+      // ui_set_next_softness(2.0f);
+      ui_set_next_corner_r(ui_corner_r_all(1.0));
+      // ui_set_next_border(5, white());
+      UI_Box* red_parent = ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners|UI_Box_flag__has_borders);
+      UI_Parent(red_parent)
+      {
+        // ui_set_next_softness(2.0f);
+        // ui_set_next_size_x(ui_px(100));
+        // ui_set_next_size_y(ui_px(100));
+        
+        // ui_set_next_b_color(blue());
+        // Str8 id = Str8FromC("Test id");
+        // UI_Actions actions = ui_actions_from_id(id);
+        // if (actions.is_down) { 
+        //   ui_set_next_b_color_uv(UV__00, black());
+        //   ui_set_next_b_color_uv(UV__10, black());
+        //   ui_set_next_b_color_uv(UV__01, white());
+        //   ui_set_next_b_color_uv(UV__11, white());
+        // } else if (actions.is_hovered) {
+        //   ui_set_next_b_color_uv(UV__00, white());
+        //   ui_set_next_b_color_uv(UV__10, white());
+        //   ui_set_next_b_color_uv(UV__01, black());
+        //   ui_set_next_b_color_uv(UV__11, black());
+        // } else {
+          // ui_set_next_b_color(blue());
+        // }
+        // ui_set_next_border(10, white());
+        // ui_set_next_softness(1.0f);
+        // button(id);
+      }
+    }
+    ui_end_build();
+
     { // Rendering
-      r_clear_frame_buffer(transparent());
-      pencil_render(&P);
+      // r_clear_frame_buffer(transparent());
+      r_clear_frame_buffer(black());
+      // pencil_render(&P);
       ui_draw();
     }
     
@@ -436,7 +493,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // Presenting 
     B32 vsync = false; 
     r_get_state()->swap_chain->Present(!!vsync, 0);
-    HRESULT commit_hr = comp_device->Commit(); 
+    // HRESULT commit_hr = comp_device->Commit(); 
     // Handle(commit_hr == S_OK);
 
     F64 frame_end_time_sec = os_get_time_for_timing_sec();

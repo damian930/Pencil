@@ -27,6 +27,7 @@ struct VertexInput {
   
   float4 rect_border_color    : RECT_BORDER_COLOR;
   float rect_border_thickness : RECT_BORNER_THICKNESS;
+  
   float softness              : SOFTNESS;
 
   uint vertex_id : SV_VertexID;
@@ -35,13 +36,16 @@ struct VertexInput {
 struct PixelInput {
   float4 vertex_color[UV__COUNT] : PER_VERTEX_COLOR;
 
-  float2 rect_origin     : RECT_ORIGIN;
-  float2 rect_dims       : RECT_DIMS;
+  nointerpolation float2 rect_origin     : RECT_ORIGIN;
+  nointerpolation float2 rect_dims       : RECT_DIMS;
 
-  float corner_radius      : CORNER_R;
+  // todo: pass 4 differnt nointerpolation cor_rs
+  nointerpolation float corner_radius  : CORNER_R;
+  
   float4 border_color      : RECT_BORDER_COLOR;
   float border_thickness   : BORDER_THICH;
-  float softness           : SOFTNESS;
+  
+  nointerpolation float softness           : SOFTNESS;
   
   float4 pos : SV_POSITION;
 };
@@ -111,32 +115,37 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   float2 pos_px = pixel_input.pos.xy;
 
   float2 pos_norm = (pos_px - pixel_input.rect_origin) / pixel_input.rect_dims; 
-
+  
   float4 top_color    = lerp(pixel_input.vertex_color[UV__00], pixel_input.vertex_color[UV__10], pos_norm.x);
   float4 bottom_color = lerp(pixel_input.vertex_color[UV__01], pixel_input.vertex_color[UV__11], pos_norm.x);
   float4 final_color  = lerp(top_color, bottom_color, pos_norm.y);
-
+  
+  float rect_outline_smoothing = 1.0f;
   {
-    float radius_in_px = pixel_input.corner_radius * max(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0;
-    float sdf          = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
-
-    if (sdf > 0.0) 
-    {
-      discard;
-    }
-    else if (-pixel_input.border_thickness <= sdf && sdf < 0.0)
-    {
-      final_color = pixel_input.border_color;
-      float smoothed = smoothstep(0.0, pixel_input.softness, -sdf);
-      final_color.a *= smoothed; 
-    }
-
-    if (-pixel_input.border_thickness <= sdf && sdf <= -(pixel_input.border_thickness - pixel_input.softness))
-    {
-      float smoothed = smoothstep(pixel_input.border_thickness, pixel_input.border_thickness-pixel_input.softness, -sdf);
-      final_color.a *= smoothed; 
-    }
+    float radius_in_px     = pixel_input.corner_radius * min(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0;
+    float rect_outline_sdf = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
+    rect_outline_smoothing = 1 - smoothstep(-2, 2, rect_outline_sdf);
   }
+
+  float rect_inner_smoothing = 1.0f;
+  if (pixel_input.border_thickness != 0.0)
+  {
+    final_color = pixel_input.border_color;
+
+    float softness = 2.0;
+    float2 inner_rect_origin = pixel_input.rect_origin + float2(pixel_input.border_thickness + softness, pixel_input.border_thickness + softness);
+    float2 inner_rect_dims   = pixel_input.rect_dims - 2 * float2(pixel_input.border_thickness + softness, pixel_input.border_thickness + softness);
+    float radius_in_px       = pixel_input.corner_radius * min(inner_rect_dims.x, inner_rect_dims.y) / 2.0;
+
+    float rect_outline_sdf = sdf_rounded_rect(inner_rect_origin, inner_rect_dims, pos_px, radius_in_px);
+    if (rect_outline_sdf < -2) { discard; }
+    else {
+      rect_inner_smoothing = smoothstep(-softness, softness, rect_outline_sdf);
+    }
+  }  
+
+  final_color.a *= rect_outline_smoothing;
+  final_color.a *= rect_inner_smoothing;
 
   return final_color;
 }

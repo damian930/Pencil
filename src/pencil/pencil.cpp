@@ -274,8 +274,6 @@ void pencil_render(const Pencil_state* P)
 
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 { 
-  ProfileFuncBegin();
-
   V4F32 pen_color_rgba = rgba_from_hsva(P->pen_color_hsva);
 
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
@@ -303,9 +301,20 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
       {
         ui_spacer(ui_px(y_offset));
         
+        ui_next_b_color(blue());
+        UI_Box* box = ui_box_make(Str8FromC("Box id"), UI_Box_flag__has_background);
+        UI_Parent(box)
+        {
+          // ...
+        }
+
+        
+        ui_button(Str8FromC("Button"));
+
         ui_set_next_size_x(ui_children_sum());
         ui_set_next_size_y(ui_children_sum());
-        ui_set_next_b_color(taupe());
+        ui_set_next_b_color_uv(taupe());
+        ui_next_b_color(red());
         UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
 
         UI_Parent(brush_box)
@@ -333,7 +342,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
           }
 
           // if (menu_name_actions.is_hovered) { ui_set_cursor(OS_Cursor__hand); }
-          if (menu_name_actions.is_hovered) { ui_set_next_b_color(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color(blue()); }
+          if (menu_name_actions.is_hovered) { ui_set_next_b_color_uv(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color_uv(blue()); }
           ui_set_next_size_x(ui_px(200));
           ui_set_next_size_y(ui_px(40));
           ui_set_next_layout_axis(Axis2__x);
@@ -467,7 +476,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
         
                   ui_set_next_size_x(ui_p_of_p(1.0f, 0.1f));
                   ui_set_next_size_y(ui_p_of_p(0.05f, 0.0f));
-                  ui_set_next_b_color(pen_color_rgba);
+                  ui_set_next_b_color_uv(pen_color_rgba);
                   UI_Box* color_rect_box = ui_box_make(Str8{}, 0);
                 }
               }
@@ -476,9 +485,9 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
               {
                 Str8 button_id = Str8FromC("Eraser##Button id");
                 UI_Actions actions = ui_actions_from_id(button_id);
-                if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                if (actions.is_down)         { ui_set_next_b_color_uv(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                else if (actions.is_hovered) { ui_set_next_b_color_uv(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                else                         { ui_set_next_b_color_uv(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
                 ui_set_next_corner_r(ui_corner_r_all(0.15f));
                 UI_Box* button_box = ui_box_make(button_id, 0);
 
@@ -525,9 +534,9 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                 {
                   Str8 button_id = Str8FromC("Brush##Button id");
                   UI_Actions actions = ui_actions_from_id(button_id);
-                  if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                  else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                  else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                  if (actions.is_down)         { ui_set_next_b_color_uv(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                  else if (actions.is_hovered) { ui_set_next_b_color_uv(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                  else                         { ui_set_next_b_color_uv(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
                   ui_set_next_corner_r(ui_corner_r_all(0.15f));
                   UI_Box* button_box = ui_box_make(button_id, 0);
   
@@ -545,6 +554,40 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
               }
             }
+         
+            // todo: Embosed/Debodes button
+            Str8 button_id = Str8FromC("Button id test");
+            UI_Actions button_actions = ui_actions_from_id(button_id);
+
+            V4F32 colors[UV__COUNT] = { red(), red(), red(), red() };
+            if (button_actions.is_down) 
+            { 
+              colors[UV__00] = change_alpha(white(), 0.5); 
+              colors[UV__01] = change_alpha(white(), 0.5); 
+              colors[UV__10] = change_alpha(black(), 0.5); 
+              colors[UV__11] = change_alpha(black(), 0.5); 
+            }
+            // else 
+            // {
+            //   colors[UV__00] = blue(); 
+            //   colors[UV__01] = blue(); 
+            //   colors[UV__10] = blue(); 
+            //   colors[UV__11] = blue(); 
+            // }
+
+            ui_set_next_size_x(ui_children_sum());
+            ui_set_next_size_y(ui_children_sum()); 
+            UI_Box* button = ui_box_make(button_id, {});
+            for EachEnum(i, UV, UV__00, UV__COUNT) { 
+              button->shape_style.vertex_colors[i] = colors[i]; 
+            }
+            UI_Parent(button)
+            {
+              UI_PaddedBox(ui_px(5), Axis2__x)
+              {
+                ui_label_f("Button text here");
+              }
+            }
           }
         }
       }
@@ -558,8 +601,6 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
   }
 
   ui_end_build();
-
-  ProfileFuncEnd();
 }
 
 ///////////////////////////////////////////////////////////

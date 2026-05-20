@@ -11,10 +11,9 @@
 
 // todo: Struture this file based on the structure of the .h ui file
 
-UI_Context* _ui_g_context = 0;
-UI_Box _ui_g_zero_box = {};
+UI_Context* _ui_g_context    = 0;
+UI_Box _ui_g_zero_box        = {};
 V2F32 _ui_g_clip_offset_stub = {};
-// V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, F32 font_size) { Assert(0, "Dude, you forgot to set a text measuing function."); return V2F32{}; }
 
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 {
@@ -28,11 +27,6 @@ UI_Size ui_px(F32 value)                     { return ui_size_make(UI_Size_kind_
 UI_Size ui_children_sum()                    { return ui_size_make(UI_Size_kind__children_sum, 0.0f, 0.0f); } // note: value is 0.0f there cause it is actually not used by the implementation
 UI_Size ui_text_size()                       { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
 UI_Size ui_p_of_p(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__percent_of_parent, value, strictness); }
-
-// Just in case if i need these
-// UI_Size ui_px_ex(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind__px, value, strictness); }
-// UI_Size ui_children_sum_ex(F32 strictness)  { return ui_size_make(UI_Size_kind__children_sum, 0.0f, strictness); } // note: value is 0.0f there cause it is actually not used by the implementation
-// UI_Size ui_text_size_ex(F32 strictness)     { return ui_size_make(UI_Size_kind__text, 0.0f, strictness); }         // note: value is 0.0f there cause it is actually not used by the implementation
 
 UI_Context* ui_get_context()
 {
@@ -87,10 +81,20 @@ void ui_init()
     _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64)); 
   }
 
-  // _ui_g_context->text_measuring_fp   = _ui_g_text_measuring_stub_f; 
   _ui_g_context->root_box            = &_ui_g_zero_box;
   _ui_g_context->current_parent_box  = &_ui_g_zero_box;
   _ui_g_context->prev_frame_root_box = &_ui_g_zero_box; 
+
+  _ui_g_context->defaults.layout_axis = Axis2__y;
+  _ui_g_context->defaults.size_x      = ui_children_sum();
+  _ui_g_context->defaults.size_y      = ui_children_sum();
+  _ui_g_context->defaults.border      = UI_Border_style{ 0.0f, transparent() };
+  _ui_g_context->defaults.softness    = 2.0f;
+  _ui_g_context->defaults.text_color  = white();
+  for EachEnum(i, UV, UV__00, UV__COUNT) { 
+    _ui_g_context->defaults.vertex_colors[i] = transparent(); 
+    _ui_g_context->defaults.corner_r.r[i]    = 0.0f;
+  }
 }
 
 void ui_release()
@@ -123,33 +127,44 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   UI_Context* ctx = ui_get_context();
   Arena* arena = ui_get_build_arena();
 
-  flags |= ui_get_flags();
-  
   UI_Box* box = ArenaPush(arena, UI_Box);
+  box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
+  
   box->flags                   = flags;
   box->layout_axis             = ui_get_layout_axis();   
-  if (f32_is_nan(ui_peek_size_x().value)) { BP; }
-
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
   
-  if (f32_is_nan(box->semantic_size[Axis2__x].value)) { BP; }
-
-  box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
-
-  if (flags & UI_Box_flag__has_background)    { box->shape_style.color  = ui_get_color();  }
-  if (flags & UI_Box_flag__has_borders)       { box->shape_style.border = ui_get_border(); }
-  if (flags & UI_Box_flag__has_corner_radius) { box->shape_style.corner_r = ui_get_corner_r(); }
-  box->shape_style.softness = ui_get_softness();
-
-  if (flags & UI_Box_flag__has_text_contents)
   {
-    Str8 text = ui_get_text_part_from_str8(id_and_text);
-    box->text_style.text       = str8_copy_alloc(ui_get_build_arena(), text);    
-    box->text_style.font       = ui_get_font();       
-    box->text_style.text_color = ui_get_text_color(); 
+    for EachEnum(i, UV, UV__00, UV__COUNT) {
+      V4F32 vertex_color = ui_get_b_color_uv(i);
+      if (!(flags & UI_Box_flag__has_background)) {
+        vertex_color = ctx->defaults.vertex_colors[i];
+      }
+      box->shape_style.vertex_colors[i] = vertex_color;
+    }
   }
 
+  {
+    UI_Border_style border = ui_get_border();
+    if (!(flags & UI_Box_flag__has_borders)) { border = ctx->defaults.border; }
+    box->shape_style.border = border;
+  }
+
+  {
+    UI_Corner_radius corner_r = ui_get_corner_r();
+    if (!(flags & UI_Box_flag__has_rounded_corners)) { corner_r = ctx->defaults.corner_r; }
+    box->shape_style.corner_r = corner_r;
+  }
+
+  box->shape_style.softness = ui_get_softness();
+
+  // box->text_style.text      = str8_copy_alloc(ui_get_build_arena(), ui_get_text_part_from_str8(id_and_text));
+  // {
+    // V4F32 text_color = ui_get_text_color();
+    // if (flags & UI_Box_flag__has_text_contents) { text_color = ctx->defaults.text_color; }
+    // box->text_style.text_color = text_color;
+  // }
   // UI_Box* this_box_prev_frame = ui_get_box_prev_frame(id_and_text);
   // if (!ui_box_is_zero(this_box_prev_frame)) 
   // {
@@ -195,7 +210,14 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   UI_Context* ctx = ui_get_context();
   
   // Resetting the prev build state
-  __ui_clear_style_stacks();
+  ctx->layout_axis_stack     = {};
+  ctx->semantic_size_x_stack = {};
+  ctx->semantic_size_y_stack = {};
+  ctx->corner_radius_stack   = {};
+  ctx->border_style_stack    = {};
+  ctx->softness_stack        = {};
+  for EachEnum(i, UV, UV__00, UV__COUNT) { ctx->vertex_color_stacks[i] = {}; }
+
   ctx->prev_frame_root_box = ctx->root_box;
   ctx->root_box            = &_ui_g_zero_box;
   ctx->current_parent_box  = &_ui_g_zero_box;
@@ -206,11 +228,20 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   Arena* arena = ui_get_build_arena();
   arena_clear(arena);
   
-  // Copying these since they are allocated on old build arenas
-  // ctx->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_active_box_id);
+  // Deep copying these since they are allocated on the old build arenas
   ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_interacted_with_box_id);
 
-  __ui_push_defaults_onto_stacks();
+  // Pushing defaults onto the style stacks
+  ui_push_layout_axis(ctx->defaults.layout_axis);
+  ui_push_size_x(ctx->defaults.size_x);
+  ui_push_size_y(ctx->defaults.size_y);
+  ui_push_b_color_uv(UV__00, ctx->defaults.vertex_colors[UV__00]);
+  ui_push_b_color_uv(UV__01, ctx->defaults.vertex_colors[UV__01]);
+  ui_push_b_color_uv(UV__10, ctx->defaults.vertex_colors[UV__10]);
+  ui_push_b_color_uv(UV__11, ctx->defaults.vertex_colors[UV__11]);
+  ui_push_corner_r(ctx->defaults.corner_r);
+  ui_push_border(ctx->defaults.border.width, ctx->defaults.border.color);
+  ui_push_softness(ctx->defaults.softness);
 
   ui_set_next_size_x(ui_px(window_dims.x));
   ui_set_next_size_y(ui_px(window_dims.y));
@@ -222,21 +253,14 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 
   ctx->mouse_x = mouse_pos.x;
   ctx->mouse_y = mouse_pos.y;
-
-  ctx->cursor = os_get_cursor();
 }
 
 void ui_end_build()
 {
-  ProfileFuncBegin();
-
   UI_Context* ctx = ui_get_context();
+  ui_pop_parent();
   ui_layout_box(ctx->root_box, Axis2__x);
   ui_layout_box(ctx->root_box, Axis2__y);
-
-  os_set_cursor(ctx->cursor);
-
-  ProfileFuncEnd();
 }
 
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
@@ -253,8 +277,9 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 
     case UI_Size_kind__text:
     {
-      V2F32 dims = fp_measure_text(root->text_style.text, root->text_style.font);
-      root->final_on_screen_size.v[axis] = dims.v[axis];
+      NotImplemented();
+      // V2F32 dims = fp_measure_text(root->text_style.text, root->text_style.font);
+      // root->final_on_screen_size.v[axis] = dims.v[axis];
     } break;
   }
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
@@ -470,11 +495,6 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis)
 {
   static F32 total_offset[Axis2__COUNT];
 
-  if (v4f32_match(root->shape_style.color, { 0, 255, 255, 255 }))
-  {
-    U32 x = 0;
-    // BreakPoint();
-  }
 
   if (axis == Axis2__x)
   {
@@ -628,14 +648,12 @@ B32 ui_has_active()
 // todo: This seems like it could be done at the start of the build since there is no dinamic data used here 
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
-  // todo: I dont know how to make this be nicer in the api yet
-  // todo: more than 1 update for the same box is possible in the same frame
-  if (this_frames_box->id.count == 0) { return UI_Actions{}; }
-
-  Assert(this_frames_box->has_been_updated_this_build == false); // todo: Deal with this better
+  UI_Actions* result_actions = &this_frames_box->actions;
+  if (this_frames_box->has_been_updated_this_build) { return *result_actions; }
   this_frames_box->has_been_updated_this_build = true;
+  result_actions->box = this_frames_box;
+  if (this_frames_box->id.count == 0) { return *result_actions; }
 
-  if (this_frames_box->id.count == 0) { return UI_Actions{}; }
   UI_Context* ctx = ui_get_context();
 
   UI_Box* prev_frame_box = ui_get_box_prev_frame(this_frames_box->id);
@@ -704,15 +722,14 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     }
   }
 
-  UI_Actions result_actions = {};
-  result_actions.is_hovered = is_hovered;
-  result_actions.is_down    = is_down;
-  result_actions.was_down   = was_down;
-  result_actions.left_box_while_was_down = left_box_while_was_down;
-  result_actions.is_clicked = was_down && !is_down && !left_box_while_was_down;
-  result_actions.wheel_move = mouse_wheel_move;
+  result_actions->is_hovered = is_hovered;
+  result_actions->is_down    = is_down;
+  result_actions->was_down   = was_down;
+  result_actions->left_box_while_was_down = left_box_while_was_down;
+  result_actions->is_clicked = was_down && !is_down && !left_box_while_was_down;
+  result_actions->wheel_move = mouse_wheel_move;
 
-  return result_actions;
+  return *result_actions;
 }
 
 UI_Actions ui_actions_from_id(Str8 id)
@@ -726,185 +743,114 @@ UI_Actions ui_actions_from_id(Str8 id)
 ///////////////////////////////////////////////////////////
 // - Misc
 //
-void ui_set_cursor(OS_Cursor cursor)
+UI_Corner_radius ui_corner_r(F32 r_00, F32 r_10, F32 r_01, F32 r_11)
 {
-  ui_get_context()->cursor = cursor;
+  UI_Corner_radius result = {};
+  result.r[UV__00] = r_00;
+  result.r[UV__10] = r_10;
+  result.r[UV__01] = r_01;
+  result.r[UV__11] = r_11;
+  return result;
 }
+
+UI_Corner_radius ui_corner_r_all(F32 r)
+{
+  return ui_corner_r(r, r, r, r);
+}
+
 
 ///////////////////////////////////////////////////////////
 // - Style stacks
 //
-#define _UI_StyleStackPush_Impl(ctx_p, stack_name_inside_ctx, node_type, val)    \
-  node_type* node = ArenaPush(ctx_p->style_stacks_arena, node_type);            \
-  node->v = val;                                                                 \
-  StackPush(&ctx_p->stack_name_inside_ctx, node);                                \
+
+// note: this is done via memcpy and not =, since in c/cpp = works like memcpy, but it does not work for arrays of fixes size, which i sometimes use, for example for color per vertex, mem cpy makes it work with static fixed size arrays and with values.
+#define _UI_StyleStackPush_Impl(ctx_p, stack_name_inside_ctx, node_type, val) \
+  node_type* node = ArenaPush(ctx_p->style_stacks_arena, node_type);          \
+  node->v = val;                                                              \
+  StackPush(&ctx_p->stack_name_inside_ctx, node);                             \
   ctx_p->stack_name_inside_ctx.count += 1;
 
 #define _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type)  \
-  StackPop(&ctx_p->stack_name_inside_ctx);                               \
-  ctx_p->stack_name_inside_ctx.count -= 1;                               \
-  ctx_p->stack_name_inside_ctx.pop_after_first_use = false;
-
-#define _UI_StyleStackAutoPop_Impl(ctx_p, stack_name_inside_ctx, node_type)  \
-  if (ctx_p->stack_name_inside_ctx.pop_after_first_use) {                    \
-    _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type);         \
+  if (ctx_p->stack_name_inside_ctx.count > 0) {                          \
+    StackPop(&ctx_p->stack_name_inside_ctx);                             \
+    ctx_p->stack_name_inside_ctx.count -= 1;                             \
+    ctx_p->stack_name_inside_ctx.pop_after_first_get = false;            \
   }
 
-#define _UI_StyleStackPeek_Impl(ctx_p, stack_name_inside_ctx, node_type) \
-  return ctx_p->stack_name_inside_ctx.first->v;
-
-// todo: remove auto from here
-#define _UI_StyleStackGet_Impl(ctx_p, stack_name_inside_ctx, node_type)   \
-  auto result = ctx_p->stack_name_inside_ctx.first->v;              \
-  _UI_StyleStackAutoPop_Impl(ctx_p, stack_name_inside_ctx, node_type);    \
+#define _UI_StyleStackGet_Impl(ctx_p, stack_name_inside_ctx, node_type, name_for_default_value_var) \
+  auto result = ctx_p->defaults.name_for_default_value_var;             \
+  if (ctx_p->stack_name_inside_ctx.first != 0) {                       \
+    result = ctx_p->stack_name_inside_ctx.first->v;                    \
+    if (ctx_p->stack_name_inside_ctx.pop_after_first_get) {            \
+      _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type); \
+    }                                                                  \
+  }                                                                    \
   return result;
 
 #define _UI_StyleStackSetNext_Impl(ctx_p, stack_name_inside_ctx, node_type, val) \
+  if (ctx_p->stack_name_inside_ctx.pop_after_first_get) {                    \
+    _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type);         \
+  }                                                                           \
   _UI_StyleStackPush_Impl(ctx_p, stack_name_inside_ctx, node_type, val);         \
-  ctx_p->stack_name_inside_ctx.pop_after_first_use = true;
+  ctx_p->stack_name_inside_ctx.pop_after_first_get = true;
 
 ///////////////////////////////////////////////////////////
-// - Style stack operations for default settings
+// - Default box settings stacks
 //
-void ui_push_flags(UI_Box_flags v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, flags_stack, UI_Box_flags_node, v) }
-void ui_set_next_flags(UI_Box_flags v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, flags_stack, UI_Box_flags_node, v) }
-void ui_pop_flags()                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, flags_stack, UI_Box_flags_node) }
-void ui_auto_pop_flags_stack()         { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, flags_stack, UI_Box_flags_node) }
-UI_Box_flags ui_peek_flags()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, flags_stack, UI_Box_flags_node) }
-UI_Box_flags ui_get_flags()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, flags_stack, UI_Box_flags_node) }
-void ui_add_flags(UI_Box_flags flags) 
-{
-  UI_Context* ctx = ui_get_context();
-  ctx->flags_stack.first->v |= flags;
-}
-void ui_add_flags_to_next(UI_Box_flags flags) 
-{
-  UI_Context* ctx = ui_get_context();
-  if (!ctx->flags_stack.pop_after_first_use)
-  {
-    ui_set_next_flags(0);
-  }
-  ctx->flags_stack.first->v |= flags;
-}
-
 void ui_push_layout_axis(Axis2 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
-void ui_set_next_layout_axis(Axis2 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
 void ui_pop_layout_axis()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
-void ui_auto_pop_layout_axis_stack()  { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
-Axis2 ui_peek_layout_axis()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
-Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
+void ui_set_next_layout_axis(Axis2 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
+Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, layout_axis) }
 
-void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); if (f32_is_nan(v.value)) { BP; } _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
-void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); if (f32_is_nan(v.value)) { BP; } _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
+void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
 void ui_pop_size_x()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
-void ui_auto_pop_size_x_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
-UI_Size ui_peek_size_x()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
-UI_Size ui_get_size_x()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
+void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
+UI_Size ui_get_size_x()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, size_x) }
 
 void ui_push_size_y(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
-void ui_set_next_size_y(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
 void ui_pop_size_y()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
-void ui_auto_pop_size_y_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
-UI_Size ui_peek_size_y()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
-UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
+void ui_set_next_size_y(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
+UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, size_y) }
 
-// todo: Setters for size x and y at the same time
+///////////////////////////////////////////////////////////
+// - Style box settings stacks
+//
+void ui_push_b_color_uv(UV uv, V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, vertex_color_stacks[uv], UI_Vertex_color_node, v                ) }
+void ui_pop_b_color_uv(UV uv)               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl        (ctx, vertex_color_stacks[uv], UI_Vertex_color_node                   ) }
+void ui_set_next_b_color_uv(UV uv, V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl    (ctx, vertex_color_stacks[uv], UI_Vertex_color_node, v                ) }
+V4F32 ui_get_b_color_uv(UV uv)              { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl        (ctx, vertex_color_stacks[uv], UI_Vertex_color_node, vertex_colors[uv]) }
 
-// -
+void ui_push_b_color(V4F32 v)     { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_push_b_color_uv(uv, v);     } }
+void ui_pop_b_color()             { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_pop_b_color_uv(uv);         } }
+void ui_set_next_b_color(V4F32 v) { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_set_next_b_color_uv(uv, v); } }
 
-void ui_push_color_no_flag(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, color_stack, UI_Color_node, v) }
-void ui_set_next_color_no_flag(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, color_stack, UI_Color_node, v) }
-void ui_pop_color()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, color_stack, UI_Color_node) }
-void ui_auto_pop_color_stack()     { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, color_stack, UI_Color_node) }
-V4F32 ui_peek_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, color_stack, UI_Color_node) }
-V4F32 ui_get_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, color_stack, UI_Color_node) }
-void ui_push_color(V4F32 v) { ui_push_color_no_flag(v);  }
-void ui_set_next_b_color(V4F32 v) { ui_set_next_color_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_background); }
+void ui_push_corner_r(UI_Corner_radius v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+void ui_pop_corner_r()                        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+void ui_set_next_corner_r(UI_Corner_radius v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+UI_Corner_radius ui_get_corner_r()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, corner_r) }
 
-void ui_push_corner_r_no_flag(UI_Corner_radius_style v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-void ui_set_next_corner_r_no_flag(UI_Corner_radius_style v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-void ui_pop_corner_r()                                      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-void ui_auto_pop_corner_r_stack()                           { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-UI_Corner_radius_style ui_peek_corner_r()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-UI_Corner_radius_style ui_get_corner_r()                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-void ui_push_corner_r(UI_Corner_radius_style v)             { ui_push_corner_r_no_flag(v); ui_add_flags(UI_Box_flag__has_corner_radius); }
-void ui_set_next_corner_r(UI_Corner_radius_style v)         { ui_set_next_corner_r_no_flag(v); ui_add_flags_to_next(UI_Box_flag__has_corner_radius); }
+void ui_push_border(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
+void ui_pop_border()                            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
+void ui_set_next_border(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
+UI_Border_style ui_get_border()                 { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node, border) }
 
-void ui_push_border_no_flag(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_set_next_border_no_flag(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border_style v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_pop_border()                                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_auto_pop_border_stack()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
-UI_Border_style ui_peek_border()                        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, border_style_stack, UI_Border_style_node) }
-UI_Border_style ui_get_border()                         { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_push_border(F32 width, V4F32 color)             { ui_push_border_no_flag(width, color); }
-void ui_set_next_border(F32 width, V4F32 color)         { ui_set_next_border_no_flag(width, color); ui_add_flags_to_next(UI_Box_flag__has_borders); }
-
-void ui_pop_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, softness_stack, UI_Softness_node) }
-void ui_auto_pop_softness()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, softness_stack, UI_Softness_node) }
-F32 ui_peek_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, softness_stack, UI_Softness_node) }
-F32 ui_get_softness()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, softness_stack, UI_Softness_node) }
 void ui_push_softness(F32 softness)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, softness_stack, UI_Softness_node, softness) }
+void ui_pop_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, softness_stack, UI_Softness_node) }
 void ui_set_next_softness(F32 softness) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, softness_stack, UI_Softness_node, softness) }
+F32 ui_get_softness()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, softness_stack, UI_Softness_node, softness) }
 
+///////////////////////////////////////////////////////////
+// - Style stack operations for text
+//
+// void ui_push_text_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+// void ui_pop_text_color()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
+// void ui_set_next_text_color(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
+// V4F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
 
-// --
-
-void ui_push_text_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-void ui_set_next_text_color(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_color_stack, UI_Text_color_node, v) }
-void ui_pop_text_color()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-void ui_auto_pop_text_color_stack()  { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_color_stack, UI_Text_color_node) }
-V4F32 ui_peek_text_color()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_color_stack, UI_Text_color_node) }
-V4F32 ui_get_text_color()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_color_stack, UI_Text_color_node) }
-
-void ui_push_font(FP_Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-void ui_set_next_font(FP_Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
-void ui_pop_font()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-void ui_auto_pop_font_stack()    { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
-FP_Font ui_peek_font()           { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_stack, UI_Text_font_node) }
-FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
-
-// void ui_push_font_size(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
-// void ui_set_next_font_size(F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_size_stack, UI_Text_font_size_node, v) }
-// void ui_pop_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-// void ui_auto_pop_font_size_stack() { UI_Context* ctx = ui_get_context(); _UI_StyleStackAutoPop_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-// F32 ui_peek_font_size()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPeek_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-// F32 ui_get_font_size()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_size_stack, UI_Text_font_size_node) }
-
-// --
-
-// void ui_set_next_id(Str8 id)
-// {
-//   UI_Context* ctx = ui_get_context();
-//   UI_ID_node* node = ArenaPush(ui_get_build_arena(), UI_ID_node);
-//   node->id = str8_copy_alloc(ui_get_build_arena(), id); // todo: Check is allocation in the middle of the arena
-//   StackPush(&ctx->id_stack, node);
-//   ctx->id_stack.count += 1;
-//   ctx->id_stack.pop_after_first_use = true;
-// }
-
-// Str8 ui_get_next_id() // note: This id might be invalid next build, so be carefull
-// {
-//   Str8 id = {};
-//   UI_Context* ctx = ui_get_context();
-//   UI_ID_stack* stack = &ctx->id_stack;
-//   Assert(stack->count > 0);
-//   if (stack->count > 0)
-//   {
-//     id = stack->first->id;
-//     if (stack->count > 1)
-//     {
-//       StackPop(stack);
-//       stack->count -= 1;
-//       stack->pop_after_first_use = false;
-//     }
-//   }
-//   return id;
-// }
-
-// todo: What happends if i pop all the values and then try to get them, if fails, then we shoud protect agains the full pop case
-
-// ========
-
+// void ui_push_font(FP_Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+// void ui_pop_font()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
+// void ui_set_next_font(FP_Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+// FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node) }
 
 #endif
 

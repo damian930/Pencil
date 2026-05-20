@@ -5,6 +5,5 @@
 #include "core_string.cpp"
 #include "core_base.cpp"
 #include "core_thread_context.cpp"
-// #include "core_profiler.cpp"
 
 #endif

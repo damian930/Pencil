@@ -7,36 +7,6 @@
 #include "draw/draw.h"
 
 ///////////////////////////////////////////////////////////
-// - Internal builder functions 
-//
-__D_Rect_builder* __d_builder_func_color(V4F32 color)
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-  for EachEnum(i, UV, UV__00, UV__COUNT) {
-    builder->corner_colors[i] = color;
-  }
-  return builder;
-}
-
-D_Command __d_builder_func_get()
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-  D_Command command = {};
-  command.u.rect_c.rect  = builder->rect;
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = builder->corner_colors[i]; }
-  return command;
-}
-
-void __d_builder_func_add()
-{
-  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
-  D_Command command      = __d_builder_func_get();
-  d_add_command_to_batch(batch, command);
-}
-
-///////////////////////////////////////////////////////////
 // - State 
 //
 global D_State __d_g_state = {};
@@ -47,10 +17,14 @@ void d_init()
 {
   __d_g_state.arena_for_draw_commands = arena_alloc(Gigabytes(1));
 
-  __d_g_state.rect_builder.color = __d_builder_func_color;
-  
+  __d_g_state.rect_builder.color       = __d_builder_func_color;
+  __d_g_state.rect_builder.color_uv    = __d_builder_func_color_uv;
+  __d_g_state.rect_builder.corner_r    = __d_builder_func_corner_r;
+  __d_g_state.rect_builder.corner_r_uv = __d_builder_func_corner_r_uv;
+  __d_g_state.rect_builder.border      = __d_builder_func_border;
+  __d_g_state.rect_builder.softness    = __d_builder_func_softness;
+
   __d_g_state.rect_builder.add = __d_builder_func_add;
-  __d_g_state.rect_builder.get = __d_builder_func_get;
 }
 
 void d_release() 
@@ -151,14 +125,6 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
 ///////////////////////////////////////////////////////////
 // - Draw commands 
 //
-__D_Rect_builder* d_draw_rect(Rect rect)
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* b = &d_state->rect_builder;
-  b->rect = rect;
-  return &d_state->rect_builder;
-}
-
 void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color)
 {
   D_State* draw_state    = d_get_state();
@@ -298,5 +264,104 @@ Rect __d_get_current_scissor_rect__default()
   return rect;
 }
 
+///////////////////////////////////////////////////////////
+// - Another api for more comfortable building of draw commands
+//
+__D_Rect_builder* d_draw_rect_build(Rect rect)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* b = &d_state->rect_builder;
+  b->rect_ = rect;
+  return &d_state->rect_builder;
+}
+
+///////////////////////////////////////////////////////////
+// - Interanl functions for rect draw command building
+//
+__D_Rect_builder* __d_builder_func_color(V4F32 color)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+  
+  for EachEnum(i, UV, UV__00, UV__COUNT) {
+    builder->corner_colors_[i] = color;
+  }
+
+  return builder;
+}
+
+__D_Rect_builder* __d_builder_func_color_uv(V4F32 color, UV uv)
+{
+   D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+  
+  builder->corner_colors_[uv] = color;
+
+  return builder;
+}
+
+__D_Rect_builder* __d_builder_func_corner_r(F32 r)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+
+  for EachEnum(i, UV, UV__00, UV__COUNT) {
+    builder->corner_radius_[i] = r;
+  }
+
+  return builder;
+}
+
+__D_Rect_builder* __d_builder_func_corner_r_uv(F32 r, UV uv)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+
+  builder->corner_radius_[uv] = r;
+
+  return builder;
+}
+
+__D_Rect_builder* __d_builder_func_border(F32 thickness, V4F32 color)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+
+  builder->border_thickness_ = thickness;
+  builder->border_color_     = color;
+
+  return builder;
+}
+
+__D_Rect_builder* __d_builder_func_softness(F32 softness)
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+
+  builder->softness_ = softness;
+
+  return builder;
+}
+
+void __d_builder_func_add()
+{
+  D_State* d_state = d_get_state();
+  __D_Rect_builder* builder = &d_state->rect_builder;
+  
+  // todo: This is here since i am not sure what i will need, but if i dont need to hold data till ->add,
+  //       then i could just store a D_Comamnd inside the builder and just fill the data in there per 
+  //       build call and then just add to batch here.
+
+  D_Command command = {};
+  command.u.rect_c.rect             = builder->rect_;
+  command.u.rect_c.border_color     = builder->border_color_;
+  command.u.rect_c.border_thickness = builder->border_thickness_;
+  command.u.rect_c.softness         = builder->softness_;
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = builder->corner_colors_[i]; }
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = builder->corner_radius_[i]; }
+
+  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
+  d_add_command_to_batch(batch, command);
+}
 
 #endif
