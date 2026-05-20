@@ -190,6 +190,16 @@ Rect rect_make(F32 x, F32 y, F32 width, F32 height)
 	return rect;
 }
 
+Rect rect_from_center(V2F32 center, V2F32 dims)
+{
+	Rect rect = {};
+	rect.x = center.x - (dims.x / 2.0f);
+	rect.y = center.y - (dims.y / 2.0f);
+	rect.width = dims.x;
+	rect.height = dims.y;
+	return rect;
+}
+
 V2F32 rect_get_origin(Rect rect)
 {
 	return v2f32(rect.x, rect.y);
@@ -203,6 +213,18 @@ V2F32 rect_get_dims(Rect rect)
 B32 rect_match(Rect r1, Rect r2)
 { 
 	return (r1.x == r2.x && r1.y == r2.y && r1.width == r2.width && r1.height == r2.height);
+}
+
+Rect rect_padded(Rect rect, F32 padd)
+{
+	Rect result = rect;
+	result.x -= padd;
+	result.y -= padd;
+	result.width += 2 * padd;
+	result.height += 2 * padd;
+	if (result.width < 0.0f) { result.width = 0.0f; }
+	if (result.height < 0.0f) { result.height = 0.0f; }
+	return result;
 }
 
 B32 is_point_inside_rect(F32 x, F32 y, Rect r)

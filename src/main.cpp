@@ -47,178 +47,6 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
 
 global B32 hot_key_activated = false;
 
-
-void r_draw_text(Str8 text, V2F32 pos, FP_Font font, V4F32 color)
-{
-  // note: These are some debug drawings for baseline and stuff
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
-  
-  F32 origin_y = pos.y + font.ascent;
-  F32 x_offset = 0.0f;
-
-  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-  {
-    U8 ch = text.data[ch_index];
-    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-    F32 origin_x = pos.x + x_offset;
-
-    // Just puttin them 1 next to another
-    Rect dest_rect = {};
-    dest_rect.x      = origin_x + glyph_data.bearing_x;
-    dest_rect.y      = origin_y - glyph_data.bearing_y;
-    dest_rect.width  = glyph_data.rect_on_atlas.width;
-    dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-    d_add_texture_command(font.atlas_texture, dest_rect, glyph_data.rect_on_atlas, true, color);
-
-    F32 advance = glyph_data.advance;
-    if (ch_index < text.count - 1)
-    {
-      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
-    } 
-    x_offset += advance; 
-  }
-}
-
-void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
-{
-  #if DEBUG_MODE
-  // if (str8_match(root->id, Str8FromC("wrapper"), 0)) { BP; }
-  #endif
-  
-  // todo: I dont fully like this if here, but for now its like this 
-  if (root->custom_draw_func != 0) 
-  { 
-    root->custom_draw_func(root); 
-
-    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-    {
-      ui_draw_box(child, parent_scissor_rect);
-    }
-  }
-  else 
-  {
-    Rect rect = root->final_on_screen_rect;
-  
-    // Background
-    {
-      d_draw_rect_build(rect)
-        ->color_uv(root->shape_style.vertex_colors[UV__00], UV__00)
-        ->color_uv(root->shape_style.vertex_colors[UV__01], UV__01)
-        ->color_uv(root->shape_style.vertex_colors[UV__10], UV__10)
-        ->color_uv(root->shape_style.vertex_colors[UV__11], UV__11)
-        //
-        ->corner_r_uv(root->shape_style.corner_r.r[UV__00], UV__00)
-        ->corner_r_uv(root->shape_style.corner_r.r[UV__01], UV__01)
-        ->corner_r_uv(root->shape_style.corner_r.r[UV__10], UV__10)
-        ->corner_r_uv(root->shape_style.corner_r.r[UV__11], UV__11)
-        //
-        ->border(root->shape_style.border.width, root->shape_style.border.color)
-        ->softness(root->shape_style.softness)
-        //
-        ->add();
-    }
-
-    // Text
-    // if (root->flags & UI_Box_flag__has_text_contents && root->text_style.text.count != 0)
-    // {
-      // NotImplemented();
-      // r_draw_text(root->text_style.text, rect_get_origin(rect), root->text_style.font, root->text_style.text_color); 
-    // }
-  
-    // Have to scissor ______ (THATS WHAT SHE SAID !!!)
-    Rect scissor_rect = parent_scissor_rect;
-    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-    {
-      RangeF2V32 default_scissor_box = {};
-      default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
-      default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
-      
-      RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
-      RangeF2V32 new_scissor_bbox = default_scissor_box;
-      
-      // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
-      // so a child cant make a scissor larger than the parent and then have its children
-      // drawn, though the parent has no overflow flag spcefied.
-      // This works per axis. So if no overflow is aplied only for 1 axis, then the other axis shoud be
-      // drawn as ussual, with oveflow. This is achieved by having default_scissor_box that extends way pass
-      // the ui coordinate limits.  
-      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
-      {
-        RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
-  
-        // Clmaping based to the space that the parent have already limited its children to
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->parent->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            F32 min = rect_bbox.min.v[axis];
-            F32 max = rect_bbox.max.v[axis];
-    
-            if (min < parent_scissor_bbox.min.v[axis]) { min = parent_scissor_bbox.min.v[axis]; }
-            if (max > parent_scissor_bbox.max.v[axis]) { max = parent_scissor_bbox.max.v[axis]; }
-    
-            new_scissor_bbox.min.v[axis] = min; 
-            new_scissor_bbox.max.v[axis] = max; 
-          }
-        }
-  
-        // The child might have a different axis specified for no overflow, so have to clamp again
-        // but this time for the child (root) and not the parent (root->parent)
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            if (new_scissor_bbox.min.v[axis] < rect_bbox.min.v[axis]) { new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; }
-            if (new_scissor_bbox.max.v[axis] > rect_bbox.max.v[axis]) { new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; }
-          }
-        }
-      }
-      else {
-        // Simple case, we dont have parent enforce scissoring at all, so we just do it, there are 
-        // no additional adjustments we have to do to not mess up what the parent have enforces before us.
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; 
-            new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; 
-          }
-        }
-      }
-  
-      scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-      d_push_scissor_rect(scissor_rect);
-    }
-  
-    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-    {
-      ui_draw_box(child, scissor_rect);
-    }
-  
-    // No longer scissoring
-    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-    {
-      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-        d_pop_scissor_rect();
-      }
-    }
-  }
-}
-
-void ui_draw()
-{
-  UI_Context* ctx = ui_get_context();
-  ui_draw_box(ctx->root_box, Rect{});
-}
-
 #define APP_WINDOW_NAME      "Pencil"
 #define APP_MUTEX_NAME_WIN32 "Pencil mutex that has a name that no one will ever know aobut. Last week was the kevin harts roast, shane did good."
 
@@ -445,7 +273,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       ui_set_next_size_y(ui_px(500));
       ui_set_next_b_color(green());
       // ui_set_next_softness(2.0f);
-      ui_set_next_corner_r(ui_corner_r_all(1.0));
+      ui_set_next_corner_r(v4f32_all(1.0));
       // ui_set_next_border(5, white());
       UI_Box* red_parent = ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners|UI_Box_flag__has_borders);
       UI_Parent(red_parent)
@@ -481,7 +309,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       // r_clear_frame_buffer(transparent());
       r_clear_frame_buffer(black());
       // pencil_render(&P);
-      ui_draw();
+      // ui_draw(); 
+    
+      d_draw_circle(os_get_mouse_pos(), 100, blue(), 0);
+      d_draw_rect_outset_borders(rect_from_center(os_get_mouse_pos(), v2f32(100, 100)), red(), 1, v4f32_all(1), 2.0);
     }
     
     r_submit(d_get_batch_list());

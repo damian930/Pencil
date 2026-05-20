@@ -15,16 +15,7 @@ D_State* d_get_state() { return &__d_g_state; }
 
 void d_init()
 {
-  __d_g_state.arena_for_draw_commands = arena_alloc(Gigabytes(1));
-
-  __d_g_state.rect_builder.color       = __d_builder_func_color;
-  __d_g_state.rect_builder.color_uv    = __d_builder_func_color_uv;
-  __d_g_state.rect_builder.corner_r    = __d_builder_func_corner_r;
-  __d_g_state.rect_builder.corner_r_uv = __d_builder_func_corner_r_uv;
-  __d_g_state.rect_builder.border      = __d_builder_func_border;
-  __d_g_state.rect_builder.softness    = __d_builder_func_softness;
-
-  __d_g_state.rect_builder.add = __d_builder_func_add;
+  __d_g_state.arena_for_draw_commands = arena_alloc(Megabytes(64));
 }
 
 void d_release() 
@@ -123,46 +114,6 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
 }
 
 ///////////////////////////////////////////////////////////
-// - Draw commands 
-//
-void d_add_rect_command_ex(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color)
-{
-  D_State* draw_state    = d_get_state();
-  Arena* arena           = draw_state->arena_for_draw_commands;
-  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
-
-  D_Command command = {};
-  command.u.rect_c.rect             = rect;
-  command.u.rect_c.border_color     = border_color;
-  command.u.rect_c.border_thickness = border_thickness;
-  command.u.rect_c.softness         = softness;
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i]  = corner_colors[i]; }
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = corner_radiuses.v[i]; }
-  d_add_command_to_batch(batch, command);
-}
-
-void d_add_rect_command(Rect rect, V4F32 color)
-{
-  V4F32 colors[UV__COUNT] = { color, color, color, color };
-  d_add_rect_command_ex(rect, colors, {}, {}, {}, {});
-}
-
-void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
-{
-  D_State* draw_state    = d_get_state();
-  Arena* arena           = draw_state->arena_for_draw_commands;
-  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Texture, texture);
-
-  D_Command command = {};
-  command.u.texture_c.dest_rect  = dest_rect;
-  command.u.texture_c.src_rect   = src_rect;
-  command.u.texture_c.is_text    = is_text;
-  command.u.texture_c.text_color = text_color;
-
-  d_add_command_to_batch(batch, command);
-}
-
-///////////////////////////////////////////////////////////
 // - Push/Pops
 //
 void d_push_blend_kind(D3D_Blend_kind blend_kind)
@@ -182,10 +133,7 @@ void d_push_blend_kind(D3D_Blend_kind blend_kind)
 void d_pop_blend_kind()
 {
   D_State* draw_state = d_get_state();
-  if (draw_state->current_blend_kind_count == 0) {  return; }
-  
   if (draw_state->current_blend_kind_count > 0) { draw_state->current_blend_kind_count -= 1; }
-  if (draw_state->current_blend_kind_count == 0) { d_push_blend_kind(draw_state->defaults.blend_kind); }
 }
 
 
@@ -216,10 +164,7 @@ void d_push_render_target(ID3D11RenderTargetView* rtv)
 void d_pop_render_target()
 {
   D_State* draw_state = d_get_state();
-  if (draw_state->current_render_target_count == 0) { return; }
-  
   if (draw_state->current_render_target_count > 0) { draw_state->current_render_target_count -= 1; }
-  if (draw_state->current_render_target_count == 0) { d_push_render_target(draw_state->defaults.render_target); }
 }
 
 ID3D11RenderTargetView* __d_get_current_render_target__defaults()
@@ -248,10 +193,7 @@ void d_push_scissor_rect(Rect rect)
 void d_pop_scissor_rect()
 {
   D_State* draw_state = d_get_state();
-  if (draw_state->current_scissor_rect_count == 0) { return; }
-  
   if (draw_state->current_scissor_rect_count > 0) { draw_state->current_scissor_rect_count -= 1; }
-  if (draw_state->current_scissor_rect_count == 0) { d_push_scissor_rect(draw_state->defaults.scissor_rect); }
 }
 
 Rect __d_get_current_scissor_rect__default()
@@ -265,103 +207,64 @@ Rect __d_get_current_scissor_rect__default()
 }
 
 ///////////////////////////////////////////////////////////
-// - Another api for more comfortable building of draw commands
+// - Low level draw commands that know about how the shader works 
 //
-__D_Rect_builder* d_draw_rect_build(Rect rect)
+void d_add_rect_command(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color)
 {
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* b = &d_state->rect_builder;
-  b->rect_ = rect;
-  return &d_state->rect_builder;
+  D_State* draw_state    = d_get_state();
+  Arena* arena           = draw_state->arena_for_draw_commands;
+  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
+
+  D_Command command = {};
+  command.u.rect_c.rect             = rect;
+  command.u.rect_c.border_color     = border_color;
+  command.u.rect_c.border_thickness = border_thickness;
+  command.u.rect_c.softness         = softness;
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i]  = corner_colors[i]; }
+  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = corner_radiuses.v[i]; }
+  d_add_command_to_batch(batch, command);
+}
+
+void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
+{
+  D_State* draw_state    = d_get_state();
+  Arena* arena           = draw_state->arena_for_draw_commands;
+  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Texture, texture);
+
+  D_Command command = {};
+  command.u.texture_c.dest_rect  = dest_rect;
+  command.u.texture_c.src_rect   = src_rect;
+  command.u.texture_c.is_text    = is_text;
+  command.u.texture_c.text_color = text_color;
+
+  d_add_command_to_batch(batch, command);
 }
 
 ///////////////////////////////////////////////////////////
-// - Interanl functions for rect draw command building
+// - Higher level draw commands that dont require the caller to know how the shader works 
 //
-__D_Rect_builder* __d_builder_func_color(V4F32 color)
+void d_draw_rect(Rect rect, V4F32 color)
 {
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-  
-  for EachEnum(i, UV, UV__00, UV__COUNT) {
-    builder->corner_colors_[i] = color;
-  }
-
-  return builder;
+  V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
+  d_add_rect_command(rect, corner_colors, {}, {}, {}, {});
 }
 
-__D_Rect_builder* __d_builder_func_color_uv(V4F32 color, UV uv)
+void d_draw_rect_pro(Rect rect, V4F32 color_x0y0, V4F32 color_x1y0, V4F32 color_x0y1, V4F32 color_x1y1, V4F32 corner_radii, F32 softness)
 {
-   D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-  
-  builder->corner_colors_[uv] = color;
-
-  return builder;
+  V4F32 corner_colors[UV__COUNT] = { color_x0y0, color_x1y0, color_x0y1, color_x1y1 };
+  d_add_rect_command(rect, corner_colors, corner_radii, {}, softness, {});
 }
 
-__D_Rect_builder* __d_builder_func_corner_r(F32 r)
+void d_draw_rect_inset_borders(Rect rect, V4F32 color, F32 thickness, V4F32 corner_radii, F32 softness)
 {
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-
-  for EachEnum(i, UV, UV__00, UV__COUNT) {
-    builder->corner_radius_[i] = r;
-  }
-
-  return builder;
+  V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
+  d_add_rect_command(rect, corner_colors, corner_radii, thickness, softness, color);
 }
 
-__D_Rect_builder* __d_builder_func_corner_r_uv(F32 r, UV uv)
+void d_draw_rect_outset_borders(Rect rect, V4F32 color, F32 thickness, V4F32 corner_radii, F32 softness)
 {
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-
-  builder->corner_radius_[uv] = r;
-
-  return builder;
-}
-
-__D_Rect_builder* __d_builder_func_border(F32 thickness, V4F32 color)
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-
-  builder->border_thickness_ = thickness;
-  builder->border_color_     = color;
-
-  return builder;
-}
-
-__D_Rect_builder* __d_builder_func_softness(F32 softness)
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-
-  builder->softness_ = softness;
-
-  return builder;
-}
-
-void __d_builder_func_add()
-{
-  D_State* d_state = d_get_state();
-  __D_Rect_builder* builder = &d_state->rect_builder;
-  
-  // todo: This is here since i am not sure what i will need, but if i dont need to hold data till ->add,
-  //       then i could just store a D_Comamnd inside the builder and just fill the data in there per 
-  //       build call and then just add to batch here.
-
-  D_Command command = {};
-  command.u.rect_c.rect             = builder->rect_;
-  command.u.rect_c.border_color     = builder->border_color_;
-  command.u.rect_c.border_thickness = builder->border_thickness_;
-  command.u.rect_c.softness         = builder->softness_;
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.vertex_color[i] = builder->corner_colors_[i]; }
-  for EachEnum(i, UV, UV__00, UV__COUNT) { command.u.rect_c.corner_radius[i] = builder->corner_radius_[i]; }
-
-  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
-  d_add_command_to_batch(batch, command);
+  V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
+  d_add_rect_command(rect_padded(rect, thickness), corner_colors, corner_radii, thickness, softness, color);
 }
 
 #endif

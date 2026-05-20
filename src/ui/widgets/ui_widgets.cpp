@@ -315,14 +315,14 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
     if (i == 0) 
     { 
       UV corner = (data->axis == Axis2__x ? UV__01 : UV__10);
-      corner_r.v[UV__00] =  box->shape_style.corner_r.r.v[UV__00]; 
-      corner_r.v[corner] = box->shape_style.corner_r.r.v[corner];
+      corner_r.v[UV__00] =  box->shape_style.corner_radii.r.v[UV__00]; 
+      corner_r.v[corner] = box->shape_style.corner_radii.r.v[corner];
     }
     else if (i == 5)
     {
       UV corner = (data->axis == Axis2__x ? UV__10 : UV__01);
-      corner_r.v[UV__11] =  box->shape_style.corner_r.r.v[UV__11]; 
-      corner_r.v[corner] = box->shape_style.corner_r.r.v[corner];
+      corner_r.v[UV__11] =  box->shape_style.corner_radii.r.v[UV__11]; 
+      corner_r.v[corner] = box->shape_style.corner_radii.r.v[corner];
     }
 
     Rect rect = {};

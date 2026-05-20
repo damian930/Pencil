@@ -649,9 +649,11 @@ struct Rect {
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
+tu_specific Rect rect_from_center(V2F32 center, V2F32 dims);
 tu_specific V2F32 rect_get_origin(Rect rect);
 tu_specific V2F32 rect_get_dims(Rect rect);
 tu_specific B32 rect_match(Rect r1, Rect r2);
+tu_specific Rect rect_padded(Rect rect, F32 padd);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
@@ -678,6 +680,8 @@ tu_specific Rect rect_from_range_v2f32(RangeF2V32 range)
 	rect.height = range.max.y - range.min.y;
 	return rect;
 }
+
+
 
 // note: this is static inline just cause i didnt care to move it to cpp file
 tu_specific B32 __is_memory_zero(U8* p, U64 size)
@@ -741,7 +745,7 @@ typedef V4F32 Vec4;
 typedef V4F32 V4;
 
 tu_specific V4F32 v4f32(F32 x, F32 y, F32 z, F32 w) { V4F32 v = { x, y, z, w }; return v; }
-
+tu_specific V4F32 v4f32_all(F32 x) { return v4f32(x, x, x, x); }
 tu_specific B32 v4f32_match(V4F32 v1, V4F32 v2)
 {
 	B32 result = (

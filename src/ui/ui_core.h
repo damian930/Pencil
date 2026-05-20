@@ -54,8 +54,7 @@ struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop
 struct UI_Vertex_color_node  { V4F32 v; UI_Vertex_color_node* next; };
 struct UI_Vertex_color_stack { UI_Vertex_color_node* first; U64 count; B32 pop_after_first_get; };
 //
-struct UI_Corner_radius       { F32 r[UV__COUNT]; };
-struct UI_Corner_radius_node  { UI_Corner_radius v; UI_Corner_radius_node* next; };
+struct UI_Corner_radius_node  { V4F32 v; UI_Corner_radius_node* next; };
 struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_get; };
 //
 struct UI_Softness_node  { F32 v; UI_Softness_node* next; };
@@ -100,7 +99,7 @@ struct UI_Box {
 
   struct {
     V4F32 vertex_colors[UV__COUNT];
-    UI_Corner_radius corner_r;
+    V4F32 corner_radii; 
     UI_Border_style border;
     F32 softness;
   } shape_style;
@@ -181,10 +180,10 @@ struct UI_Context {
     UI_Size size_x;
     UI_Size size_y;
 
-    V4F32            vertex_colors[UV__COUNT];
-    UI_Corner_radius corner_r;
-    UI_Border_style  border;
-    F32              softness;
+    V4F32           vertex_colors[UV__COUNT];
+    V4F32           corner_radii;
+    UI_Border_style border;
+    F32             softness;
 
     V4F32 text_color;
   } defaults;
@@ -270,10 +269,6 @@ UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id);
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
 UI_Actions ui_actions_from_id(Str8 id);
 
-// - Misc
-UI_Corner_radius ui_corner_r(F32 r_00, F32 r_10, F32 r_01, F32 r_11);
-UI_Corner_radius ui_corner_r_all(F32 r);
-
 // - Default box settings stacks
 void  ui_push_layout_axis(Axis2 v);       
 void  ui_pop_layout_axis(); 
@@ -304,10 +299,10 @@ void ui_push_b_color(V4F32 v);
 void ui_pop_b_color();
 void ui_set_next_b_color(V4F32 v);
 
-void             ui_push_corner_r(UI_Corner_radius v);
-void             ui_pop_corner_r();
-void             ui_set_next_corner_r(UI_Corner_radius v);
-UI_Corner_radius ui_get_corner_r();
+void  ui_push_corner_r(V4F32 v);
+void  ui_pop_corner_r();
+void  ui_set_next_corner_r(V4F32 v);
+V4F32 ui_get_corner_r();
 
 void            ui_push_border(F32 width, V4F32 color);
 void            ui_pop_border();
