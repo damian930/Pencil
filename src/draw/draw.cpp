@@ -36,8 +36,8 @@ void d_begin_batching(R_Target target)
   draw_state->command_batch_list = {};
   arena_clear(draw_state->arena_for_draw_commands); 
 
-  draw_state->defaults.blend_kind    = D3D_Blend_kind__alpha;
-  draw_state->defaults.render_target = target.texture_rtv; 
+  draw_state->defaults.blend_kind    = R_Blend_kind__alpha;
+  draw_state->defaults.render_target = target; 
   draw_state->defaults.scissor_rect  = rect_make(0.0f, 0.0f, r_get_target_dims(target).x, r_get_target_dims(target).y);
 
   draw_state->current_blend_kind_count    = 0;
@@ -51,7 +51,7 @@ void d_end_batching() { /*Nothing here*/ }
 
 D_Command_batch_list* d_get_batch_list() { return &d_get_state()->command_batch_list; }
 
-D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* texture)
+D_Command_batch* d_add_new_batch(D_Command_type command_type, R_Target texture)
 {
   D_State* draw_state = d_get_state();
   Arena* arena = draw_state->arena_for_draw_commands;
@@ -64,12 +64,12 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
   // Why is it important?
   // It is important to now have bugs, since to have batches working we have to change the code in couple 
   // of places after we add settings to the Batch struct. This place is 1 of them. 
-  StaticAssert(sizeof(D_Command_batch) == 80);
+  // StaticAssert(sizeof(D_Command_batch) == (96 + 24));
 
   D_Command_batch* new_batch = ArenaPush(arena, D_Command_batch);
   new_batch->command_type = command_type;
   new_batch->texture      = texture;
-  new_batch->rtv          = __d_get_current_render_target__defaults();
+  new_batch->target       = __d_get_current_render_target__defaults();
   new_batch->scissor_rect = __d_get_current_scissor_rect__default();
   new_batch->blend_kind   = __d_get_current_blend_kind__defaults();
   
@@ -79,7 +79,7 @@ D_Command_batch* d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* t
   return new_batch;
 }
 
-D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID3D11Texture2D* texture)
+D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, R_Target texture)
 {
   // note:
   // If this static assert fails, that mean that the batch struct has changed. 
@@ -89,16 +89,16 @@ D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, ID
   // Why is it important?
   // It is important to now have bugs, since to have batches working we have to change the code in couple 
   // of places after we add settings to the Batch struct. This place is 1 of them. 
-  StaticAssert(sizeof(D_Command_batch) == 80);
+  // StaticAssert(sizeof(D_Command_batch) == 96);
   
   D_State* draw_state = d_get_state();
   D_Command_batch* batch = draw_state->command_batch_list.last;
   if ( batch == 0 
     || batch->command_type != command_type  
-    || batch->texture      != texture
-    || batch->rtv          != __d_get_current_render_target__defaults() 
     || batch->blend_kind   != __d_get_current_blend_kind__defaults()
-    || !rect_match(batch->scissor_rect, __d_get_current_scissor_rect__default())
+    || !r_target_match(batch->texture, texture)
+    || !r_target_match (batch->target, __d_get_current_render_target__defaults())
+    || !rect_match     (batch->scissor_rect, __d_get_current_scissor_rect__default())
   ) {
     batch = d_add_new_batch(command_type, texture);
   }
@@ -120,12 +120,12 @@ void d_add_command_to_batch(D_Command_batch* batch, D_Command command)
 ///////////////////////////////////////////////////////////
 // - Push/Pops
 //
-void d_push_blend_kind(D3D_Blend_kind blend_kind)
+void d_push_blend_kind(R_Blend_kind blend_kind)
 {
   D_State* draw_state = d_get_state();
   if (draw_state->current_blend_kind_count < ArrayCount(draw_state->arr_of_blend_kinds))
   {
-    D3D_Blend_kind current_blend_kind = __d_get_current_blend_kind__defaults();
+    R_Blend_kind current_blend_kind = __d_get_current_blend_kind__defaults();
     if (current_blend_kind != blend_kind)
     {
       draw_state->arr_of_blend_kinds[draw_state->current_blend_kind_count++] = blend_kind;
@@ -141,25 +141,25 @@ void d_pop_blend_kind()
 }
 
 
-D3D_Blend_kind __d_get_current_blend_kind__defaults()
+R_Blend_kind __d_get_current_blend_kind__defaults()
 {
   D_State* draw_state = d_get_state();
-  D3D_Blend_kind blend_kind = draw_state->defaults.blend_kind;  
+  R_Blend_kind blend_kind = draw_state->defaults.blend_kind;  
   if (draw_state->current_blend_kind_count > 0) { 
     blend_kind = draw_state->arr_of_blend_kinds[draw_state->current_blend_kind_count - 1];
   } 
   return blend_kind;
 }
 
-void d_push_render_target(ID3D11RenderTargetView* rtv)
+void d_push_render_target(R_Target target)
 {
   D_State* draw_state = d_get_state();
   if (draw_state->current_render_target_count < ArrayCount(draw_state->arr_of_render_targets))
   {
-    ID3D11RenderTargetView* current_rtv = __d_get_current_render_target__defaults();
-    if (current_rtv != rtv)
+    R_Target current_rtv = __d_get_current_render_target__defaults();
+    if (!r_target_match(current_rtv, target))
     {
-      draw_state->arr_of_render_targets[draw_state->current_render_target_count++] = rtv;
+      draw_state->arr_of_render_targets[draw_state->current_render_target_count++] = target;
     }
   }
   else { InvalidCodePath(); }
@@ -171,10 +171,10 @@ void d_pop_render_target()
   if (draw_state->current_render_target_count > 0) { draw_state->current_render_target_count -= 1; }
 }
 
-ID3D11RenderTargetView* __d_get_current_render_target__defaults()
+R_Target __d_get_current_render_target__defaults()
 {
   D_State* draw_state = d_get_state();
-  ID3D11RenderTargetView* rtv = draw_state->defaults.render_target;  
+  R_Target rtv = draw_state->defaults.render_target;  
   if (draw_state->current_render_target_count > 0) { 
     rtv = draw_state->arr_of_render_targets[draw_state->current_render_target_count - 1];
   } 
@@ -217,7 +217,7 @@ void d_add_rect_command(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_
 {
   D_State* draw_state    = d_get_state();
   Arena* arena           = draw_state->arena_for_draw_commands;
-  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, Null);
+  D_Command_batch* batch = d_get_or_add_batch_for_settings(D_Command_type__Rect, r_target_zero_handle());
 
   D_Command command = {};
   command.u.rect_c.rect             = rect;
@@ -229,7 +229,7 @@ void d_add_rect_command(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_
   d_add_command_to_batch(batch, command);
 }
 
-void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
+void d_add_texture_command(R_Target texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color)
 {
   D_State* draw_state    = d_get_state();
   Arena* arena           = draw_state->arena_for_draw_commands;

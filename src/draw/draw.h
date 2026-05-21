@@ -38,12 +38,12 @@ struct D_Command_node {
 
 struct D_Command_batch {
   D_Command_type command_type;
-  ID3D11RenderTargetView* rtv;
+  R_Target target;
   Rect scissor_rect;
-  D3D_Blend_kind blend_kind;
+  R_Blend_kind blend_kind;
 
   // Fat stuct data
-  ID3D11Texture2D* texture;
+  R_Target texture;
 
   D_Command_node* first_command_node;
   D_Command_node* last_command_node;
@@ -51,7 +51,6 @@ struct D_Command_batch {
 
   D_Command_batch* next_batch; 
 };  
-#define __D_COMMAND_BATCH_SIZE_TEST 80
 
 struct D_Command_batch_list {
   D_Command_batch* first;
@@ -65,15 +64,15 @@ struct D_State {
  
   // Batch setting stacks
   struct {
-    D3D_Blend_kind blend_kind;
-    ID3D11RenderTargetView* render_target;
+    R_Blend_kind blend_kind;
+    R_Target render_target;
     Rect scissor_rect;
   } defaults;
   //
-  D3D_Blend_kind arr_of_blend_kinds[64];
+  R_Blend_kind arr_of_blend_kinds[64];
   U64 current_blend_kind_count;
   //
-  ID3D11RenderTargetView* arr_of_render_targets[64];
+  R_Target arr_of_render_targets[64];
   U64 current_render_target_count;
   //
   Rect arr_of_scissor_rects[64];
@@ -86,23 +85,23 @@ void     d_init();
 void     d_release();
 
 // - Batching
-void d_begin_batching(R_Target target) ;
+void                  d_begin_batching(R_Target target) ;
 void                  d_end_batching();
 D_Command_batch_list* d_get_batch_list();
-D_Command_batch*      d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* texture);
-D_Command_batch*      d_get_or_add_batch_for_settings(D_Command_type command_type, ID3D11Texture2D* texture);
+D_Command_batch*      d_add_new_batch(D_Command_type command_type, R_Target texture);
+D_Command_batch*      d_get_or_add_batch_for_settings(D_Command_type command_type, R_Target texture);
 void                  d_add_command_to_batch(D_Command_batch* batch, D_Command command);
 
 // - Push/Pops 
-void           d_push_blend_kind(D3D_Blend_kind blend_kind);
+void           d_push_blend_kind(R_Blend_kind blend_kind);
 void           d_pop_blend_kind();
-D3D_Blend_kind __d_get_current_blend_kind__defaults();
+R_Blend_kind __d_get_current_blend_kind__defaults();
 #define        D_Blend(blend_kind) DeferLoop(d_push_blend_kind(blend_kind), d_pop_blend_kind())
 
-void                    d_push_render_target(ID3D11RenderTargetView* rtv);
-void                    d_pop_render_target();
-ID3D11RenderTargetView* __d_get_current_render_target__defaults();
-#define                 D_RenderTarget(target) DeferLoop(d_push_render_target(target), d_pop_render_target())
+void     d_push_render_target(R_Target target);
+void     d_pop_render_target();
+R_Target __d_get_current_render_target__defaults();
+#define  D_RenderTarget(target) DeferLoop(d_push_render_target(target), d_pop_render_target())
 
 void    d_push_scissor_rect(Rect rect);
 void    d_pop_scissor_rect();
@@ -111,7 +110,7 @@ Rect    __d_get_current_scissor_rect__default();
 
 // - Low level draw commands that require the caller to know how the shader works
 void d_add_rect_command(Rect rect, V4F32 corner_colors[UV__COUNT], V4F32 corner_radiuses, F32 border_thickness, F32 softness, V4F32 border_color);
-void d_add_texture_command(ID3D11Texture2D* texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
+void d_add_texture_command(R_Target texture, Rect dest_rect, Rect src_rect, B32 is_text, V4F32 text_color);
 
 // - Higher level draw commands that dont require the caller to know how the shader works
 void d_draw_rect(Rect rect, V4F32 color);

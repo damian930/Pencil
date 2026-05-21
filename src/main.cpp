@@ -99,7 +99,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     ATOM wc_atom = RegisterClassExA(&win32_state->window.window_class);
     Assert(wc_atom != 0);
     
-    win32_state->window.is_transparent = false;
+    win32_state->window.is_transparent = true;
     win32_state->window.handle = CreateWindowExA(
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
@@ -208,8 +208,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     end_scratch(&scratch);
   }
 
-  R_Chain swap_chain = r_attach_window(win32_state->window);
-  R_Target swap_chain_target = r_target_from_swap_chain(swap_chain);
+  R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
@@ -218,8 +217,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
 
     os_frame_begin();
-    r_render_begin(swap_chain);
-    d_begin_batching(swap_chain_target);
+    r_prepare_canvas(&window_frame_buffer_target);
+    d_begin_batching(window_frame_buffer_target);
 
     if (!MAIN_IS_DEBUGGING)
     if (hot_key_activated && !P.is_mid_drawing)
@@ -234,19 +233,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
 
     { // Rendering
-      r_clear_chain(swap_chain, transparent());
+      r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
       if (!os_window_is_mouse_passthrough()) { ui_draw(); }
     }
     
-    r_submit(swap_chain_target, d_get_batch_list());
+    r_submit(window_frame_buffer_target, d_get_batch_list());
 
     d_end_batching();
-    r_render_end(swap_chain);
     os_frame_end();
 
-    // Presenting 
-    r_present_swap_chain(swap_chain, true);
+    r_present(window_frame_buffer_target, true);
     
     F64 frame_end_time_sec = os_get_time_for_timing_sec();
     prev_frame_duration_sec = frame_end_time_sec - frame_start_time_sec;

@@ -6,10 +6,8 @@
 
 struct Draw_record {
   // These are allocated when done 
-  ID3D11Texture2D*        texture_before_we_affected;
-  ID3D11Texture2D*        texture_after_we_affected;
-  ID3D11RenderTargetView* texture_before_we_affected_rtv;  
-  ID3D11RenderTargetView* texture_after_we_affected_rtv;   
+  R_Target texture_before_we_affected;
+  R_Target texture_after_we_affected;
 
   // These are used in general to have a list of drawings 
   // and are also used for managing a free list 
@@ -32,8 +30,7 @@ struct Pencil_state {
   U32 draw_texures_width;
   U32 draw_texures_height;
   // todo: Rename this to be a less complicated name since now we only have 1 of them (no non_fresh_texture)
-  ID3D11Texture2D*        draw_texture_always_fresh;
-  ID3D11RenderTargetView* draw_texture_always_fresh_rtv; 
+  R_Target draw_texture_always_fresh;
 
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50

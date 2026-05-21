@@ -33,7 +33,6 @@ void pencil_init(Pencil_state* P)
   P->draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
 
   P->draw_texture_always_fresh     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
-  P->draw_texture_always_fresh_rtv = r_rtv_from_texture(P->draw_texture_always_fresh);
 
   // Putting everything into the free list since we already have a static buffer of draw records
   for EachIndex(i, DRAW_RECORDS_MAX_COUNT)
@@ -122,8 +121,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 
     if (next_record)
     {
-      ID3D11RenderTargetView* future_texture = next_record->texture_after_we_affected_rtv;
-      r_copy_into_texture_from_texture(P->draw_texture_always_fresh_rtv, future_texture);
+      r_copy_into_texture_from_texture(P->draw_texture_always_fresh, next_record->texture_after_we_affected, 0);
       P->current_record = next_record;
     }
   }
@@ -136,8 +134,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     if (P->current_record != 0)
     {
       Draw_record* record = P->current_record;
-      ID3D11RenderTargetView* texture_before_we_affected_rtv = record->texture_before_we_affected_rtv;
-      r_copy_into_texture_from_texture(P->draw_texture_always_fresh_rtv, texture_before_we_affected_rtv);
+      r_copy_into_texture_from_texture(P->draw_texture_always_fresh, record->texture_before_we_affected, 0);
       P->current_record = P->current_record->prev;
     }
   }
@@ -156,13 +153,13 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
       U64 h = P->draw_texures_height;
       
       // Storing the texture before we clear it
-      r_copy_into_texture_from_texture(P->current_record->texture_before_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+      r_copy_into_texture_from_texture(P->current_record->texture_before_we_affected, P->draw_texture_always_fresh, 0);
 
-      // Clearing the texture
-      r_clear_rtv(P->draw_texture_always_fresh_rtv, transparent());
+      // Clearing the texture right here (not waiting for batching)
+      r_clear_target(P->draw_texture_always_fresh, transparent());
       
-      // Storing the texture after clearing it
-      r_copy_into_texture_from_texture(P->current_record->texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+      // Storing the texture after clearing it 
+      r_copy_into_texture_from_texture(P->current_record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
     }
   }
   else // User wants to start using the eraser pen 
@@ -216,12 +213,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     F32 pen_size = (F32)P->pen_size;
     
     if (P->is_erasing_mode) { 
-      d_push_blend_kind(D3D_Blend_kind__no_blend);
+      d_push_blend_kind(R_Blend_kind__no_blend);
       color_rgba = transparent(); 
       pen_size = (F32)P->eraser_size; 
     }
 
-    D_RenderTarget(P->draw_texture_always_fresh_rtv)
+    D_RenderTarget(P->draw_texture_always_fresh)
     {
       F32 dx     = new_pos.x - prev_pos.x;
       F32 dy     = new_pos.y - prev_pos.y;
@@ -244,8 +241,8 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__Left))
   {
     Assert(P->current_record != 0);
-    Assert(P->current_record->texture_after_we_affected_rtv != 0);  // These are expected to already be allocated by this point
-    Assert(P->current_record->texture_before_we_affected_rtv != 0); // These are expected to already be allocated by this point
+    Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_after_we_affected));  // These are expected to already be allocated by this point
+    Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_before_we_affected)); // These are expected to already be allocated by this point
 
     P->is_mid_drawing = false;
 
@@ -253,7 +250,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     Draw_record* record = P->current_record;
 
     // Storing the new version of the draw texture
-    r_copy_into_texture_from_texture(record->texture_after_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+    r_copy_into_texture_from_texture(record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
   }
 
   __active_draw_update_routine_end__: {};
@@ -581,8 +578,9 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P)
     for (Draw_record* record = P->last_record; record != 0;) 
     {
       if (record == P->current_record) { break; }
-      record->texture_before_we_affected_rtv->Release();
-      record->texture_after_we_affected_rtv->Release();
+      
+      r_release_texture(&record->texture_before_we_affected);
+      r_release_texture(&record->texture_after_we_affected);
       
       DllPopBack_Name(P, first_record, last_record, next, prev);
       Draw_record* prev_record = record->prev;
@@ -610,15 +608,15 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P)
   // Adding the new draw record to the draw record queue
   DllPushBack_Name(P, new_draw_record, first_record, last_record, next, prev); Assert(P->last_record == new_draw_record);
 
-  new_draw_record->texture_before_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
-  new_draw_record->texture_before_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_before_we_affected);
-  HandleLater(new_draw_record->texture_before_we_affected != 0);
+  new_draw_record->texture_before_we_affected = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  // todo:
+  // HandleLater(new_draw_record->texture_before_we_affected != 0);
 
-  r_copy_into_texture_from_texture(new_draw_record->texture_before_we_affected_rtv, P->draw_texture_always_fresh_rtv);
+  r_copy_into_texture_from_texture(new_draw_record->texture_before_we_affected, P->draw_texture_always_fresh, 0);
 
-  new_draw_record->texture_after_we_affected     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
-  new_draw_record->texture_after_we_affected_rtv = r_rtv_from_texture(new_draw_record->texture_after_we_affected);
-  HandleLater(new_draw_record->texture_after_we_affected != 0);
+  new_draw_record->texture_after_we_affected = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  // todo:
+  // HandleLater(new_draw_record->texture_after_we_affected != 0);
 
   Draw_record_registration_result result = {};
   result.succ = true;
@@ -656,21 +654,21 @@ void __debug_export_current_record_images(const Pencil_state* P)
   // Loading up always_fresh_texture
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    r_export_texture(P->draw_texture_always_fresh_rtv, Str8FromC("always_fresh_texture.png"));
+    r_export_texture(P->draw_texture_always_fresh, Str8FromC("always_fresh_texture.png"));
   }
 
   // Loading up current texture_after_we_affected_rtv
   if (P->current_record != 0)
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    r_export_texture(P->current_record->texture_after_we_affected_rtv, Str8FromC("current_texture_after_we_affected.png"));
+    r_export_texture(P->current_record->texture_after_we_affected, Str8FromC("current_texture_after_we_affected.png"));
   }
 
   // Loading up current texture_before_we_affected_rtv
   if (P->current_record != 0)
   DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
-    r_export_texture(P->current_record->texture_before_we_affected_rtv, Str8FromC("current_texture_before_we_affected.png"));
+    r_export_texture(P->current_record->texture_before_we_affected, Str8FromC("current_texture_before_we_affected.png"));
   }
 }
 #endif
