@@ -6,13 +6,6 @@
 ///////////////////////////////////////////////////////////
 // - Simple widgets
 //
-// todo:
-// void ui_label_c(const char* c_str);
-// void ui_label(Str8 str);
-// void ui_label_f(const char* fmt, ...);
-// void ui_spacer(UI_Size size);
-// UI_Actions ui_button(Str8 str); 
-
 void ui_label(Str8 str)
 {
   ui_set_next_size_x(ui_text_size()); 
@@ -49,10 +42,11 @@ UI_Actions ui_button(Str8 str) // todo: Remove the fucking rli events from there
 {
   ui_push_size_x(ui_text_size());
   ui_push_size_y(ui_text_size());
-  UI_Box* box = ui_box_make(str, UI_Box_flag__has_background|UI_Box_flag__has_text_contents);
+  UI_Box* box = ui_box_make(str, UI_Box_flag__has_background|
+                                 UI_Box_flag__has_text_contents|
+                                 UI_Box_flag__has_rounded_corners|
+                                 UI_Box_flag__has_borders);
   UI_Actions actions = ui_actions_from_box(box);
-  // if (actions.is_down) { ui_set_active_box(box); }
-  // else if (!actions.is_down) { ui_reset_active_box_match(box); } // todo: This shoud also check if it is active, cause then if we just down on the button it will reset the global active state
   return actions;
 }
 
@@ -61,12 +55,10 @@ UI_Actions ui_button(Str8 str) // todo: Remove the fucking rli events from there
 //
 void ui_layout_stack_begin(Axis2 axis)
 {
-  // Str8 id = ui_get_next_id();
-  Str8 id = {}; 
   ui_set_next_size_x(ui_children_sum());
   ui_set_next_size_y(ui_children_sum());
   ui_set_next_layout_axis(axis);
-  UI_Box* stack = ui_box_make(id, 0); 
+  UI_Box* stack = ui_box_make(Str8{}, 0); 
   ui_push_parent(stack);
 }
 
@@ -168,7 +160,7 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   
   UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
   V2F32 mouse          = ui_get_mouse_pos();
-  F32 circle_diameter  = 15.0f;
+  F32 circle_diameter  = 10.0f;
 
   F32 circle_x_offset = 0.0f;
   F32 circle_y_offset = 0.0f;
@@ -196,11 +188,10 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
 
         ui_set_next_size_x(ui_px(circle_diameter));
         ui_set_next_size_y(ui_px(circle_diameter));
-        ui_set_next_corner_r(ui_corner_r_all(1));
-        // ui_set_next_b_color(white());
-        ui_set_next_border(4, white());
+        ui_set_next_corner_r(v4f32_all(1));
+        ui_set_next_border(3, white());
         ui_set_next_softness(1.5f);
-        UI_Box* circle_picker = ui_box_make(Str8{}, 0);
+        UI_Box* circle_picker = ui_box_make(Str8FromC("White circle for the picker"), UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners);
       }
     }
   }
@@ -209,14 +200,8 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   F32 new_sat = hsva.saturation;
   F32 new_val = hsva.value;
   UI_Actions actions = ui_actions_from_box(color_picker_box);
-  if (!actions.is_down) {
-    // ui_reset_active_box_match(color_picker_box); 
-    // ui_set_cursor(actions.is_hovered ? OS_Cursor__hand : OS_Cursor__arrow);
-  }
-  else {
-    // ui_set_active_box(color_picker_box);
-    // ui_set_cursor(OS_Cursor__hand);
-    
+  if (actions.is_down) 
+  {
     if (box_data.found)
     {
       F32 picker_relative_x = (mouse.x - box_data.on_screen_rect.x) / (box_data.on_screen_rect.width);
@@ -259,23 +244,20 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
     UI_Stack(direction)
     {
       ui_spacer(ui_px(thumb_offset));
+
       if (direction == Axis2__x)      { ui_set_next_size_x(ui_px(thumb_width)); ui_set_next_size_y(ui_px(box_dims.v[Axis2__y])); }
       else if (direction == Axis2__y) { ui_set_next_size_y(ui_px(thumb_width)); ui_set_next_size_x(ui_px(box_dims.v[Axis2__x]));}
-      ui_set_next_corner_r(ui_corner_r_all(0.25));
-      ui_set_next_border(4, white());
-      UI_Box* thumb = ui_box_make({}, 0);
+      ui_set_next_corner_r(v4f32_all(0.5));
+      ui_set_next_border(3, white());
+      ui_set_next_softness(1);
+      UI_Box* thumb = ui_box_make(Str8FromC("test id"), UI_Box_flag__has_rounded_corners|UI_Box_flag__has_borders);
     }
   }
 
   F32 new_hue = hue;
   UI_Actions actions = ui_actions_from_box(color_picker_box);
-  if (!actions.is_down)
+  if (actions.is_down)
   {
-    // ui_reset_active_box_match(color_picker_box);
-  }
-  else if (actions.is_down)
-  {
-    // ui_set_active_box(color_picker_box);
     if (box_data.found)
     {
       F32 mouse_pos_rel = ui_get_mouse_pos().v[direction] - box_origin.v[direction] - (thumb_width / 2.0f);
@@ -290,7 +272,7 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
 void __ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_data* data = (_UI_Color_picker_sv_data*)box->custom_draw_data;
-  d_add_rect_command_ex(box->final_on_screen_rect, data->colors, {}, {}, {}, {});
+  d_draw_rect_pro(box->final_on_screen_rect, data->colors[UV__00], data->colors[UV__10], data->colors[UV__01], data->colors[UV__11], V4F32{}, 0.0f);
 }
 
 void __ui_color_picker_h_draw_func(UI_Box* box)
@@ -311,18 +293,18 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
     colors[UV__01] = data->axis == Axis2__x ? rgb_for_section_start : rgb_for_section_end;
     colors[UV__11] = data->axis == Axis2__x ? rgb_for_section_end   : rgb_for_section_end;
     
-    V4F32 corner_r = {};
+    V4F32 corner_radii = {};
     if (i == 0) 
     { 
       UV corner = (data->axis == Axis2__x ? UV__01 : UV__10);
-      corner_r.v[UV__00] =  box->shape_style.corner_radii.r.v[UV__00]; 
-      corner_r.v[corner] = box->shape_style.corner_radii.r.v[corner];
+      corner_radii.v[UV__00] = box->shape_style.corner_radii.v[UV__00]; 
+      corner_radii.v[corner] = box->shape_style.corner_radii.v[corner];
     }
     else if (i == 5)
     {
       UV corner = (data->axis == Axis2__x ? UV__10 : UV__01);
-      corner_r.v[UV__11] =  box->shape_style.corner_radii.r.v[UV__11]; 
-      corner_r.v[corner] = box->shape_style.corner_radii.r.v[corner];
+      corner_radii.v[UV__11] = box->shape_style.corner_radii.v[UV__11]; 
+      corner_radii.v[corner] = box->shape_style.corner_radii.v[corner];
     }
 
     Rect rect = {};
@@ -341,7 +323,7 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
       rect = rect_make(rect_p.x, rect_p.y, rect_dims.x, rect_dims.y);
     }
 
-    d_add_rect_command_ex(rect, colors, corner_r, {}, box->shape_style.softness, {});
+    d_draw_rect_pro(rect, colors[UV__00], colors[UV__10], colors[UV__01], colors[UV__11], corner_radii, 0.0f);
 
     hue_section_start += hue_section_length;
   }

@@ -210,6 +210,14 @@ V2F32 rect_get_dims(Rect rect)
 	return v2f32(rect.width, rect.height);
 }
 
+V2F32 rect_center(Rect rect)
+{
+	V2F32 center = {};
+	center.x = rect.x + (rect.width / 2.0f);
+	center.y = rect.y + (rect.height / 2.0f);
+	return center;
+}
+
 B32 rect_match(Rect r1, Rect r2)
 { 
 	return (r1.x == r2.x && r1.y == r2.y && r1.width == r2.width && r1.height == r2.height);

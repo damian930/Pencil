@@ -16,6 +16,9 @@
 
 #include "core/core_include.h"
 
+// Pre-defines for draw layer 
+struct D_Command_batch_list; 
+
 // Misc structs here
 // todo:
 // note: I wanted to maybe make this be just a zero id for texture like in opengl, 
@@ -108,15 +111,10 @@ struct D3D_State {
   // These we get at initialisation
   ID3D11Device*        device;
   ID3D11DeviceContext* context;
-  IDXGIFactory2*       dxgi_factory;
   // 
-  IDXGISwapChain1*        swap_chain;
   ID3D11RasterizerState*  rasterizer_state;
   ID3D11BlendState*       alpha_blend_state;
   ID3D11SamplerState*     sampler;
-  //
-  ID3D11Texture2D*        frame_buffer_texture;
-  ID3D11RenderTargetView* frame_buffer_rtv;
   //
   ID3D11Buffer* rect_program_ia_buffer;
   ID3D11Buffer* rect_program_uniform_buffer;
@@ -125,16 +123,24 @@ struct D3D_State {
   ID3D11Buffer* texture_program_ia_buffer;
   ID3D11Buffer* texture_program_uniform_buffer;
   D3D_Program   texture_program;
-  
-  // Per frame stuff
-  V2F32 viewport_dims;
-
-  // -----------------------------
-  // Debug stuff for layer
-  // Arena* debug_arena;
-  // Str8* error_messages_arr;
-  // U64 error_messages_count;
 };
+
+struct R_Target {
+  ID3D11Texture2D*        texture;
+  ID3D11RenderTargetView* texture_rtv;
+};
+
+struct R_Chain {
+  HWND __win32_window_handle_for_assert;
+
+  IDXGISwapChain1*        swap_chain;
+  ID3D11Texture2D*        texture;
+  ID3D11RenderTargetView* texture_rtv;
+};
+
+V2F32 r_get_swap_chain_dims(R_Chain chain);
+V2F32 r_get_target_dims(R_Target target);
+R_Target r_target_from_swap_chain(R_Chain chain);
 
 extern global D3D_State __d3d_g_state;
 
@@ -143,12 +149,19 @@ D3D_State* r_get_state();
 void r_init();
 void r_relesase();
 
+// todo: Name this section here
+// R_Handle r_handle_zero();
+// B32 r_handle_match(R_Handle handle, R_Handle handle);
+
 // - Render pass
-void r_render_begin(V2F32 vp_dims);
-void r_render_end();
+// todo: This has more to do with the swap chain, so name it better
+// void r_render_begin(V2F32 vp_dims);
+// void r_render_end();
+
+// void r_submit(D_Command_batch_list* command_batch_list);
 
 // - Clearing
-void r_clear_frame_buffer(V4F32 color);
+void r_clear_chain(R_Chain chain, V4F32 color);
 void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color);
 
 // - Other
@@ -169,6 +182,37 @@ void r_export_texture(ID3D11RenderTargetView* rtv, Str8 file_path);
 ID3D11Texture2D* r_load_texture_from_file(Str8 file_name);
 ID3D11Texture2D* r_load_texture_from_image(Image image);
 void r_copy_into_texture_from_texture(ID3D11RenderTargetView* dest_rtv, ID3D11RenderTargetView* src_rtv);
-V2F32 r_get_viewport_dims();
+
+// - Per vertex data describtions
+const global 
+D3D11_INPUT_ELEMENT_DESC __r_g_rect_program_input_assembler_element_desc[] = 
+{
+  { "RECT_00_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_00),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_10_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_10),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_01_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_01),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_11_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_11),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_X",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_ORIGIN_Y",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_WIDTH",            0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),            D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_HEIGHT",           0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, height),           D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_00_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_00), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_10_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_01_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_11_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_BORDER_COLOR",     0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, border_color),     D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "RECT_BORNER_THICKNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, border_thickness), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SOFTNESS",              0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, softness),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
+
+D3D11_INPUT_ELEMENT_DESC __r_g_texture_program_input_assembler_element_desc[] = 
+{
+  { "TEXT_COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, text_color),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "IS_TEXT_TEXTURE",  0, DXGI_FORMAT_R32_UINT,           0, TypeFieldOffset(D3D_Texture_instance_data, is_text_texture),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
 
 #endif

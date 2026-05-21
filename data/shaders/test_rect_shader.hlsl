@@ -120,11 +120,16 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   float4 bottom_color = lerp(pixel_input.vertex_color[UV__01], pixel_input.vertex_color[UV__11], pos_norm.x);
   float4 final_color  = lerp(top_color, bottom_color, pos_norm.y);
   
+  float softness = pixel_input.softness;
+
   float rect_outline_smoothing = 1.0f;
   {
-    float radius_in_px     = pixel_input.corner_radius * min(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0;
-    float rect_outline_sdf = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
-    rect_outline_smoothing = 1 - smoothstep(-2, 2, rect_outline_sdf);
+    float2 inner_rect_origin = pixel_input.rect_origin + float2(softness, softness);
+    float2 inner_rect_dims   = pixel_input.rect_dims - 2 * float2(softness, softness);
+    float radius_in_px       = pixel_input.corner_radius * min(inner_rect_dims.x, inner_rect_dims.y) / 2.0;
+
+    float rect_outline_sdf = sdf_rounded_rect(inner_rect_origin, inner_rect_dims, pos_px, radius_in_px);
+    rect_outline_smoothing = 1 - smoothstep(0, 1.4*softness, rect_outline_sdf);
   }
 
   float rect_inner_smoothing = 1.0f;
@@ -132,15 +137,15 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   {
     final_color = pixel_input.border_color;
 
-    float softness = 2.0;
     float2 inner_rect_origin = pixel_input.rect_origin + float2(pixel_input.border_thickness + softness, pixel_input.border_thickness + softness);
     float2 inner_rect_dims   = pixel_input.rect_dims - 2 * float2(pixel_input.border_thickness + softness, pixel_input.border_thickness + softness);
     float radius_in_px       = pixel_input.corner_radius * min(inner_rect_dims.x, inner_rect_dims.y) / 2.0;
 
     float rect_outline_sdf = sdf_rounded_rect(inner_rect_origin, inner_rect_dims, pos_px, radius_in_px);
-    if (rect_outline_sdf < -2) { discard; }
+    if (rect_outline_sdf < -softness) { discard; }
     else {
-      rect_inner_smoothing = smoothstep(-softness, softness, rect_outline_sdf);
+      // rect_inner_smoothing = smoothstep(-softness, softness, rect_outline_sdf);
+      rect_inner_smoothing = 1- smoothstep(-2*softness, 0.0, -rect_outline_sdf);
     }
   }  
 

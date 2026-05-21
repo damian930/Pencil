@@ -86,7 +86,7 @@ void     d_init();
 void     d_release();
 
 // - Batching
-void                  d_begin_batching();
+void d_begin_batching(R_Target target) ;
 void                  d_end_batching();
 D_Command_batch_list* d_get_batch_list();
 D_Command_batch*      d_add_new_batch(D_Command_type command_type, ID3D11Texture2D* texture);
@@ -119,10 +119,7 @@ void d_draw_rect_pro(Rect rect, V4F32 color_x0y0, V4F32 color_x1y0, V4F32 color_
 
 void d_draw_rect_inset_borders(Rect rect, V4F32 color, F32 thickness, V4F32 corner_radii, F32 softness);
 
-void d_draw_circle(V2F32 center, F32 r, V4F32 color, F32 softness)
-{
-  Rect rect = rect_from_center(center, v2f32(r, r));
-  d_draw_rect_pro(rect, color, color, color, color, v4f32_all(r), softness);
-}
+void d_draw_circle(V2F32 center, F32 r, V4F32 color, F32 softness);
+void d_draw_circle_inset_border(V2F32 center, F32 r, V4F32 color, F32 thickness, F32 softness);
 
 #endif

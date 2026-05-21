@@ -30,6 +30,8 @@
 
 global D3D_State __d3d_g_state = {};
 
+#define HR(cond) Handle(cond == S_OK)
+
 ///////////////////////////////////////////////////////////
 // - State
 //
@@ -38,43 +40,11 @@ D3D_State* r_get_state()
   return &__d3d_g_state;
 }
 
-const global 
-D3D11_INPUT_ELEMENT_DESC rect_program_input_assembler_element_desc[] = 
-{
-  { "RECT_00_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_00),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_10_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_10),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_01_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_01),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_11_COLOR",         0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, color_11),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_ORIGIN_X",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_x),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_ORIGIN_Y",         0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, origin_y),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_WIDTH",            0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, width),            D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_HEIGHT",           0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, height),           D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_00_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_00), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_10_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_10), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_01_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_01), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_11_CORNER_RADIUS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, corner_radius_11), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_BORDER_COLOR",     0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Rect_instance_data, border_color),     D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "RECT_BORNER_THICKNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, border_thickness), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SOFTNESS",              0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(D3D_Rect_instance_data, softness),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-};
-
-D3D11_INPUT_ELEMENT_DESC texture_program_input_assembler_element_desc[] = 
-{
-  { "TEXT_COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(D3D_Texture_instance_data, text_color),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(D3D_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "IS_TEXT_TEXTURE",  0, DXGI_FORMAT_R32_UINT,           0, TypeFieldOffset(D3D_Texture_instance_data, is_text_texture),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-};
-
 void r_init()
 {
   D3D_State* d3d = r_get_state();
 
   HRESULT hr = S_OK;
-  #define HR(hr_value) HandleLater(hr == S_OK) // todo: Remove this 
 
   // Device, Context
   {
@@ -113,42 +83,6 @@ void r_init()
     dxgi_debug->Release();
   }
   #endif
-
-  // Swap chain
-  {
-    IDXGIDevice* dxgi_device = 0;
-    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
-    HR(hr);
-
-    IDXGIAdapter* dxgi_adapter = 0;
-    hr = dxgi_device->GetAdapter(&dxgi_adapter);
-    HR(hr);
-
-    // get DXGI factory from DXGI adapter
-    hr = dxgi_adapter->GetParent(IID_IDXGIFactory2, (void**)&d3d->dxgi_factory);
-    HR(hr);
-
-    B32 is_transparent = false;
-    DXGI_SWAP_CHAIN_DESC1 desc = {};
-    desc.Width       = 69;
-    desc.Height      = 69;
-    desc.Format      = DXGI_FORMAT_R8G8B8A8_UNORM;
-    desc.Stereo      = FALSE;
-    desc.SampleDesc  = { 1, 0 };
-    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-    desc.BufferCount = 2;
-    desc.Scaling     = (is_transparent ? DXGI_SCALING_STRETCH : DXGI_SCALING_NONE); // todo: Learn what these do
-    desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
-    desc.AlphaMode   = (is_transparent ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_UNSPECIFIED);
-    desc.Flags       = 0;
-    if (is_transparent) { hr = d3d->dxgi_factory->CreateSwapChainForComposition(d3d->device, &desc, Null, &d3d->swap_chain); }
-    else                { hr = d3d->dxgi_factory->CreateSwapChainForHwnd(d3d->device, os_get_state()->window.handle, &desc, Null, Null, &d3d->swap_chain); }
-    HR(hr);
-
-    dxgi_device->Release();
-    dxgi_adapter->Release();
-  }
-  IDXGISwapChain1* d3d_swap_chain = d3d->swap_chain;
 
   // Rasterizer state
   {
@@ -189,12 +123,6 @@ void r_init()
     d3d->device->CreateSamplerState(&desc, &d3d->sampler);
   }
 
-  // Frame buffer
-  {
-    d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
-    d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
-  }
-
   // Rect program
   {
     // Creating a buffer for input assembler data transfer
@@ -218,7 +146,7 @@ void r_init()
     }
 
     // Loading programs
-    d3d->rect_program = r_program_from_file(L"../data/shaders/test_rect_shader.hlsl", "vs_main", "ps_main", rect_program_input_assembler_element_desc, ArrayCount(rect_program_input_assembler_element_desc));
+    d3d->rect_program = r_program_from_file(L"../data/shaders/test_rect_shader.hlsl", "vs_main", "ps_main", __r_g_rect_program_input_assembler_element_desc, ArrayCount(__r_g_rect_program_input_assembler_element_desc));
   }
 
   // Texture program
@@ -244,10 +172,8 @@ void r_init()
     }
 
     // Loading programs
-    d3d->texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", texture_program_input_assembler_element_desc, ArrayCount(texture_program_input_assembler_element_desc));
+    d3d->texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", __r_g_texture_program_input_assembler_element_desc, ArrayCount(__r_g_texture_program_input_assembler_element_desc));
   }
-
-  #undef HR // todo: Remove this HR shit from here
 }
 
 void r_relesase()
@@ -255,36 +181,65 @@ void r_relesase()
   // todo:
 }
 
-///////////////////////////////////////////////////////////
-// - TESTING THE ERROR A NEW HANDLING WAY FOR THE LAYER
-//
-// void __r_push_error_message(Str8 str)
-// {
-//   D3D_State* d3d = r_get_state();
-//   Str8 error_str = str8_copy_alloc(d3d->debug_arena, str);
-//   d3d->error_messages_count += 1;
+// todo: Name this section here
+// R_Handle r_handle_zero() 
+// { 
+//   R_Handle handle = {};
+//   return handle;
 // }
-// #define __R_PUSH_ERROR_AND_DEBUG(c_lit) do { __r_push_error_message(Str8FromC(c_lit)); BreakPoint(); } while (0); 
-///////////////////////////////////////////////////////////
 
-void r_render_begin(V2F32 vp_dims)
+// B32 r_handle_match(R_Handle handle, R_Handle other)
+// {
+//   B32 is_match = (
+//        handle.swap_chain           == other.swap_chain
+//     && handle.frame_buffer_texture == other.frame_buffer_texture
+//     && handle.frame_buffer_rtv     == other.frame_buffer_rtv
+//   );
+//   return is_match;
+// }
+
+void r_render_begin(R_Chain chain)
 {
+  // todo: Do this when handles are done and api is ready
+  // if (r_handle_match(render_handle, r_handle_zero())) { return; }
+
+  {
+    B32 match = chain.__win32_window_handle_for_assert == os_get_state()->window.handle;
+    if (!match) 
+    {
+      // note: 
+      // Up to this moment the renderer uses a single window directly from the os layer, since
+      // the os layer only had 1 window. At some point it was possible that you would start to use 
+      // more windows, and you would have to render them. For that reason i have put a window handle into 
+      // the renderer that i would then hard code at handle creation with the same window from the win32 
+      // state. If you are reading this, the hi dude, hope you are doing great, making some 3s.
+      // The code after this comment uses the calls for window stuff specific to that win32 window.
+      // Now that you have more windows, have os supplie them via handles and then use those to get 
+      // data about them to then use here.
+      NotImplemented();
+    }
+  }
+
   D3D_State* d3d = r_get_state();
 
+  V2F32 chain_dims  = r_get_swap_chain_dims(chain);
+  V2F32 window_dims = os_get_window_dims();
+
   // Resizing the frame buffer
-  if (vp_dims.x != 0.0f && vp_dims.y != 0.0f && !v2f32_match(d3d->viewport_dims, vp_dims))
-  {
-    V2F32 window_dims = os_get_client_area_dims();
-    d3d->frame_buffer_texture->Release();
-    d3d->frame_buffer_rtv->Release();
-    d3d->swap_chain->ResizeBuffers(0, (UINT)window_dims.x, (UINT)window_dims.y, DXGI_FORMAT_UNKNOWN, 0);
-    d3d->swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&d3d->frame_buffer_texture);
-    d3d->device->CreateRenderTargetView((ID3D11Resource*)d3d->frame_buffer_texture, NULL, &d3d->frame_buffer_rtv);
-    d3d->viewport_dims = window_dims;
+  if ( window_dims.x != 0.0f 
+    && window_dims.y != 0.0f 
+    && !v2f32_match(chain_dims, window_dims)
+  ) {
+    chain.texture->Release();
+    chain.texture_rtv->Release();
+
+    chain.swap_chain->ResizeBuffers(0, (UINT)os_get_window_dims().x, (UINT)os_get_window_dims().y, DXGI_FORMAT_UNKNOWN, 0);
+    chain.swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&chain.texture);
+    d3d->device->CreateRenderTargetView((ID3D11Resource*)chain.texture, NULL, &chain.texture_rtv);
   }
 }
 
-void r_render_end()
+void r_render_end(R_Chain chain)
 {
   // Nothing here, keeping this to have a logical pair of render_begin/render_end
 }
@@ -292,10 +247,12 @@ void r_render_end()
 ///////////////////////////////////////////////////////////
 // - Clearing
 //
-void r_clear_frame_buffer(V4F32 color)
+void r_clear_chain(R_Chain chain, V4F32 color)
 {
+  // todo: if chain is 0 return
+
   D3D_State* d3d = r_get_state();
-  d3d->context->ClearRenderTargetView(d3d->frame_buffer_rtv, color.v);
+  d3d->context->ClearRenderTargetView(chain.texture_rtv, color.v);
 }
 
 void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
@@ -304,54 +261,71 @@ void r_clear_rtv(ID3D11RenderTargetView* rtv, V4F32 color)
   d3d->context->ClearRenderTargetView(rtv, color.v);
 }
 
-///////////////////////////////////////////////////////////
-// - New drawing
-//
-/*
-void r_draw_text(Str8 text, V2F32 pos, FP_Font font, V4F32 color)
-{
-  // note: These are some debug drawings for baseline and stuff
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
-  
-  F32 origin_y = pos.y + font.ascent;
-  F32 x_offset = 0.0f;
-
-  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-  {
-    U8 ch = text.data[ch_index];
-    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-    F32 origin_x = pos.x + x_offset;
-
-    // Just puttin them 1 next to another
-    Rect dest_rect = {};
-    dest_rect.x      = origin_x + glyph_data.bearing_x;
-    dest_rect.y      = origin_y - glyph_data.bearing_y;
-    dest_rect.width  = glyph_data.rect_on_atlas.width;
-    dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-    r_draw_texture(
-      dest_rtv, dest_rect,
-      font.atlas_texture, glyph_data.rect_on_atlas
-    );
-
-    F32 advance = glyph_data.advance;
-    if (ch_index < text.count - 1)
-    {
-      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
-    } 
-    x_offset += advance; 
-  }
-}
-*/
-// todo: This call gets all the batches and then submits them to be drawn by the gpu to the rendering target
-void r_submit(D_Command_batch_list* command_batch_list)
+R_Chain r_attach_window(OS_Window window)
 {
   D3D_State* d3d = r_get_state();
-  V2F32 rtv_dims = r_get_texture_dims(d3d->frame_buffer_texture);
+
+  HRESULT hr = S_OK;
+  
+  IDXGISwapChain1* swap_chain = 0;
+  {
+    IDXGIDevice* dxgi_device = 0;
+    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
+    HR(hr);
+
+    IDXGIAdapter* dxgi_adapter = 0;
+    hr = dxgi_device->GetAdapter(&dxgi_adapter);
+    HR(hr);
+
+    IDXGIFactory2* dxgi_factory = 0;
+    hr = dxgi_adapter->GetParent(IID_IDXGIFactory2, (void**)&dxgi_factory);
+    HR(hr);
+
+    DXGI_SWAP_CHAIN_DESC1 desc = {};
+    desc.Width       = 69;
+    desc.Height      = 69;
+    desc.Format      = DXGI_FORMAT_R8G8B8A8_UNORM;
+    desc.Stereo      = FALSE;
+    desc.SampleDesc  = { 1, 0 };
+    desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+    desc.BufferCount = 2;
+    desc.Scaling     = (os_window_is_transparent() ? DXGI_SCALING_STRETCH : DXGI_SCALING_NONE);                    // todo: Learn what these do
+    desc.AlphaMode   = (os_window_is_transparent() ? DXGI_ALPHA_MODE_PREMULTIPLIED : DXGI_ALPHA_MODE_UNSPECIFIED); // todo: Learn what these do
+    desc.SwapEffect  = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+    desc.Flags       = 0;
+    if  (os_window_is_transparent()) { hr = dxgi_factory->CreateSwapChainForComposition(d3d->device, &desc, Null, &swap_chain); }
+    else                             { hr = dxgi_factory->CreateSwapChainForHwnd(d3d->device, window.handle, &desc, Null, Null, &swap_chain); }
+    HR(hr);
+
+    dxgi_factory->Release();
+    dxgi_adapter->Release();
+    dxgi_device->Release();
+  }
+
+  ID3D11Texture2D* frame_buffer_texture = 0;
+  {
+    hr = swap_chain->GetBuffer(0, IID_ID3D11Texture2D, (void**)&frame_buffer_texture);
+    HR(hr);
+  }
+
+  ID3D11RenderTargetView* frame_buffer_rtv = 0;
+  {
+    hr = d3d->device->CreateRenderTargetView((ID3D11Resource*)frame_buffer_texture, NULL, &frame_buffer_rtv);
+    HR(hr);
+  }
+
+  R_Chain handle = {};
+  handle.__win32_window_handle_for_assert = window.handle;
+  handle.swap_chain  = swap_chain;
+  handle.texture     = frame_buffer_texture;
+  handle.texture_rtv = frame_buffer_rtv;
+  return handle;
+}
+
+void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
+{
+  D3D_State* d3d = r_get_state();
+  V2F32 rtv_dims = r_get_target_dims(target);
 
   // Setting state that is the same for all batches
   {
@@ -409,6 +383,7 @@ void r_submit(D_Command_batch_list* command_batch_list)
       // Filling up the ia buffer with data
       { 
         D3D11_MAPPED_SUBRESOURCE mapped = {};
+        // todo: This doesnt check the cap for size of the buffer, this shoud be fixed
         d3d->context->Map((ID3D11Resource*)d3d->rect_program_ia_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
         
         U64 i = 0;
@@ -503,143 +478,16 @@ void r_submit(D_Command_batch_list* command_batch_list)
   }
 }
 
-///////////////////////////////////////////////////////////
-// - Old drawing code
-//
-
-// void r_draw_texture(ID3D11RenderTargetView* dest_rtv, Rect rect_in_dest, ID3D11RenderTargetView* src_rtv, Rect rect_in_src)
-// {
-//   D3D_State* d3d = r_get_state();
-//   HRESULT hr = S_OK;
-
-//   // Setting the uniform buffer
-//   {
-//     D3D_Texture_program_data u_data = {};
-//     u_data.vp_width         = d3d->render_viewport_width;
-//     u_data.vp_height        = d3d->render_viewport_height;
-//     u_data.dest_rect_origin = v2f32(rect_in_dest.x, rect_in_dest.y);
-//     u_data.dest_rect_size   = v2f32(rect_in_dest.width, rect_in_dest.height);
-//     u_data.src_rect_origin  = v2f32(rect_in_src.x, rect_in_src.y);
-//     u_data.src_rect_size    = v2f32(rect_in_src.width, rect_in_src.height);
-//     u_data.src_texture_dims = r_get_texture_dims(src_rtv);
-
-//     D3D11_MAPPED_SUBRESOURCE mapped = {};
-//     hr = d3d->context->Map((ID3D11Resource*)d3d->uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
-//     InvariantCheck(hr == S_OK);
-//     if (hr == S_OK) {
-//       memcpy(mapped.pData, &u_data, sizeof(u_data));
-//       d3d->context->Unmap((ID3D11Resource*)d3d->uniform_buffer, 0);
-//     } 
-//   }
-
-//   d3d->context->VSSetShader(d3d->draw_texture_program.v_shader, 0, 0);
-//   d3d->context->VSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-
-//   ID3D11SamplerState* sampler;
-//   {
-//     D3D11_SAMPLER_DESC desc = {};
-//     desc.Filter        = D3D11_FILTER_MIN_MAG_MIP_POINT;
-//     desc.AddressU      = D3D11_TEXTURE_ADDRESS_WRAP;
-//     desc.AddressV      = D3D11_TEXTURE_ADDRESS_WRAP;
-//     desc.AddressW      = D3D11_TEXTURE_ADDRESS_WRAP;
-//     desc.MipLODBias    = 0;
-//     desc.MaxAnisotropy = 1;
-//     desc.MinLOD        = 0;
-//     desc.MaxLOD        = D3D11_FLOAT32_MAX;
-//     d3d->device->CreateSamplerState(&desc, &sampler);
-//   }
-//   d3d->context->PSSetSamplers(0, 1, &sampler);
-//   d3d->context->PSSetShader(d3d->draw_texture_program.p_shader, 0, 0);
-//   {
-//     ID3D11Resource* resource = 0;
-//     src_rtv->GetResource(&resource);
-
-//     ID3D11ShaderResourceView* view = 0;
-//     d3d->device->CreateShaderResourceView(resource, NULL, &view);
-//     d3d->context->PSSetShaderResources(0, 1, &view);
-//     d3d->context->PSSetConstantBuffers(0, 1, &d3d->uniform_buffer);
-//     view->Release();
-//     resource->Release();
-//   }
-
-//   d3d->context->OMSetRenderTargets(1, &dest_rtv, 0);
-
-//   d3d->context->Draw(4, 0);
-
-//   sampler->Release();
-// }
-
-// #include "pencil/pencil.h"
-
-// void r_draw_text(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, Str8 text)
-// {
-//   ProfileFuncBegin();
-  
-//   F32 origin_y = pos.y + font.ascent;
-//   F32 x_offset = 0.0f;
-  
-//   // note: These are some debug drawings for baseline and stuff
-//   // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-//   // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-//   // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
-
-//   for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-//   {
-//     U8 ch = text.data[ch_index];
-//     FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-//     F32 origin_x = pos.x + x_offset;
-
-//     // Just puttin them 1 next to another
-//     Rect dest_rect = {};
-//     dest_rect.x      = origin_x + glyph_data.bearing_x;
-//     dest_rect.y      = origin_y - glyph_data.bearing_y;
-//     dest_rect.width  = glyph_data.rect_on_atlas.width;
-//     dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-//     r_draw_texture(
-//       dest_rtv, dest_rect,
-//       font.atlas_texture, glyph_data.rect_on_atlas
-//     );
-
-//     F32 advance = glyph_data.advance;
-//     if (ch_index < text.count - 1)
-//     {
-//       FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-//       if (!IsMemZero(entry)) { advance += entry.advance; }
-//     } 
-//     x_offset += advance; 
-//   }
-
-//   ProfileFuncEnd();
-// }
-
-// void r_draw_text_f(ID3D11RenderTargetView* dest_rtv, V2F32 pos, FP_Font font, V4F32 color, const char* fmt, ...)
-// {
-//   // todo: This only uses 128
-//   va_list argptr;
-//   va_start(argptr, fmt);
-//   Scratch scratch = get_scratch(0, 0);
-//   U64 buffer_count = 128;
-//   U8* buffer = ArenaPushArr(scratch.arena, U8, buffer_count);
-//   int err = vsnprintf((char*)buffer, buffer_count, fmt, argptr);
-//   if (err < 0) { Assert(0); }
-//   else if (err >= buffer_count) { Assert(0); }
-//   else if (err < buffer_count) { /* All good */ }
-//   va_end(argptr);
-//   Str8 str = str8_manuall(buffer, (U64)err);
-//   r_draw_text(dest_rtv, pos, font, color, str);
-//   end_scratch(&scratch);
-// }
+void r_present_swap_chain(R_Chain swap_chain, B32 vsync)
+{
+  swap_chain.swap_chain->Present(!!vsync, 0);
+  // HRESULT commit_hr = comp_device->Commit(); 
+  // Handle(commit_hr == S_OK);
+}
 
 ///////////////////////////////////////////////////////////
 // - Other
 //
-ID3D11RenderTargetView* r_get_frame_buffer_rtv()
-{
-  return r_get_state()->frame_buffer_rtv;
-}
-
 // note: This makes a texture that is for rendering into and rendering with
 ID3D11Texture2D* r_make_texture(U32 width, U32 height)
 {
@@ -689,19 +537,6 @@ D3D_Texture_result r_texture_from_rtv(ID3D11RenderTargetView* rtv)
   resource->Release();
   return result;
 }
-
-// V2F32 r_get_texture_dims(ID3D11RenderTargetView* rtv)
-// {
-//   D3D_Texture_result texture_res = r_texture_from_rtv(rtv);
-//   Handle(texture_res.succ);
-
-//   D3D11_TEXTURE2D_DESC desc = {};
-//   texture_res.texture->GetDesc(&desc);
-
-//   texture_res.texture->Release();
-//   V2F32 dims = v2f32((F32)desc.Width, (F32)desc.Height);
-//   return dims;
-// }
 
 V2F32 r_get_texture_dims(ID3D11Texture2D* texture)
 {
@@ -930,65 +765,37 @@ void r_copy_into_texture_from_texture(
   
   d3d->context->CopyResource(dest_resource, src_resource);
 }
-V2F32 r_get_viewport_dims()
 
+V2F32 r_get_swap_chain_dims(R_Chain chain)
 {
-  return r_get_state()->viewport_dims;
+  // todo: return if chain i n0
+
+  V2F32 dims = {};
+  DXGI_SWAP_CHAIN_DESC1 desc = {};
+  if (chain.swap_chain->GetDesc1(&desc) == S_OK)
+  {
+    dims = v2f32((F32)desc.Width, (F32)desc.Height);
+  }
+  return dims;
 }
 
-/*
-void r_scissoring_set(Rect rect)
+V2F32 r_get_target_dims(R_Target target)
 {
-  D3D_State* d3d = r_get_state();
-
-  // Release these at the bottom
-  ID3D11RasterizerState* old_rasterizer_state = 0;
-  ID3D11RasterizerState* new_rasterizer_state = 0;
-  
-  D3D11_RASTERIZER_DESC desc = {};
-  d3d->context->RSGetState(&old_rasterizer_state);
-  old_rasterizer_state->GetDesc(&desc);
-  desc.ScissorEnable = true;
-  
-  HRESULT hr = d3d->device->CreateRasterizerState(&desc, &new_rasterizer_state);
-  Handle(hr == S_OK);
-  
-  d3d->context->RSSetState(new_rasterizer_state);
-  
-  D3D11_RECT scissorRect = {};
-  scissorRect.left   = (LONG)(rect.x);
-  scissorRect.top    = (LONG)(rect.y);
-  scissorRect.right  = (LONG)(rect.x + rect.width);
-  scissorRect.bottom = (LONG)(rect.y + rect.height);
-  d3d->context->RSSetScissorRects(1, &scissorRect);
-  
-  new_rasterizer_state->Release();
-  old_rasterizer_state->Release();
+  // todo: return if target is 0
+  D3D11_TEXTURE2D_DESC desc = {};
+  target.texture->GetDesc(&desc);
+  return v2f32((F32)desc.Width, (F32)desc.Height);
 }
-*/
 
-/*
-void r_scissoring_clear()
+R_Target r_target_from_swap_chain(R_Chain chain)
 {
-  D3D_State* d3d = r_get_state();
-
-  ID3D11RasterizerState* old_rasterizer_state = 0;
-  ID3D11RasterizerState* new_rasterizer_state = 0;
-
-  D3D11_RASTERIZER_DESC desc = {};
-  d3d->context->RSGetState(&old_rasterizer_state);
-  old_rasterizer_state->GetDesc(&desc);
-  desc.ScissorEnable = false;
-
-  HRESULT hr = d3d->device->CreateRasterizerState(&desc, &new_rasterizer_state);
-  Handle(hr == S_OK);
-  
-  d3d->context->RSSetState(new_rasterizer_state);
-  d3d->context->RSSetScissorRects(0, 0);
-  
-  new_rasterizer_state->Release();
-  old_rasterizer_state->Release();
+  // todo: If chain is 00 return
+  R_Target target = {};
+  target.texture     = chain.texture;
+  target.texture_rtv = chain.texture_rtv;
+  return target;
 }
-*/
+
+#undef HR
 
 #endif

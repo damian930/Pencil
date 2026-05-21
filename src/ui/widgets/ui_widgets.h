@@ -8,7 +8,6 @@
 #include "render/render.cpp"
 
 // - Simple widgets
-void ui_label_c(const char* c_str);
 void ui_label(Str8 str);
 void ui_label_f(const char* fmt, ...);
 void ui_spacer(UI_Size size);
@@ -22,7 +21,7 @@ void ui_layout_stack_end();
 #define UI_Col() UI_Stack(Axis2__y)
 
 // - Padded box
-// todo: I have this here so so much
+// todo: I hate this here so much
 void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis);
 void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis);
 void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
@@ -36,6 +35,13 @@ void ui_padded_box_end(UI_Size size);
 void ui_wrapper_begin(Axis2 axis);
 void ui_wrapper_end();
 #define UI_Wrapper(axis) DeferLoop(ui_wrapper_begin(axis), ui_wrapper_end())
+
+// - Color pickers
+void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);
+void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv);
+
+void __ui_color_picker_sv_square_draw_func(UI_Box* box);
+void __ui_color_picker_h_draw_func(UI_Box* box);
 
 // - Slider
 struct UI_Slider_style {
@@ -54,12 +60,12 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
 
-  if (slider_actions.is_hovered) { ui_set_next_b_color_uv(slider_style->hover_color);} 
-  else                           { ui_set_next_b_color_uv(slider_style->no_hover_color); }
+  if (slider_actions.is_hovered) { ui_set_next_b_color(slider_style->hover_color);} 
+  else                           { ui_set_next_b_color(slider_style->no_hover_color); }
   ui_set_next_size_x(slider_style->size_x);
   ui_set_next_size_y(slider_style->size_y);
   ui_set_next_layout_axis(Axis2__x);
-  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__dont_draw_overflow); // todo: Why do we have no draw overflow flag here
+  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__has_background); 
 
   F32 new_value = current_value;
   UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
@@ -77,8 +83,8 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     {
       ui_set_next_size_x(ui_px(thumb_offset));
       ui_set_next_size_y(ui_px(slider_box_data.on_screen_rect.height));
-      ui_set_next_b_color_uv(slider_style->slided_part_color);
-      UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), 0);
+      ui_set_next_b_color(slider_style->slided_part_color);
+      UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), UI_Box_flag__has_background);
     }
   
     UI_Parent(slider_box)
@@ -87,8 +93,6 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
       UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__y) 
       UI_PaddedBox(ui_p_of_p(1.0f, 0.0f), Axis2__x)
       {
-        // ui_set_next_text_color(slider_style->text_color);
-        // ui_set_next_font_size(slider_style->font_size);
         ui_label_f(slider_style->fmt_str, current_value);
       }
     }
@@ -123,13 +127,6 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 
   return moved_slider;
 }
-
-// - Color pickers
-void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);
-void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv);
-
-void __ui_color_picker_sv_square_draw_func(UI_Box* box);
-void __ui_color_picker_h_draw_func(UI_Box* box);
 
 ///////////////////////////////////////////////////////////
 // - Other old code

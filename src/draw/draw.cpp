@@ -27,22 +27,26 @@ void d_release()
 ///////////////////////////////////////////////////////////
 // - Batching 
 //
-void d_begin_batching() 
+void d_begin_batching(R_Target target) 
 { 
+  // todo: If targe t== 0 return
+
   D_State* draw_state = d_get_state();
   
   draw_state->command_batch_list = {};
   arena_clear(draw_state->arena_for_draw_commands); 
 
   draw_state->defaults.blend_kind    = D3D_Blend_kind__alpha;
-  draw_state->defaults.render_target = r_get_frame_buffer_rtv();
-  draw_state->defaults.scissor_rect  = rect_make(0.0f, 0.0f, r_get_viewport_dims().x, r_get_viewport_dims().y);
+  draw_state->defaults.render_target = target.texture_rtv; 
+  draw_state->defaults.scissor_rect  = rect_make(0.0f, 0.0f, r_get_target_dims(target).x, r_get_target_dims(target).y);
 
   draw_state->current_blend_kind_count    = 0;
   draw_state->current_render_target_count = 0;
   draw_state->current_scissor_rect_count  = 0;
 }
 
+// todo: THis does not take it target and this makes it less clear about the idea for the call and what it does,
+//       make it better 
 void d_end_batching() { /*Nothing here*/ }
 
 D_Command_batch_list* d_get_batch_list() { return &d_get_state()->command_batch_list; }
@@ -265,6 +269,18 @@ void d_draw_rect_outset_borders(Rect rect, V4F32 color, F32 thickness, V4F32 cor
 {
   V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
   d_add_rect_command(rect_padded(rect, thickness), corner_colors, corner_radii, thickness, softness, color);
+}
+
+void d_draw_circle(V2F32 center, F32 r, V4F32 color, F32 softness)
+{
+  Rect rect = rect_from_center(center, v2f32(r, r));
+  d_draw_rect_pro(rect, color, color, color, color, v4f32_all(1.0f), softness);
+}
+
+void d_draw_circle_inset_border(V2F32 center, F32 r, V4F32 color, F32 thickness, F32 softness)
+{
+  Rect rect = rect_from_center(center, v2f32(r, r));
+  d_draw_rect_inset_borders(rect, color, thickness, v4f32_all(1.0f), softness);
 }
 
 #endif

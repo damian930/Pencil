@@ -5,6 +5,10 @@
 
 #include "font_provider/font_provider.h"
 
+/* todos:
+  [ ] - Need to have a default font, right now 0 is used for it
+*/
+
 enum UI_Size_kind {
   UI_Size_kind__px,
   UI_Size_kind__children_sum,
@@ -24,10 +28,10 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__has_background      = (1 << 1),
   UI_Box_flag__has_rounded_corners = (1 << 2),
   UI_Box_flag__has_borders         = (1 << 3),
-  // UI_Box_flag__has_text_contents = (1 << 4),
+  UI_Box_flag__has_text_contents   = (1 << 4),
 
-  UI_Box_flag__floating_x         = (1 << 5), 
-  UI_Box_flag__floating_y         = (1 << 6), 
+  UI_Box_flag__floating_x = (1 << 5), 
+  UI_Box_flag__floating_y = (1 << 6), 
 
   // UI_Box_flag__clip_x = (1 << 7), 
   // UI_Box_flag__clip_y = (1 << 8), 
@@ -42,7 +46,7 @@ typedef U32 UI_Box_flags;
 
 // - Stacks for default settings
 struct UI_Box_flags_node  { UI_Box_flags v; UI_Box_flags_node* next; };
-struct UI_Box_flgas_stack { UI_Box_flags_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Box_flags_stack { UI_Box_flags_node* first; U64 count; B32 pop_after_first_get; };
 //
 struct UI_Layout_axis_node  { Axis2 v; UI_Layout_axis_node* next; };
 struct UI_Layout_axis_stack { UI_Layout_axis_node* first; U64 count; B32 pop_after_first_get; };
@@ -60,16 +64,14 @@ struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop
 struct UI_Softness_node  { F32 v; UI_Softness_node* next; };
 struct UI_Softness_stack { UI_Softness_node* first; U64 count; B32 pop_after_first_get; };
 //
-struct UI_Border_style       { F32 width; V4F32 color; };
-struct UI_Border_style_node  { UI_Border_style v; UI_Border_style_node* next; };
+struct UI_Border             { F32 width; V4F32 color; };
+struct UI_Border_style_node  { UI_Border v; UI_Border_style_node* next; };
 struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_get; };
 
 // - Stacks for styles related to text
-// struct UI_Text_color_node  { V4F32 v; UI_Text_color_node* next; };
-// struct UI_Text_color_stack { UI_Text_color_node* first; U64 count; B32 pop_after_first_get; }; 
-//
-// struct UI_Text_font_node  { FP_Font v; UI_Text_font_node* next; };
-// struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_get; }; 
+struct UI_Text_font_node  { FP_Font v; UI_Text_font_node* next; };
+struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_get; }; 
+
 struct UI_Box;
 
 struct UI_Actions {
@@ -100,13 +102,13 @@ struct UI_Box {
   struct {
     V4F32 vertex_colors[UV__COUNT];
     V4F32 corner_radii; 
-    UI_Border_style border;
+    UI_Border border;
     F32 softness;
   } shape_style;
 
   struct {
-    // Str8 text;
-    // FP_Font font;
+    Str8 text;
+    FP_Font font;
     // F32 font_size;      
     // V4F32 text_color;
   } text_style;
@@ -161,6 +163,7 @@ struct UI_Context {
   Arena* style_stacks_arena; 
   //
   // Default style stacks
+  UI_Box_flags_stack     flags_stack;
   UI_Layout_axis_stack   layout_axis_stack;
   UI_Semantic_size_stack semantic_size_x_stack;
   UI_Semantic_size_stack semantic_size_y_stack;
@@ -173,19 +176,21 @@ struct UI_Context {
   //
   // Text style stacks
   // UI_Text_color_stack text_color_stack;
+  UI_Text_font_stack text_font_stack;
 
   // Some style defaults
   struct {
-    Axis2   layout_axis;
-    UI_Size size_x;
-    UI_Size size_y;
+    UI_Box_flags flags;
+    Axis2        layout_axis;
+    UI_Size      size_x;
+    UI_Size      size_y;
 
-    V4F32           vertex_colors[UV__COUNT];
-    V4F32           corner_radii;
-    UI_Border_style border;
-    F32             softness;
+    V4F32     vertex_colors[UV__COUNT];
+    V4F32     corner_radii;
+    UI_Border border;
+    F32       softness;
 
-    V4F32 text_color;
+    FP_Font font;
   } defaults;
 };
 
@@ -270,6 +275,11 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
 UI_Actions ui_actions_from_id(Str8 id);
 
 // - Default box settings stacks
+void         ui_push_flags(UI_Box_flags v);       
+void         ui_pop_flags(); 
+void         ui_set_next_flags(UI_Box_flags v);       
+UI_Box_flags ui_get_flags();
+//
 void  ui_push_layout_axis(Axis2 v);       
 void  ui_pop_layout_axis(); 
 void  ui_set_next_layout_axis(Axis2 v);       
@@ -304,22 +314,20 @@ void  ui_pop_corner_r();
 void  ui_set_next_corner_r(V4F32 v);
 V4F32 ui_get_corner_r();
 
-void            ui_push_border(F32 width, V4F32 color);
-void            ui_pop_border();
-void            ui_set_next_border(F32 width, V4F32 color);
-UI_Border_style ui_get_border();
+void      ui_push_border(F32 width, V4F32 color);
+void      ui_pop_border();
+void      ui_set_next_border(F32 width, V4F32 color);
+UI_Border ui_get_border();
 
 void ui_push_softness(F32 softness);
 void ui_pop_softness();
 void ui_set_next_softness(F32 softness);
-F32 ui_get_softness();
+F32  ui_get_softness();
 
-// note: These add flags as well to the next, might need a version for no flag style scopes
-// #define UI_Color(v)             DeferLoop(ui_push_b_color(v),           ui_pop_color())
-// #define UI_Border(width, color) DeferLoop(ui_push_border(width, color), ui_pop_border())
-// #define UI_Corner_radius(v)    DeferLoop(ui_push_corner_radius(v), ui_pop_corner_radius())
-// #define UI_Border_width(v)     DeferLoop(ui_push_border_width(v),  ui_pop_border_width())
-// #define UI_Border_color(v)     DeferLoop(ui_push_border_color(v),  ui_pop_border_color())
+#define UI_BColor(v)            DeferLoop(ui_push_b_color(v),           ui_pop_color())
+#define UI_Border(width, color) DeferLoop(ui_push_border(width, color), ui_pop_border())
+#define UI_Corner_radius(v)     DeferLoop(ui_push_corner_radius(v), ui_pop_corner_radius())
+#define UI_Softness(v)          DeferLoop(ui_push_softness(v), ui_pop_softness())
 
 // - Style stack operations for text
 // void ui_push_text_color(V4F32 v);
@@ -327,10 +335,10 @@ F32 ui_get_softness();
 // void ui_set_next_text_color(V4F32 v);
 // V4F32 ui_get_text_color();
 
-// void ui_push_font(FP_Font v);
-// void ui_pop_font();
-// void ui_set_next_font(FP_Font v);
-// FP_Font ui_get_font();
+void ui_push_font(FP_Font v);
+void ui_pop_font();
+void ui_set_next_font(FP_Font v);
+FP_Font ui_get_font();
 
 // #define UI_TextColor(color) DeferLoop(ui_push_text_color(color), ui_pop_text_color())
 // #define UI_Font(font)       DeferLoop(ui_push_font(font),        ui_pop_font())

@@ -9,6 +9,9 @@ struct OS_Window {
   WNDCLASSEXA window_class;
   HWND handle;
 
+  // Has to be specified at window creation and cant be changed later
+  B32 is_transparent;
+
   B32 should_close;
 
   // Per frame data
@@ -197,6 +200,77 @@ void os_file_close(OS_File* file)
   *file = OS_File{};
 }
 
+// todo: now its b32 here, cause i have no idea what i need to check, so just b32 this bitch
+B32 os_file_read(OS_File file, Data_buffer* out_buffer)
+{
+  if (!os_file_is_valid(file)) { return false; }
+
+  // note:
+  // I really dont have an idea for this api yet. Right now all i need is just
+  // regular reads into a buffer that is always the same size as the file, 
+  // i have never read a file otherwise, so for now just that. When i have a case
+  // where i need to read it another way i will see what i need and change the api,
+  // right now trying to come up with a better api i just wasting time. 
+  Handle(os_file_get_props(file).size == out_buffer->count);
+
+  LARGE_INTEGER new_pointer_pos  = {};
+  LARGE_INTEGER distance_to_move = {};
+  distance_to_move.QuadPart = 0;
+  
+  B32 succ = false;
+
+  if (SetFilePointerEx((HANDLE)file.u64, distance_to_move, &new_pointer_pos, FILE_BEGIN))
+  {
+    succ = true;
+
+    U64 bytes_read = 0;
+    for (;bytes_read < out_buffer->count;)
+    {
+      U32 bytes_to_read = (U32)clamp_u64(out_buffer->count - bytes_read, 0, u32_max);
+
+      // todo: This will just rewrite the data in the out buffer when we do the second loop, fix this
+      U32 bytes_read_this_time = 0;
+      BOOL read_succ = ReadFile((HANDLE)file.u64, 
+                                (void*)(out_buffer->data + bytes_read), 
+                                bytes_to_read, 
+                                (DWORD*)&bytes_read_this_time, 
+                                Null);
+                                
+      if (!read_succ || bytes_read_this_time != bytes_to_read) { BP; succ = false; break; }
+      bytes_read += bytes_read_this_time;
+    }
+  }
+
+  return succ; 
+}
+
+B32 os_file_write_end(OS_File file, Data_buffer buffer)
+{
+  if (!os_file_is_valid(file)) { return false; }
+  
+  B32 succ = false;
+  
+  LARGE_INTEGER new_pointer_pos = {};
+  if (SetFilePointerEx((HANDLE)file.u64, LARGE_INTEGER{}, &new_pointer_pos, FILE_END))
+  {
+    succ = true;
+
+    U64 bytes_written = 0;
+    for (;bytes_written < buffer.count;)
+    {
+      U32 bytes_written_this_time = 0;
+      U32 bytes_to_write          = (U32)clamp_u64(buffer.count - bytes_written, 0, u32_max);
+      BOOL write_succ             = WriteFile((HANDLE)file.u64, buffer.data + bytes_written, 
+                                              bytes_to_write, 
+                                              (DWORD*)&bytes_written_this_time, Null);
+      if (!write_succ || bytes_to_write != bytes_written_this_time) { succ = false; break; }
+      bytes_written += (U64)bytes_written_this_time;
+    }
+  } else { succ = false; }
+
+  return succ;
+}
+
 // note: Returns Str8{} if fails, though i shoud not fail unless there is a bug in the implementation
 Str8 os_get_current_dir_path(Arena* arena)
 {
@@ -222,76 +296,6 @@ Str8 os_get_current_dir_path(Arena* arena)
     arena_pop_to_pos(arena, arena_pos_before_allocations);
   }
   return result_path;
-}
-
-// todo: now its b32 here, cause i have no idea what i need to check, so just b32 this bitch
-B32 os_file_read(OS_File file, Data_buffer* out_buffer)
-{
-  if (!os_file_is_valid(file)) { return false; }
-
-  // note:
-  // I really dont have an idea for this api yet. Right now all i need is just
-  // regular reads into a buffer that is always the same size as the file, 
-  // i have never read a file otherwise, so for now just that. When i have a case
-  // where i need to read it another way i will see what i need and change the api,
-  // right now trying to come up with a better api i just wasting time. 
-  Assert(os_file_get_props(file).size == out_buffer->count);
-
-  LARGE_INTEGER new_pointer_pos = {};
-  LARGE_INTEGER distance_to_move = {};
-  distance_to_move.QuadPart = 0;
-  
-  B32 succ = false;
-
-  if (SetFilePointerEx((HANDLE)file.u64, distance_to_move, &new_pointer_pos, FILE_BEGIN))
-  {
-    succ = true;
-
-    U64 bytes_read = 0;
-    for (;bytes_read < out_buffer->count;)
-    {
-      // todo: This will just rewrite the data in the out buffer when we do the second loop, fix this
-      U32 bytes_read_this_time = 0;
-      BOOL read_succ = ReadFile(
-        (HANDLE)file.u64, 
-        (void*)(out_buffer->data + bytes_read), 
-        (U32)(out_buffer->count - bytes_read), 
-        (DWORD*)&bytes_read_this_time, 
-        Null
-      );
-      bytes_read += bytes_read_this_time;
-  
-      if (!read_succ) { succ = false; break; }
-    }
-  }
-
-  return succ; 
-}
-
-B32 os_file_write_end(OS_File file, Data_buffer buffer)
-{
-  if (!os_file_is_valid(file)) { return false; }
-  
-  B32 succ = true;
-  
-  LARGE_INTEGER new_pointer_pos = {};
-  if (SetFilePointerEx((HANDLE)file.u64, LARGE_INTEGER{}, &new_pointer_pos, FILE_END))
-  {
-    // todo: Make sure this doesnt fail of buffer longer then U32 holds
-    U64 bytes_written = 0;
-    for (;bytes_written < buffer.count;)
-    {
-      U32 bytes_written_this_time = 0;
-      U64 bytes_to_write = buffer.count - bytes_written;
-      BOOL write_succ = WriteFile((HANDLE)file.u64, buffer.data + bytes_written, 
-                                  (U32)bytes_to_write, 
-                                  (DWORD*)&bytes_written_this_time, Null);
-      if (!write_succ) { succ = false; break; }
-      bytes_written += (U64)bytes_written_this_time;
-    }
-  } else { succ = false; }
-
-  return succ;
 }
 
 ///////////////////////////////////////////////////////////
@@ -438,6 +442,11 @@ void os_window_minimize()
 {
   BOOL succ = ShowWindow(os_get_state()->window.handle, SW_MINIMIZE);
   Assert(succ);
+}
+
+B32 os_window_is_transparent()
+{
+  return os_get_state()->window.is_transparent;
 }
 
 void os_window_set_mouse_passthrough(B32 enable)
@@ -807,6 +816,7 @@ LRESULT win32_proc(
 
     case WM_NCCALCSIZE:
     {
+      // result = 0;
       result = DefWindowProc(window_handle, message, w_param, l_param);
       // todo: Get the caption size from the system and only remove the caption size on y.
       //       This is needed to have the resize buttons and all that be present.

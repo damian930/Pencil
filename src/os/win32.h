@@ -31,6 +31,11 @@ enum OS_File_access : U32 {
 };  
 typedef U32 OS_File_access_flags; 
 
+struct OS_File_props {
+  B32 succ; // todo: I would like a better name for this
+  U64 size;
+};
+
 struct OS_File { U64 u64; };
 
 ///////////////////////////////////////////////////////////
@@ -185,10 +190,6 @@ enum OS_Error : U32 {
   OS_Error__access_denied,
   OS_Error__already_exists,
 };
-struct OS_File_props {
-  B32 succ; // todo: I would like a better name for this
-  U64 size;
-};
 OS_File os_file_handle_zero();
 B32 os_file_handle_match(OS_File handle, OS_File other);
 B32 os_file_is_valid(OS_File file);
@@ -196,10 +197,10 @@ OS_File_props os_file_get_props(OS_File file);
 OS_File os_file_open_ex(Str8 file_name, OS_File_access_flags acess_flags, OS_Error* out_error);
 OS_File os_file_open(Str8 file_name, OS_File_access_flags acess_flags);
 void os_file_close(OS_File* file);
-// U64 os_file_read(OS_File file, Data_buffer* buffer);
+B32 os_file_read(OS_File file, Data_buffer* out_buffer);
+B32 os_file_write_end(OS_File file, Data_buffer buffer);
+Str8 os_get_current_dir_path(Arena* arena);
 #define OS_FileOpenClose(file_var_name, file_path, access_flags) DeferInitReleaseLoop(OS_File file_var_name = os_file_open(file_path, access_flags), os_file_close(&file_var_name))
-
-void os_get_current_dir_path();
 
 // - Frame
 void os_frame_begin();
@@ -214,7 +215,7 @@ V2F32 os_get_mouse_delta();
 B32 os_window_should_close();
 void os_window_maximize();
 void os_window_minimize();
-// void os_window_set_top_most(B32 b);
+B32 os_window_is_transparent();
 
 // - Inputs for keyboard
 OS_Key_state os_get_key_state(Key key);

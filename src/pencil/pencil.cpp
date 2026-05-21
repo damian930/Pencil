@@ -235,9 +235,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
         F32 x = prev_pos.x + dx * t;
         F32 y = prev_pos.y + dy * t;
         V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
-        x -= pen_size / 2.0f;
-        y -= pen_size / 2.0f;
-        d_add_rect_command_ex(rect_make(x, y, pen_size, pen_size), corner_colors, v4f32(1, 1, 1, 1), 0, 2.0f, {});
+        d_draw_circle(v2f32(x, y), pen_size, color_rgba, 0.0f);
       }
     }
     if (P->is_erasing_mode) { d_pop_blend_kind(); }
@@ -282,9 +280,9 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
   ui_set_next_size_x(ui_p_of_p(1.0f, 1.0f));
   ui_set_next_size_y(ui_p_of_p(1.0f, 1.0f));
-  ui_set_next_border(10, red());
+  ui_set_next_border(20, red());
   ui_set_next_softness(0.0f);
-  UI_Box* content_inner = ui_box_make(Str8{}, 0);
+  UI_Box* content_inner = ui_box_make(Str8FromC("test id"), UI_Box_flag__has_borders);
 
   static F32 x_offset = 0.0f;
   static F32 y_offset = 0.0f;
@@ -300,65 +298,54 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
       UI_Col()
       {
         ui_spacer(ui_px(y_offset));
-        
-        ui_next_b_color(blue());
-        UI_Box* box = ui_box_make(Str8FromC("Box id"), UI_Box_flag__has_background);
-        UI_Parent(box)
+       
+        if (P->show_brush_ui_menu)
         {
-          // ...
-        }
-
-        
-        ui_button(Str8FromC("Button"));
-
-        ui_set_next_size_x(ui_children_sum());
-        ui_set_next_size_y(ui_children_sum());
-        ui_set_next_b_color_uv(taupe());
-        ui_next_b_color(red());
-        UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), 0);
-
-        UI_Parent(brush_box)
-        {
-          Str8 menu_name_box_id = Str8FromC("Brush box menu name box id");
-          UI_Actions menu_name_actions = ui_actions_from_id(menu_name_box_id);
-        
-          if (!menu_name_actions.was_down && menu_name_actions.is_down)
-          {
-            UI_Box_data content_inner_data = ui_get_box_data_prev_frame_from_box(content_inner);
-            V2F32 content_inner_p = rect_get_origin(content_inner_data.on_screen_rect);
+          ui_set_next_size_x(ui_children_sum());
+          ui_set_next_size_y(ui_children_sum());
+          ui_set_next_b_color(taupe());
+          UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), UI_Box_flag__has_background);
   
-            inside_menu_mouse_rel_x = (ui_get_mouse_x() - content_inner_p.x) - x_offset;
-            inside_menu_mouse_rel_y = (ui_get_mouse_y() - content_inner_p.y) - y_offset;
-          }
-          else if (menu_name_actions.is_down)
+          UI_Parent(brush_box)
           {
-            UI_Box_data content_inner_box = ui_get_box_data_prev_frame_from_box(content_inner);
-            x_offset = ui_get_mouse_x() - content_inner_box.on_screen_rect.x - inside_menu_mouse_rel_x;
-            y_offset = ui_get_mouse_y() - content_inner_box.on_screen_rect.y - inside_menu_mouse_rel_y;
-          }
-          else {
-            inside_menu_mouse_rel_x = 0.0f;
-            inside_menu_mouse_rel_y = 0.0f;
-          }
-
-          // if (menu_name_actions.is_hovered) { ui_set_cursor(OS_Cursor__hand); }
-          if (menu_name_actions.is_hovered) { ui_set_next_b_color_uv(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color_uv(blue()); }
-          ui_set_next_size_x(ui_px(200));
-          ui_set_next_size_y(ui_px(40));
-          ui_set_next_layout_axis(Axis2__x);
-          UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), 0);
-
-
-          UI_Parent(menu_name_box)
-          {
-            UI_PaddedBoxEx(ui_px(7), ui_px(0), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
+            Str8 menu_name_box_id = Str8FromC("Brush box menu name box id");
+            UI_Actions menu_name_actions = ui_actions_from_id(menu_name_box_id);
+          
+            if (!menu_name_actions.was_down && menu_name_actions.is_down)
             {
-              ui_label(Str8FromC("Brushes"));
+              UI_Box_data content_inner_data = ui_get_box_data_prev_frame_from_box(content_inner);
+              V2F32 content_inner_p = rect_get_origin(content_inner_data.on_screen_rect);
+    
+              inside_menu_mouse_rel_x = (ui_get_mouse_x() - content_inner_p.x) - x_offset;
+              inside_menu_mouse_rel_y = (ui_get_mouse_y() - content_inner_p.y) - y_offset;
             }
-          }
-
-          if (P->show_brush_ui_menu)
-          {
+            else if (menu_name_actions.is_down)
+            {
+              UI_Box_data content_inner_box = ui_get_box_data_prev_frame_from_box(content_inner);
+              x_offset = ui_get_mouse_x() - content_inner_box.on_screen_rect.x - inside_menu_mouse_rel_x;
+              y_offset = ui_get_mouse_y() - content_inner_box.on_screen_rect.y - inside_menu_mouse_rel_y;
+            }
+            else {
+              inside_menu_mouse_rel_x = 0.0f;
+              inside_menu_mouse_rel_y = 0.0f;
+            }
+  
+            // if (menu_name_actions.is_hovered) { ui_set_cursor(OS_Cursor__hand); }
+            ui_set_next_size_x(ui_px(200));
+            ui_set_next_size_y(ui_px(40));
+            ui_set_next_layout_axis(Axis2__x);
+            if (menu_name_actions.is_hovered) { ui_set_next_b_color(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color(blue()); }
+            UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), UI_Box_flag__has_background);
+  
+  
+            UI_Parent(menu_name_box)
+            {
+              UI_PaddedBoxEx(ui_px(7), ui_px(0), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
+              {
+                ui_label(Str8FromC("Brushes"));
+              }
+            }
+  
             ui_spacer(ui_px(7));
             
             if (!P->is_erasing_mode)  
@@ -367,7 +354,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
               ui_set_next_size_y(ui_px(40 + 14));
               ui_set_next_layout_axis(Axis2__x);
               UI_Box* pen_size_box = ui_box_make(Str8FromC("Box with color change_ui"), 0);
-
+  
               UI_Parent(pen_size_box)
               {
                 UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
@@ -387,17 +374,17 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                     P->signal_new_pen_size = true;
                     P->new_pen_size = (U32)new_pen_size;
                   }
-
+  
                   ui_spacer(ui_px(7));
                   
                   ui_label_f("Pen size");
                 }
               }
-
+  
               ui_set_next_size_x(ui_px(200));
               ui_set_next_size_y(ui_px(200));
               UI_Box* box_with_color_ui = ui_box_make(Str8FromC("Box with color change_ui"), 0);
-
+  
               UI_Parent(box_with_color_ui)
               UI_PaddedBox(ui_px(7), Axis2__x)
               {
@@ -476,8 +463,8 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
         
                   ui_set_next_size_x(ui_p_of_p(1.0f, 0.1f));
                   ui_set_next_size_y(ui_p_of_p(0.05f, 0.0f));
-                  ui_set_next_b_color_uv(pen_color_rgba);
-                  UI_Box* color_rect_box = ui_box_make(Str8{}, 0);
+                  ui_set_next_b_color(pen_color_rgba);
+                  UI_Box* color_rect_box = ui_box_make(Str8{}, UI_Box_flag__has_background);
                 }
               }
     
@@ -485,24 +472,24 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
               {
                 Str8 button_id = Str8FromC("Eraser##Button id");
                 UI_Actions actions = ui_actions_from_id(button_id);
-                if (actions.is_down)         { ui_set_next_b_color_uv(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                else if (actions.is_hovered) { ui_set_next_b_color_uv(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                else                         { ui_set_next_b_color_uv(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
-                ui_set_next_corner_r(ui_corner_r_all(0.15f));
-                UI_Box* button_box = ui_box_make(button_id, 0);
-
+                if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                ui_set_next_corner_r(v4f32_all(0.25f));
+                UI_Box* button_box = ui_box_make(button_id, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
+  
                 UI_Parent(button_box)
                 UI_PaddedBox(ui_px(10), Axis2__x)
                 {
                   ui_label_f("Eraser");
                 }
-
+  
                 if (actions.is_clicked)
                 {
                   P->signal_swap_to_eraser = true;
                 }
               }
-
+  
               ui_spacer(ui_px(7));
             }
             else 
@@ -530,74 +517,36 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                 }
   
                 ui_spacer(ui_px(7));
-
+  
                 {
                   Str8 button_id = Str8FromC("Brush##Button id");
                   UI_Actions actions = ui_actions_from_id(button_id);
-                  if (actions.is_down)         { ui_set_next_b_color_uv(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                  else if (actions.is_hovered) { ui_set_next_b_color_uv(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                  else                         { ui_set_next_b_color_uv(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
-                  ui_set_next_corner_r(ui_corner_r_all(0.15f));
-                  UI_Box* button_box = ui_box_make(button_id, 0);
+                  if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
+                  else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
+                  else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
+                  ui_set_next_corner_r(v4f32_all(0.25f));
+                  UI_Box* button_box = ui_box_make(button_id, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
   
                   UI_Parent(button_box)
                   UI_PaddedBox(ui_px(10), Axis2__x)
                   {
                     ui_label_f("Brush");
                   }
-
+  
                   if (actions.is_clicked)
                   {
                     P->signal_swap_to_pen = true;
                   }
                 }
-
+  
               }
             }
-         
-            // todo: Embosed/Debodes button
-            Str8 button_id = Str8FromC("Button id test");
-            UI_Actions button_actions = ui_actions_from_id(button_id);
-
-            V4F32 colors[UV__COUNT] = { red(), red(), red(), red() };
-            if (button_actions.is_down) 
-            { 
-              colors[UV__00] = change_alpha(white(), 0.5); 
-              colors[UV__01] = change_alpha(white(), 0.5); 
-              colors[UV__10] = change_alpha(black(), 0.5); 
-              colors[UV__11] = change_alpha(black(), 0.5); 
-            }
-            // else 
-            // {
-            //   colors[UV__00] = blue(); 
-            //   colors[UV__01] = blue(); 
-            //   colors[UV__10] = blue(); 
-            //   colors[UV__11] = blue(); 
-            // }
-
-            ui_set_next_size_x(ui_children_sum());
-            ui_set_next_size_y(ui_children_sum()); 
-            UI_Box* button = ui_box_make(button_id, {});
-            for EachEnum(i, UV, UV__00, UV__COUNT) { 
-              button->shape_style.vertex_colors[i] = colors[i]; 
-            }
-            UI_Parent(button)
-            {
-              UI_PaddedBox(ui_px(5), Axis2__x)
-              {
-                ui_label_f("Button text here");
-              }
-            }
+              
           }
         }
+
       }
     }
-
-
-    // else // Do the eraser menu
-    // {
-    //   ui_label_f("THIS AT SOME POINT WILL BE THE MENU FOR THE ERASER");
-    // }
   }
 
   ui_end_build();

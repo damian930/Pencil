@@ -36,11 +36,11 @@ abstract.
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
-// #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.h"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -50,19 +50,14 @@ global B32 hot_key_activated = false;
 #define APP_WINDOW_NAME      "Pencil"
 #define APP_MUTEX_NAME_WIN32 "Pencil mutex that has a name that no one will ever know aobut. Last week was the kevin harts roast, shane did good."
 
-UI_Actions button(Str8 id)
-{
-  UI_Box* box = ui_box_make(id, UI_Box_flag__has_background|UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners);
-  UI_Actions actions = ui_actions_from_box(box);
-  return actions;
-}
+#define MAIN_IS_DEBUGGING true 
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   // Layers we allocate for the runtime 
   allocate_thread_context();
   os_init();
-  // r_init(); // NOTE: Since is is connected to the window directly at init and not later, i have to init it after i have a window, its not great, but for now like this
+  r_init(); 
   d_init();
   fp_init();
   ui_init();
@@ -84,38 +79,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     }
   }
 
-  // todo: Try to read a file that is longer than 4 gigs
-  // todo: Try to write a file that is longer than 4 gigs
-  // todo: Have these be working
-  /*
-  Arena* a = arena_alloc(Gigabytes(20));
-  OS_File file = os_file_open(String("../test_big_file.txt"), OS_File_access__write);
-  Assert(os_file_is_valid(file));
-
-  Data_buffer buffer = data_buffer_make(a, (U64)u32_max + 100);
-  Data_buffer buffer_out = data_buffer_make(a, (U64)u32_max + 100);
-  
-  for (U64 i = 0; i < buffer.count; i += 1)
-  {
-    buffer.data[i] = 'A';
-  }
-
-  B32 write_succ = os_file_write_end(file, buffer);
-  Assert(write_succ);
-
-  B32 read_succ = os_file_read(file, &buffer_out);
-  Assert(read_succ);
-
-  for (U64 i = 0; i < buffer.count; i += 1)
-  {
-    Assert(buffer.data[i] == buffer_out.data[i]);
-  }
-
-  os_file_close(&file);
-  BP;
-  return -1;
-  */
-
   OS_State* win32_state = os_get_state();
 
   ///////////////////////////////////////////////////////////
@@ -136,12 +99,12 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     ATOM wc_atom = RegisterClassExA(&win32_state->window.window_class);
     Assert(wc_atom != 0);
     
+    win32_state->window.is_transparent = false;
     win32_state->window.handle = CreateWindowExA(
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
       "Pencil",
-      WS_OVERLAPPEDWINDOW,
-      // WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME),
+      WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME),
       // WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
       CW_USEDEFAULT, CW_USEDEFAULT,
       800, 600,
@@ -152,12 +115,22 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     );
     HandleLater(win32_state->window.handle != 0);
   
-    ShowWindow(win32_state->window.handle, SW_SHOW);
+    if (MAIN_IS_DEBUGGING) {
+      ShowWindow(win32_state->window.handle, SW_SHOW);
+    } else {
+      ShowWindow(win32_state->window.handle, SW_MAXIMIZE);
+    }
+    os_set_cursor(OS_Cursor__arrow);
   }
   
   { // Making the window be on top all the time
-    BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
-    // BOOL succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    BOOL succ = true;
+    if (MAIN_IS_DEBUGGING) {
+      succ = SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+    } else {
+      succ = SetWindowPos(win32_state->window.handle, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
+      os_window_set_mouse_passthrough(true);
+    } 
     HandleLater(succ);
   }
 
@@ -173,56 +146,51 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     HandleLater(succ);
   }
 
-  r_init();
-
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  // Pencil_state P = {}; 
-  // pencil_init(&P);
+  Pencil_state P = {}; 
+  pencil_init(&P);
 
   // todo: Do better with this here
   //       Here is the link to the resource that explaince this code here and why it is needed
   //       https://learn.microsoft.com/en-us/archive/msdn-magazine/2014/june/windows-with-c-high-performance-window-layering-using-the-windows-composition-engine
   // todo: Move this into the renderer
-  // #define HR(x) Assert(x == S_OK)
-  // IDCompositionDevice* comp_device = 0;
-  // {
-  //   HRESULT hr = {};
+  /*
+  IDCompositionDevice* comp_device = 0;
+  {
+    HRESULT hr = {};
     
-  //   // todo: Move this out of there
-  //   D3D_State* d3d = r_get_state();
+    // todo: Move this out of there
+    D3D_State* d3d = r_get_state();
 
-  //   IDXGIDevice* dxgi_device    = 0;
-  //   IDCompositionVisual* visual = 0;
-  //   IDCompositionTarget* target =  0;
+    IDXGIDevice* dxgi_device    = 0;
+    IDCompositionVisual* visual = 0;
+    IDCompositionTarget* target =  0;
 
-  //   hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
-  //   HR(hr);
+    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
+    HR(hr);
     
-  //   hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
-  //   HR(hr);
+    hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
+    HR(hr);
 
-  //   hr = comp_device->CreateVisual(&visual);
-  //   HR(hr);
+    hr = comp_device->CreateVisual(&visual);
+    HR(hr);
   
-  //   hr = visual->SetContent((IUnknown*)d3d->swap_chain);
-  //   HR(hr);
+    hr = visual->SetContent((IUnknown*)d3d->swap_chain);
+    HR(hr);
     
-  //   hr = comp_device->CreateTargetForHwnd(win32_state->window.handle, true, &target);
-  //   HR(hr);
+    hr = comp_device->CreateTargetForHwnd(win32_state->window.handle, true, &target);
+    HR(hr);
 
-  //   hr = target->SetRoot(visual);
-  //   HR(hr);
+    hr = target->SetRoot(visual);
+    HR(hr);
 
-  //   // dxgi_device->Release();
-  //   // visual->Release();
-  //   // target->Release();
-  // }
-
-  // Fake for loop for testing
-  SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, WS_OVERLAPPEDWINDOW);
-  // r_clear_rtv(P.draw_texture_always_fresh_rtv, yellow_f());
+    // dxgi_device->Release();
+    // visual->Release();
+    // target->Release();
+  }
+  */
 
   // Testing and working on font provider
   FP_Font font = {};
@@ -240,7 +208,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     end_scratch(&scratch);
   }
 
-  // os_window_set_mouse_passthrough(true);
+  R_Chain swap_chain = r_attach_window(win32_state->window);
+  R_Target swap_chain_target = r_target_from_swap_chain(swap_chain);
 
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
@@ -249,84 +218,36 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
 
     os_frame_begin();
-    r_render_begin(os_get_client_area_dims());
-    d_begin_batching();
+    r_render_begin(swap_chain);
+    d_begin_batching(swap_chain_target);
 
-    /*
+    if (!MAIN_IS_DEBUGGING)
     if (hot_key_activated && !P.is_mid_drawing)
     {
       hot_key_activated = false;
       os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
     }
-    */
     
     { // UI and Application update 
-      // pencil_do_ui(&P, font);
-      // pencil_update(&P, !ui_has_active());
+      pencil_do_ui(&P, font);
+      pencil_update(&P, !ui_has_active());
     }
-    
-    ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
-    {
-      ui_push_softness(0.0f);
-
-      ui_set_next_size_x(ui_px(500));
-      ui_set_next_size_y(ui_px(500));
-      ui_set_next_b_color(green());
-      // ui_set_next_softness(2.0f);
-      ui_set_next_corner_r(v4f32_all(1.0));
-      // ui_set_next_border(5, white());
-      UI_Box* red_parent = ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners|UI_Box_flag__has_borders);
-      UI_Parent(red_parent)
-      {
-        // ui_set_next_softness(2.0f);
-        // ui_set_next_size_x(ui_px(100));
-        // ui_set_next_size_y(ui_px(100));
-        
-        // ui_set_next_b_color(blue());
-        // Str8 id = Str8FromC("Test id");
-        // UI_Actions actions = ui_actions_from_id(id);
-        // if (actions.is_down) { 
-        //   ui_set_next_b_color_uv(UV__00, black());
-        //   ui_set_next_b_color_uv(UV__10, black());
-        //   ui_set_next_b_color_uv(UV__01, white());
-        //   ui_set_next_b_color_uv(UV__11, white());
-        // } else if (actions.is_hovered) {
-        //   ui_set_next_b_color_uv(UV__00, white());
-        //   ui_set_next_b_color_uv(UV__10, white());
-        //   ui_set_next_b_color_uv(UV__01, black());
-        //   ui_set_next_b_color_uv(UV__11, black());
-        // } else {
-          // ui_set_next_b_color(blue());
-        // }
-        // ui_set_next_border(10, white());
-        // ui_set_next_softness(1.0f);
-        // button(id);
-      }
-    }
-    ui_end_build();
 
     { // Rendering
-      // r_clear_frame_buffer(transparent());
-      r_clear_frame_buffer(black());
-      // pencil_render(&P);
-      // ui_draw(); 
-    
-      d_draw_circle(os_get_mouse_pos(), 100, blue(), 0);
-      d_draw_rect_outset_borders(rect_from_center(os_get_mouse_pos(), v2f32(100, 100)), red(), 1, v4f32_all(1), 2.0);
+      r_clear_chain(swap_chain, transparent());
+      pencil_render(&P);
+      if (!os_window_is_mouse_passthrough()) { ui_draw(); }
     }
     
-    r_submit(d_get_batch_list());
+    r_submit(swap_chain_target, d_get_batch_list());
 
     d_end_batching();
-    r_render_end();
+    r_render_end(swap_chain);
     os_frame_end();
 
     // Presenting 
-    B32 vsync = false; 
-    r_get_state()->swap_chain->Present(!!vsync, 0);
-    // HRESULT commit_hr = comp_device->Commit(); 
-    // Handle(commit_hr == S_OK);
-
+    r_present_swap_chain(swap_chain, true);
+    
     F64 frame_end_time_sec = os_get_time_for_timing_sec();
     prev_frame_duration_sec = frame_end_time_sec - frame_start_time_sec;
 
