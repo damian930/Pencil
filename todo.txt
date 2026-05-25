@@ -8,9 +8,12 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Stuff to fix or add next:
-[x] - Pen size on scroll wheel
+[ ] - Create clear bounds between modes (draw | ruller)
+[ ] - Ways to swap between modes (draw | ruler) with a shortcut
+[ ] - Start having shortcuts be stores somehow in a settings file
+[ ] - Add more shortcutes (look at the next todo)
+[ ] - Have a shortcut resolver (use vscode as an example of the idea of what to do in case of a duplicate)
 [ ] - Pen size on the screen when drawing
-[ ] - Way to swap between the ruler and the pen
 
 - Minor fixes and additions:
 [ ] - The next project shoud be in C. 
