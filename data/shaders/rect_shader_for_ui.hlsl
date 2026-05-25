@@ -65,11 +65,6 @@ bool is_point_inside_rect(float2 p, float2 origin, float2 dims)
   return (origin.x <= p.x && p.x < origin.x + dims.x && origin.y <= p.y && p.y < origin.y + dims.y);
 }
 
-float2 rect_vertex_coords[4] = {
-  float2(0.0, 0.0), float2(1.0, 0.0),
-  float2(0.0, 1.0), float2(1.0, 1.0),
-};
-
 PixelInput vs_main(VertexInput vertex_input) 
 {
   float2 vp_dims     = float2(u_window_width, u_window_height);

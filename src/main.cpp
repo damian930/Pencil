@@ -11,6 +11,8 @@ Will see if its bad on not. If it is, well i will learn about the platform more 
 abstract. 
 */
 
+#define MAIN_IS_DEBUGGING true 
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #ifndef STB_IMAGE_WRITE_IMPLEMENTATION
@@ -49,8 +51,6 @@ global B32 hot_key_activated = false;
 
 #define APP_WINDOW_NAME      "Pencil"
 #define APP_MUTEX_NAME_WIN32 "Pencil mutex that has a name that no one will ever know aobut. Last week was the kevin harts roast, shane did good."
-
-#define MAIN_IS_DEBUGGING true 
 
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
@@ -93,7 +93,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     win32_state->window.window_class.hCursor       = Null;
     win32_state->window.window_class.hbrBackground = Null;
     win32_state->window.window_class.lpszMenuName  = Null;
-    win32_state->window.window_class.lpszClassName = "d3d_1_window_class_name";
+    win32_state->window.window_class.lpszClassName = "pencil_app_flopper_class_name";
     win32_state->window.window_class.hIconSm       = Null;
   
     ATOM wc_atom = RegisterClassExA(&win32_state->window.window_class);
@@ -104,7 +104,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
       "Pencil",
-      WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME),
+      (MAIN_IS_DEBUGGING ? 0 : WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME)),
       // WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
       CW_USEDEFAULT, CW_USEDEFAULT,
       800, 600,
@@ -142,7 +142,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     LONG_PTR set_succ_proc = SetWindowLongPtrA(win32_state->window.handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
     Assert(set_succ_proc != 0);
 
-    BOOL succ = RegisterHotKey(win32_state->window.handle, 0, MOD_SHIFT|MOD_ALT, 'S');
+    BOOL succ = RegisterHotKey(win32_state->window.handle, 0, MOD_SHIFT|MOD_ALT, (MAIN_IS_DEBUGGING ? 'Q' : 'S'));
     HandleLater(succ);
   }
 
@@ -152,61 +152,22 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   Pencil_state P = {}; 
   pencil_init(&P);
 
-  // todo: Do better with this here
-  //       Here is the link to the resource that explaince this code here and why it is needed
-  //       https://learn.microsoft.com/en-us/archive/msdn-magazine/2014/june/windows-with-c-high-performance-window-layering-using-the-windows-composition-engine
-  // todo: Move this into the renderer
-  /*
-  IDCompositionDevice* comp_device = 0;
-  {
-    HRESULT hr = {};
-    
-    // todo: Move this out of there
-    D3D_State* d3d = r_get_state();
-
-    IDXGIDevice* dxgi_device    = 0;
-    IDCompositionVisual* visual = 0;
-    IDCompositionTarget* target =  0;
-
-    hr = d3d->device->QueryInterface(IID_IDXGIDevice, (void**)&dxgi_device);
-    HR(hr);
-    
-    hr = DCompositionCreateDevice(dxgi_device, __uuidof(comp_device), (void**)&comp_device);
-    HR(hr);
-
-    hr = comp_device->CreateVisual(&visual);
-    HR(hr);
-  
-    hr = visual->SetContent((IUnknown*)d3d->swap_chain);
-    HR(hr);
-    
-    hr = comp_device->CreateTargetForHwnd(win32_state->window.handle, true, &target);
-    HR(hr);
-
-    hr = target->SetRoot(visual);
-    HR(hr);
-
-    // dxgi_device->Release();
-    // visual->Release();
-    // target->Release();
-  }
-  */
-
   // Testing and working on font provider
   FP_Font font = {};
-  {
-    Scratch scratch = get_scratch(0, 0);
-    Str8 path_to_fonts = os_get_path_to_system_fonts();
-    Str8_list path_parts = {};
-    str8_list_append_copy(scratch.arena, &path_parts, os_get_path_to_system_fonts());
-    if (!str8_match(Str8FromC("\\"), str8_back(path_to_fonts, 1), Str8_match__normalise_slash)) { 
-      str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("\\"));
-    }
-    str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("Arial.ttf"));
-    Str8 path_to_font = str8_from_list(scratch.arena, &path_parts);
-    font = fp_load_font(path_to_font, 18, range_u64_make(0, (U64)u8_max + 1));
-    end_scratch(&scratch);
-  }
+  // {
+  //   Scratch scratch = get_scratch(0, 0);
+  //   Str8 path_to_fonts = os_get_path_to_system_fonts();
+  //   Str8_list path_parts = {};
+  //   str8_list_append_copy(scratch.arena, &path_parts, os_get_path_to_system_fonts());
+  //   if (!str8_match(Str8FromC("\\"), str8_back(path_to_fonts, 1), Str8_match__normalise_slash)) { 
+  //     str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("\\"));
+  //   }
+  //   str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("Arial.ttf"));
+  //   Str8 path_to_font = str8_from_list(scratch.arena, &path_parts);
+  //   font = fp_load_font(path_to_font, 128, range_u64_make(0, (U64)u8_max + 1));
+  //   end_scratch(&scratch);
+  // }
+  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
 
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
@@ -229,7 +190,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     
     { // UI and Application update 
       pencil_do_ui(&P, font);
-      pencil_update(&P, !ui_has_active());
+      pencil_update(&P, !ui_has_active(), true);
     }
 
     { // Rendering

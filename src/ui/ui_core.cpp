@@ -92,7 +92,7 @@ void ui_init()
   _ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
   _ui_g_context->defaults.softness    = 2.0f;
   _ui_g_context->defaults.font        = {};
-  for EachEnum(i, UV, UV__00, UV__COUNT) { 
+  for EachEnumRange(i, UV, UV__00, UV__COUNT) { 
     _ui_g_context->defaults.vertex_colors[i]  = transparent(); 
     _ui_g_context->defaults.corner_radii.v[i] = 0.0f;
   }
@@ -131,14 +131,14 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   UI_Box* box = ArenaPush(arena, UI_Box);
   box->id = str8_copy_alloc(ui_get_build_arena(), id_and_text);
   
-  flags |= ui_get_flags();
+  flags |= ui_get_flags(); 
   box->flags                   = flags;
-  box->layout_axis             = ui_get_layout_axis();   
+  box->layout_axis             = ui_get_layout_axis();    
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
   
   {
-    for EachEnum(i, UV, UV__00, UV__COUNT) {
+    for EachEnumRange(i, UV, UV__00, UV__COUNT) {
       V4F32 vertex_color = ui_get_b_color_uv(i);
       if (!(flags & UI_Box_flag__has_background)) {
         vertex_color = ctx->defaults.vertex_colors[i];
@@ -180,6 +180,17 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   DllPushBack_Name(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling);
   box->parent = ui_get_parent();
   box->parent->children_count += 1;
+
+  // Resetting possible single use valus on the style stacks
+  ui_pop_single_usage_flags();
+  ui_pop_single_usage_layout_axis();
+  ui_pop_single_usage_size_x();
+  ui_pop_single_usage_size_y();
+  ui_pop_single_usage_b_color();
+  ui_pop_single_usage_corner_r();
+  ui_pop_single_usage_border();
+  ui_pop_single_usage_softness();
+  ui_pop_single_usage_font();
 
   return box;
 }
@@ -224,7 +235,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   ctx->border_style_stack    = {};
   ctx->softness_stack        = {};
   ctx->text_font_stack       = {};
-  for EachEnum(i, UV, UV__00, UV__COUNT) { ctx->vertex_color_stacks[i] = {}; }
+  for EachEnumRange(i, UV, UV__00, UV__COUNT) { ctx->vertex_color_stacks[i] = {}; }
 
   ctx->prev_frame_root_box = ctx->root_box;
   ctx->root_box            = &_ui_g_zero_box;
@@ -695,7 +706,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 
     if (is_hovered && !was_down)
     {
-      if (os_mouse_button_went_down(Mouse_button__Left)) // todo: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
+      if (os_mouse_button_went_down(Mouse_button__left)) // todo: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
       {
         // New box is interacted, so setting the state for it
         Assert(!was_down);
@@ -717,7 +728,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         ctx->currently_interacted_with_box__left_box_while_was_down = true;
       }
   
-      if (os_mouse_button_went_up(Mouse_button__Left))
+      if (os_mouse_button_went_up(Mouse_button__left))
       {
         Assert(ctx->currently_interacted_with_box_id.count != 0);
         is_down = false;
@@ -763,25 +774,27 @@ UI_Actions ui_actions_from_id(Str8 id)
   if (ctx_p->stack_name_inside_ctx.count > 0) {                          \
     StackPop(&ctx_p->stack_name_inside_ctx);                             \
     ctx_p->stack_name_inside_ctx.count -= 1;                             \
-    ctx_p->stack_name_inside_ctx.pop_after_first_get = false;            \
+    ctx_p->stack_name_inside_ctx.pop_after_first_use = false;            \
   }
 
 #define _UI_StyleStackGet_Impl(ctx_p, stack_name_inside_ctx, node_type, name_for_default_value_var) \
-  auto result = ctx_p->defaults.name_for_default_value_var;             \
-  if (ctx_p->stack_name_inside_ctx.first != 0) {                       \
-    result = ctx_p->stack_name_inside_ctx.first->v;                    \
-    if (ctx_p->stack_name_inside_ctx.pop_after_first_get) {            \
-      _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type); \
-    }                                                                  \
-  }                                                                    \
-  return result;
+  if (ctx_p->stack_name_inside_ctx.first != 0) {                                                    \
+    return ctx_p->stack_name_inside_ctx.first->v;                                                   \
+  } else {                                                                                          \
+    return ctx_p->defaults.name_for_default_value_var;                                              \
+  }                                                                    
 
 #define _UI_StyleStackSetNext_Impl(ctx_p, stack_name_inside_ctx, node_type, val) \
-  if (ctx_p->stack_name_inside_ctx.pop_after_first_get) {                    \
-    _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type);         \
-  }                                                                           \
+  if (ctx_p->stack_name_inside_ctx.pop_after_first_use) {                        \
+    _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type);             \
+  }                                                                              \
   _UI_StyleStackPush_Impl(ctx_p, stack_name_inside_ctx, node_type, val);         \
-  ctx_p->stack_name_inside_ctx.pop_after_first_get = true;
+  ctx_p->stack_name_inside_ctx.pop_after_first_use = true;
+
+#define _U_StyleStackPopSigngleUsage_Imp(ctx_p, stack_name_inside_ctx, node_type) \
+  if (ctx->stack_name_inside_ctx.pop_after_first_use) {                           \
+    _UI_StyleStackPop_Impl(ctx_p, stack_name_inside_ctx, node_type)               \
+  }
 
 ///////////////////////////////////////////////////////////
 // - Default box settings stacks
@@ -789,21 +802,25 @@ UI_Actions ui_actions_from_id(Str8 id)
 void ui_push_flags(UI_Box_flags v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, flags_stack, UI_Box_flags_node, v) }       
 void ui_pop_flags()                    { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, flags_stack, UI_Box_flags_node) } 
 void ui_set_next_flags(UI_Box_flags v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, flags_stack, UI_Box_flags_node, v) }       
+void ui_pop_single_usage_flags()       { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, flags_stack, UI_Box_flags_node) }
 UI_Box_flags ui_get_flags()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, flags_stack, UI_Box_flags_node, flags) }
 
 void ui_push_layout_axis(Axis2 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
 void ui_pop_layout_axis()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
 void ui_set_next_layout_axis(Axis2 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
+void ui_pop_single_usage_layout_axis() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, layout_axis_stack, UI_Layout_axis_node) }
 Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, layout_axis) }
 
 void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
 void ui_pop_size_x()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 void ui_set_next_size_x(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v); }
+void ui_pop_single_usage_size_x()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
 UI_Size ui_get_size_x()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, size_x) }
 
 void ui_push_size_y(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
 void ui_pop_size_y()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
 void ui_set_next_size_y(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
+void ui_pop_single_usage_size_y()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
 UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, size_y) }
 
 ///////////////////////////////////////////////////////////
@@ -812,25 +829,30 @@ UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_Sty
 void ui_push_b_color_uv(UV uv, V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, vertex_color_stacks[uv], UI_Vertex_color_node, v                ) }
 void ui_pop_b_color_uv(UV uv)               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl        (ctx, vertex_color_stacks[uv], UI_Vertex_color_node                   ) }
 void ui_set_next_b_color_uv(UV uv, V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl    (ctx, vertex_color_stacks[uv], UI_Vertex_color_node, v                ) }
+void ui_pop_single_usage_b_color_uv(UV uv)  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, vertex_color_stacks[uv], UI_Vertex_color_node                 ) }
 V4F32 ui_get_b_color_uv(UV uv)              { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl        (ctx, vertex_color_stacks[uv], UI_Vertex_color_node, vertex_colors[uv]) }
 
-void ui_push_b_color(V4F32 v)     { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_push_b_color_uv(uv, v);     } }
-void ui_pop_b_color()             { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_pop_b_color_uv(uv);         } }
-void ui_set_next_b_color(V4F32 v) { for EachEnum(uv, UV, UV__00, UV__COUNT) { ui_set_next_b_color_uv(uv, v); } }
+void ui_push_b_color(V4F32 v)      { for EachEnumRange(uv, UV, UV__00, UV__COUNT) { ui_push_b_color_uv(uv, v);     } }
+void ui_pop_b_color()              { for EachEnumRange(uv, UV, UV__00, UV__COUNT) { ui_pop_b_color_uv(uv);         } }
+void ui_set_next_b_color(V4F32 v)  { for EachEnumRange(uv, UV, UV__00, UV__COUNT) { ui_set_next_b_color_uv(uv, v); } }
+void ui_pop_single_usage_b_color() { for EachEnumRange(uv, UV, UV__00, UV__COUNT) { ui_pop_single_usage_b_color_uv(uv); } }
 
-void ui_push_corner_r(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-void ui_pop_corner_r()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
-void ui_set_next_corner_r(V4F32 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
-V4F32 ui_get_corner_r()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, corner_radii) }
+void ui_push_corner_r(V4F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+void ui_pop_corner_r()              { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, corner_radius_stack, UI_Corner_radius_node) }
+void ui_set_next_corner_r(V4F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
+void ui_pop_single_usage_corner_r() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, corner_radius_stack, UI_Corner_radius_node) }
+V4F32 ui_get_corner_r()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, corner_radii) }
 
 void ui_push_border(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
 void ui_pop_border()                            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
 void ui_set_next_border(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-UI_Border ui_get_border()                 { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node, border) }
+void ui_pop_single_usage_border()               { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, border_style_stack, UI_Border_style_node) }
+UI_Border ui_get_border()                       { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node, border) }
 
 void ui_push_softness(F32 softness)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, softness_stack, UI_Softness_node, softness) }
 void ui_pop_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, softness_stack, UI_Softness_node) }
 void ui_set_next_softness(F32 softness) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, softness_stack, UI_Softness_node, softness) }
+void ui_pop_single_usage_softness()     { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, softness_stack, UI_Softness_node) }
 F32 ui_get_softness()                   { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, softness_stack, UI_Softness_node, softness) }
 
 ///////////////////////////////////////////////////////////
@@ -844,45 +866,10 @@ F32 ui_get_softness()                   { UI_Context* ctx = ui_get_context(); _U
 void ui_push_font(FP_Font v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
 void ui_pop_font()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, text_font_stack, UI_Text_font_node) }
 void ui_set_next_font(FP_Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
+void ui_pop_single_usage_font()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, text_font_stack, UI_Text_font_node) }
 FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node, font) }
 
 // - UI Draw
-void r_draw_text(Str8 text, V2F32 pos, FP_Font font, V4F32 color)
-{
-  // note: These are some debug drawings for baseline and stuff
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, pos.y + font.ascent + font.descent, 100, 1), green_f());
-  // r_draw_rect(dest_rtv, rect_make(pos.x, origin_y, 100, 1), green_f());
-  
-  F32 origin_y = pos.y + font.ascent;
-  F32 x_offset = 0.0f;
-
-  for (U64 ch_index = 0; ch_index < text.count; ch_index += 1)
-  {
-    U8 ch = text.data[ch_index];
-    FP_Codepoint_data glyph_data = fp_get_glyph_data(font, ch); 
-
-    F32 origin_x = pos.x + x_offset;
-
-    // Just puttin them 1 next to another
-    Rect dest_rect = {};
-    dest_rect.x      = origin_x + glyph_data.bearing_x;
-    dest_rect.y      = origin_y - glyph_data.bearing_y;
-    dest_rect.width  = glyph_data.rect_on_atlas.width;
-    dest_rect.height = glyph_data.rect_on_atlas.height;
-    
-    d_add_texture_command(font.atlas_texture, dest_rect, glyph_data.rect_on_atlas, true, color);
-
-    F32 advance = glyph_data.advance;
-    if (ch_index < text.count - 1)
-    {
-      FP_Kerning_entry entry = fp_get_kerning(font, ch, text.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
-    } 
-    x_offset += advance; 
-  }
-}
-
 void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 {
   #if DEBUG_MODE
@@ -910,7 +897,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 
     if (root->flags & UI_Box_flag__has_text_contents)
     {
-      r_draw_text(root->text_style.text, rect_get_origin(rect), root->text_style.font, white()); 
+      d_draw_text(root->text_style.text, root->text_style.font, rect_get_origin(rect), white()); 
     }
     
     if (root->flags & UI_Box_flag__has_borders)
@@ -925,12 +912,12 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
     {
       NotImplemented(); // todo: Fix the innitial rect for this that you pass to the root box that gets drawn
-      RangeF2V32 default_scissor_box = {};
+      RangeV2F32 default_scissor_box = {};
       default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
       default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
       
-      RangeF2V32 rect_bbox        = range_f2v32_from_rect(rect);
-      RangeF2V32 new_scissor_bbox = default_scissor_box;
+      RangeV2F32 rect_bbox        = range_v2f32_from_rect(rect);
+      RangeV2F32 new_scissor_bbox = default_scissor_box;
       
       // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
       // so a child cant make a scissor larger than the parent and then have its children
@@ -940,7 +927,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
       // the ui coordinate limits.  
       if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
       {
-        RangeF2V32 parent_scissor_bbox = range_f2v32_from_rect(parent_scissor_rect);
+        RangeV2F32 parent_scissor_bbox = range_v2f32_from_rect(parent_scissor_rect);
   
         // Clmaping based to the space that the parent have already limited its children to
         for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)

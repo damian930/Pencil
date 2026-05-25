@@ -5,8 +5,8 @@
 #include "__third_party/stb/stb_image_write.h"
 #endif
 
-// #include "core/core_include.h"
-// #include "core/core_include.cpp"
+#include "core/core_include.h"
+#include "core/core_include.cpp"
 
 // #include "os/win32.h"
 // #include "os/win32.cpp"
@@ -23,15 +23,46 @@
 // #include "ui/ui_core.h"
 // #include "ui/ui_core.cpp"
 
-#include "render/render.h"
-#include "render/render.cpp"
+// #include "render/render.h"
+// #include "render/render.cpp"
 
 // #include "ui/widgets/ui_widgets.h"
 // #include "ui/widgets/ui_widgets.cpp"
 
-int main()
+void test(U32* arr)
 {
   
+}
+
+struct Ball {
+  V4F32 color;
+};
+
+struct State {
+  U64* p;
+  Ball balls[1000];
+  U64 count;
+};
+
+void add_ball(State* S)
+{
+  if (S->count < ArrayCount(S->balls))
+  {
+    Ball* ball = S->balls + S->count;
+    ball->color = blue();
+    S->count += 1;
+  }
+}
+
+int main()
+{
+  allocate_thread_context();
+
+  State state = {};
+  add_ball(&state);
+  add_ball(&state);
+  add_ball(&state);
+  add_ball(&state);
 
   return 0;
 }

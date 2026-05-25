@@ -105,7 +105,13 @@ Str8 str8_fmt(Arena* arena, const char* fmt, ...)
 {
   va_list valist;
   va_start(valist, fmt);
+  Str8 str = str8_valist(arena, fmt, valist);
+  va_end(valist);
+  return str;
+}
 
+Str8 str8_valist(Arena* arena, const char* fmt, va_list valist)
+{
   va_list valist_copy;
   va_copy(valist_copy, valist);
   U64 buffer_size_no_nt = __str8_fmt_count_valist(fmt, valist_copy);
@@ -114,7 +120,6 @@ Str8 str8_fmt(Arena* arena, const char* fmt, ...)
   Data_buffer buffer = data_buffer_make(arena, buffer_size_no_nt + 1);
   int size_written   = vsprintf((char*)buffer.data, fmt, valist);
   InvariantCheck(size_written + 1 == buffer.count);
-  va_end(valist);
 
   Str8 str_no_nt = str8_chop_back(buffer, 1);
   arena_pop(arena, 1);

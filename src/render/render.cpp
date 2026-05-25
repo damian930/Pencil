@@ -85,13 +85,23 @@ void r_init()
   #endif
 
   // Rasterizer state
+  for EachEnumRange(fill_mode, R_Fill_mode, R_Fill_mode__solid, R_Fill_mode__COUNT)
   {
+    ID3D11RasterizerState** raster_state = d3d->rasterizer_states + fill_mode;
+    D3D11_FILL_MODE d3d_fill_mode = D3D11_FILL_SOLID;
+    switch(fill_mode)
+    {
+      case R_Fill_mode__solid:     { d3d_fill_mode = D3D11_FILL_SOLID;     } break;
+      case R_Fill_mode__wireframe: { d3d_fill_mode = D3D11_FILL_WIREFRAME; } break;
+      default: { InvalidCodePath(); } break;
+    }
+
     // No culling, this makes all the triangles appear, not only the once that follow a specific clock direction (meaning clock-wise or counter clock-wise)
     D3D11_RASTERIZER_DESC desc = {};
-    desc.FillMode        = D3D11_FILL_SOLID;
+    desc.FillMode        = d3d_fill_mode;
     desc.CullMode        = D3D11_CULL_NONE;
     desc.DepthClipEnable = true;
-    hr = d3d->device->CreateRasterizerState(&desc, &d3d->rasterizer_state);
+    hr = d3d->device->CreateRasterizerState(&desc, raster_state);
     HR(hr);
   }
 
@@ -146,8 +156,11 @@ void r_init()
     }
 
     // Loading programs
-    d3d->rect_program = r_program_from_file(L"../data/shaders/test_rect_shader.hlsl", "vs_main", "ps_main", __r_g_rect_program_input_assembler_element_desc, ArrayCount(__r_g_rect_program_input_assembler_element_desc));
+    d3d->rect_program = r_program_from_file(L"../data/shaders/rect_shader_for_ui.hlsl", "vs_main", "ps_main", __r_g_rect_program_input_assembler_element_desc, ArrayCount(__r_g_rect_program_input_assembler_element_desc));
   }
+
+  // todo: These programm stuff shoud be made a loop with an enum to index into them and then a loop to compile
+  //       and set data for them here, cause this is getting out of hand and alos error prone.
 
   // Texture program
   {
@@ -161,10 +174,10 @@ void r_init()
       d3d->device->CreateBuffer(&desc, 0, &d3d->texture_program_ia_buffer);
     }
     
-    // Uniform buffer for rect program
+    // Uniform buffer for texture program
     {
       D3D11_BUFFER_DESC desc = {};
-      desc.ByteWidth      = sizeof(R_Rect_unifrom_data); 
+      desc.ByteWidth      = sizeof(R_Texture_uniform_data); 
       desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
       desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
       desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
@@ -172,7 +185,33 @@ void r_init()
     }
 
     // Loading programs
-    d3d->texture_program = r_program_from_file(L"../data/shaders/draw_texture_program_shader.hlsl", "vs_main", "ps_main", __r_g_texture_program_input_assembler_element_desc, ArrayCount(__r_g_texture_program_input_assembler_element_desc));
+    d3d->texture_program = r_program_from_file(L"../data/shaders/texture_shader.hlsl", "vs_main", "ps_main", __r_g_texture_program_input_assembler_element_desc, ArrayCount(__r_g_texture_program_input_assembler_element_desc));
+  }
+
+  // Line program
+  {
+    // Creating a buffer for input assembler data transfer
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = Megabytes(8); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_VERTEX_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->line_program_ia_buffer);
+    }
+    
+    // Uniform buffer for line program
+    {
+      D3D11_BUFFER_DESC desc = {};
+      desc.ByteWidth      = sizeof(R_Line_uniform_data); 
+      desc.Usage          = D3D11_USAGE_DYNAMIC; // Dynamic is for for gpu to read and for cpu to write 
+      desc.BindFlags      = D3D11_BIND_CONSTANT_BUFFER;
+      desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+      d3d->device->CreateBuffer(&desc, 0, &d3d->line_program_uniform_buffer); 
+    }
+
+    // Loading programs
+    d3d->line_program = r_program_from_file(L"../data/shaders/line_shader.hlsl", "vs_main", "ps_main", __r_g_line_program_input_assembler_element_desc, ArrayCount(__r_g_line_program_input_assembler_element_desc));
   }
 }
 
@@ -180,7 +219,6 @@ void r_relesase()
 {
   // todo:
 }
-
 
 ///////////////////////////////////////////////////////////
 // - Rendering work flow 
@@ -337,9 +375,6 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
   {
     d3d->context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLESTRIP);
 
-    // Rasterizer
-    d3d->context->RSSetState(d3d->rasterizer_state);
-
     // Viewport 
     {
       D3D11_VIEWPORT vp = {};
@@ -357,8 +392,9 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
   for (D_Command_batch* batch = command_batch_list->first; batch; batch = batch->next_batch)
   {
     d3d->context->OMSetRenderTargets(1, &batch->target.texture_rtv, Null);
-    d3d->context->RSSetScissorRects(0, 0);
-    
+    d3d->context->RSSetScissorRects(0, 0); // TODO: SCISSOR IS PRESENT, BUT DONT WORK YET
+    d3d->context->RSSetState(d3d->rasterizer_states[batch->fill_mode]);
+
     if (0)                                                  {}
     else if (batch->blend_kind == R_Blend_kind__alpha)    { d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U); }
     else if (batch->blend_kind == R_Blend_kind__no_blend) { d3d->context->OMSetBlendState(Null, Null, ~0U); }
@@ -467,8 +503,7 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
           instance_data.src_rect_origin  = rect_get_origin(node->command.u.texture_c.src_rect);
           instance_data.src_rect_size    = rect_get_dims(node->command.u.texture_c.src_rect);
           instance_data.src_texture_dims = r_get_target_dims(batch->texture);
-          instance_data.is_text_texture  = node->command.u.texture_c.is_text;
-          instance_data.text_color       = node->command.u.texture_c.text_color;
+          instance_data.tint             = node->command.u.texture_c.tint;
           memcpy((R_Texture_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
         }
         d3d->context->Unmap(d3d->texture_program_ia_buffer, 0);
@@ -477,6 +512,50 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
       UINT stride = sizeof(R_Texture_instance_data);
       UINT offset = 0;
       d3d->context->IASetVertexBuffers(0, 1, &d3d->texture_program_ia_buffer, &stride, &offset);
+    }
+    else if (batch->command_type == D_Command_type__Line)
+    {
+      d3d->context->IASetInputLayout(d3d->line_program.input_layout);
+
+      // Filling up the uniform buffer with data 
+      {
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        d3d->context->Map(d3d->line_program_uniform_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        R_Line_uniform_data uniform_data = {};
+        uniform_data.viewport_width  = rtv_dims.x;
+        uniform_data.viewport_height = rtv_dims.y;
+        memcpy(mapped.pData, &uniform_data, sizeof(uniform_data));
+        d3d->context->Unmap(d3d->line_program_uniform_buffer, 0);
+      }
+      
+      // Vertex shader
+      d3d->context->VSSetShader(d3d->line_program.v_shader, Null, Null);
+      d3d->context->VSSetConstantBuffers(0, 1, &d3d->line_program_uniform_buffer);  
+      
+      // Pixel shader
+      d3d->context->PSSetShader(d3d->line_program.p_shader, Null, Null);
+      d3d->context->PSSetConstantBuffers(0, 1, &d3d->line_program_uniform_buffer);
+
+      // Filling up the ia buffer with data
+      { 
+        D3D11_MAPPED_SUBRESOURCE mapped = {};
+        // todo: This doesnt check the cap for size of the buffer, this shoud be fixed
+        d3d->context->Map(d3d->line_program_ia_buffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped);
+        
+        U64 i = 0;
+        for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
+        {
+          R_Line_instance_data instance_data = {};
+          instance_data.color = node->command.u.line_c.color; 
+
+          memcpy((R_Line_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));
+        }
+        d3d->context->Unmap(d3d->line_program_ia_buffer, 0);
+      }
+
+      UINT stride = sizeof(R_Line_instance_data);
+      UINT offset = 0;
+      d3d->context->IASetVertexBuffers(0, 1, &d3d->line_program_ia_buffer, &stride, &offset);
     }
     else { InvalidCodePath(); }
   

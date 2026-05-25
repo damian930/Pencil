@@ -60,6 +60,7 @@ tu_specific Str8 str8_copy_alloc(Arena* arena, Str8 str);
 tu_specific Str8 str8_from_list(Arena* arena, Str8_list* list); // todo: There is not point in the list beeing passed by a pointer here. It shoud either be by value. Or a const pointer
 tu_specific Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_before, Str8 str_to_put_between, Str8 str_to_put_after); 
 tu_specific Str8 str8_fmt(Arena* arena, const char* fmt, ...);
+tu_specific Str8 str8_valist(Arena* arena, const char* fmt, va_list valist);
 tu_specific U64 str8_fmt_count(const char* fmt, ...);
 tu_specific U64 __str8_fmt_count_valist(const char* fmt, va_list valist);
 

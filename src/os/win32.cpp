@@ -790,14 +790,14 @@ LRESULT win32_proc(
       B8 went_down = false;
       B8 went_up = false;
 
-      if (message == WM_LBUTTONDOWN) { button = Mouse_button__Left;   went_down = true; }
-      if (message == WM_RBUTTONDOWN) { button = Mouse_button__Right;  went_down = true; }
-      if (message == WM_MBUTTONDOWN) { button = Mouse_button__Middle; went_down = true; }
+      if (message == WM_LBUTTONDOWN) { button = Mouse_button__left;   went_down = true; }
+      if (message == WM_RBUTTONDOWN) { button = Mouse_button__right;  went_down = true; }
+      if (message == WM_MBUTTONDOWN) { button = Mouse_button__middle; went_down = true; }
       if (message == WM_XBUTTONDOWN) { InvalidCodePath(); }
 
-      if (message == WM_LBUTTONUP) { button = Mouse_button__Left;   went_up = true; }
-      if (message == WM_RBUTTONUP) { button = Mouse_button__Right;  went_up = true; }
-      if (message == WM_MBUTTONUP) { button = Mouse_button__Middle; went_up = true; }
+      if (message == WM_LBUTTONUP) { button = Mouse_button__left;   went_up = true; }
+      if (message == WM_RBUTTONUP) { button = Mouse_button__right;  went_up = true; }
+      if (message == WM_MBUTTONUP) { button = Mouse_button__middle; went_up = true; }
       if (message == WM_XBUTTONUP) { InvalidCodePath(); }
 
       // was down/up are not touched here, since they are updated in the frame_begin routine
@@ -816,8 +816,13 @@ LRESULT win32_proc(
 
     case WM_NCCALCSIZE:
     {
+      #ifdef MAIN_IS_DEBUGGING
+      if (MAIN_IS_DEBUGGING) {
+        result = DefWindowProc(window_handle, message, w_param, l_param);
+      } 
+      #endif
+
       // result = 0;
-      result = DefWindowProc(window_handle, message, w_param, l_param);
       // todo: Get the caption size from the system and only remove the caption size on y.
       //       This is needed to have the resize buttons and all that be present.
     } break;
@@ -870,29 +875,35 @@ Str8 str8_from_wstr(Arena* arena, WCHAR* wstr)
 
 void os_set_cursor(OS_Cursor cursor)
 {
+  StaticAssert(OS_Cursor__COUNT == OS_Cursor__crosshair + 1); // Making sure thet i dont forget to add code to this func if i add a new cursor
+
   HCURSOR cursor_handle = {};
   switch (cursor) 
   {
-    default:               { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
-    case OS_Cursor__arrow: { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
-    case OS_Cursor__hand:  { cursor_handle = LoadCursor(Null, IDC_HAND);  } break;
+    default:                   { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
+    case OS_Cursor__arrow:     { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
+    case OS_Cursor__hand:      { cursor_handle = LoadCursor(Null, IDC_HAND);  } break;
+    case OS_Cursor__crosshair: { cursor_handle = LoadCursor(Null, IDC_CROSS); } break;
   }
   SetCursor(cursor_handle);
 }
 
 OS_Cursor os_get_cursor()
 {
+  StaticAssert(OS_Cursor__COUNT == OS_Cursor__crosshair + 1); // Making sure thet i dont forget to add code to this func if i add a new cursor
+
   HCURSOR cursor_handle = GetCursor();
   Handle(cursor_handle != Null);
 
   HCURSOR win32_arrow = LoadCursor(Null, IDC_ARROW);
   HCURSOR win32_hand  = LoadCursor(Null, IDC_HAND);
+  HCURSOR win32_cross = LoadCursor(Null, IDC_CROSS);
 
   OS_Cursor cursor = OS_Cursor__arrow;
   if      (cursor_handle == win32_arrow) { cursor = OS_Cursor__arrow; }
   else if (cursor_handle == win32_hand)  { cursor = OS_Cursor__hand; }
+  else if (cursor_handle == win32_cross) { cursor = OS_Cursor__crosshair; }
   return cursor;
 }
-
 
 #endif

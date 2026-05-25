@@ -190,6 +190,11 @@ Rect rect_make(F32 x, F32 y, F32 width, F32 height)
 	return rect;
 }
 
+Rect rect_make_v(V2F32 pos, V2F32 dims)
+{
+	return rect_make(pos.x, pos.y, dims.x, dims.y);
+}
+
 Rect rect_from_center(V2F32 center, V2F32 dims)
 {
 	Rect rect = {};
@@ -210,7 +215,7 @@ V2F32 rect_get_dims(Rect rect)
 	return v2f32(rect.width, rect.height);
 }
 
-V2F32 rect_center(Rect rect)
+V2F32 rect_get_center(Rect rect)
 {
 	V2F32 center = {};
 	center.x = rect.x + (rect.width / 2.0f);
@@ -253,7 +258,7 @@ B32 is_point_inside_rectV(V2F32 v, Rect r)
 	return is_inside;	
 }
 
-B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end)
+B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end)
 {
 	// This formula uses cross product. I dont understand why this works, but this is the formula
 	F32 equation_left_side  = (line_end.y - line_start.y) * (point.x - line_start.x);

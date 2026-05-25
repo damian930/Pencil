@@ -179,10 +179,10 @@ typedef double F64;
 #define InvalidCodePath(...) do { Assert(false); } while (0)
 #define NotImplemented(...)  do { Assert(false); } while (0)
 
-#define EachIndex(it, count)                     (U64 it = 0; it < count; it += 1)
-#define EachArrElement(it, static_arr)           (U64 it = 0; i < ArrayCount(static_arr); it += 1)
-#define EachInRange(it, range_min, range_max)    (U64 it = range_min; it < range_max; it += 1)
-#define EachEnum(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)it + 1))	
+#define EachIndex(it, count)                          (U64 it = 0; it < count; it += 1)
+#define EachArrElement(it, static_arr)                (U64 it = 0; i < ArrayCount(static_arr); it += 1)
+#define EachInRange(it, range_min, range_max)         (U64 it = range_min; it < range_max; it += 1)
+#define EachEnumRange(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)it + 1))	
 
 /* NOTES:
   Stack here is a list that only has the "first" node pointer. Nodes only have the "next" pointer.
@@ -589,13 +589,13 @@ union V2F32 {
 	};
 	F32 v[2];
 };
-typedef V2F32 Vec2;
-typedef V2F32 V2;
 
 tu_specific V2F32 v2f32(F32 x, F32 y) { V2F32 v = { x, y }; return v; }
 tu_specific B32 v2f32_match(V2F32 v1, V2F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
 tu_specific F32 v2f32_len_sq(V2F32 v) { F32 len = (v.x * v.x) + (v.y * v.y); return len; }
 tu_specific F32 v2f32_len(V2F32 v) { F32 len = sqrtf(v2f32_len_sq(v)); return len; }
+
+tu_specific V2F32 v2f32_sub(V2F32 v1, V2F32 v2) { return v2f32(v1.x - v2.x, v1.y - v2.y); }
 
 union V3F32 {
 	struct {
@@ -649,30 +649,52 @@ struct Rect {
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
+tu_specific Rect rect_make_v(V2F32 pos, V2F32 dims);
 tu_specific Rect rect_from_center(V2F32 center, V2F32 dims);
 tu_specific V2F32 rect_get_origin(Rect rect);
 tu_specific V2F32 rect_get_dims(Rect rect);
-tu_specific V2F32 rect_center(Rect rect);
+tu_specific V2F32 rect_get_center(Rect rect);
 tu_specific B32 rect_match(Rect r1, Rect r2);
 tu_specific Rect rect_padded(Rect rect, F32 padd);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
-tu_specific B32 is_point_inside_line(V2 point, V2 line_start, V2 line_end);
+tu_specific B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end);
 
-struct RangeF2V32 {
+struct RangeV2F32 {
 	V2F32 min;
 	V2F32 max;
 };
 
-tu_specific RangeF2V32 range_f2v32_from_rect(Rect rect)
+tu_specific RangeV2F32 range_v2f32(V2F32 min, V2F32 max)
 {
-	RangeF2V32 range = {};
+	RangeV2F32 range = {};
+	range.min = min;
+	range.max = max;
+	return range;
+}
+
+tu_specific RangeV2F32 range_v2f32_as_bb(V2F32 p1, V2F32 p2)
+{
+	V2F32 min = {};
+	min.x = Min(p1.x, p2.x);
+	min.y = Min(p1.y, p2.y);
+
+	V2F32 max = {};
+	max.x = Max(p1.x, p2.x);
+	max.y = Max(p1.y, p2.y);
+
+	return range_v2f32(min, max);
+}
+
+tu_specific RangeV2F32 range_v2f32_from_rect(Rect rect)
+{
+	RangeV2F32 range = {};
 	range.min = v2f32(rect.x, rect.y);
 	range.max = v2f32(rect.x + rect.width, rect.y + rect.height);
 	return range;
 }
 
-tu_specific Rect rect_from_range_v2f32(RangeF2V32 range)
+tu_specific Rect rect_from_range_v2f32(RangeV2F32 range)
 {
 	Rect rect = {};
 	rect.x      = range.min.x;
@@ -681,8 +703,6 @@ tu_specific Rect rect_from_range_v2f32(RangeF2V32 range)
 	rect.height = range.max.y - range.min.y;
 	return rect;
 }
-
-
 
 // note: this is static inline just cause i didnt care to move it to cpp file
 tu_specific B32 __is_memory_zero(U8* p, U64 size)

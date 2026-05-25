@@ -130,11 +130,11 @@ enum Key : U32 {
 
 enum Mouse_button : U32 {
   Mouse_button__NONE,
-  Mouse_button__Left,
-  Mouse_button__Right,
-  Mouse_button__Middle,
-  Mouse_button__Side_far,
-  Mouse_button__Side_near,
+  Mouse_button__left,
+  Mouse_button__right,
+  Mouse_button__middle,
+  Mouse_button__side_far,
+  Mouse_button__side_near,
   Mouse_button__COUNT,
 };
 
@@ -247,7 +247,9 @@ void os_sleep(U64 ms);
 // - Misc
 enum OS_Cursor : U32{
   OS_Cursor__arrow, 
-  OS_Cursor__hand, 
+  OS_Cursor__hand,
+  OS_Cursor__crosshair,
+  OS_Cursor__COUNT,
 };
 
 Str8 os_get_path_to_system_fonts();

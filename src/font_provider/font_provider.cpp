@@ -1,12 +1,6 @@
 #ifndef FONT_PROVIDER_CPP
 #define FONT_PROVIDER_CPP
 
-// todo: Do we need these here really ???
-#include "os/win32.h"
-#include "os/win32.cpp"
-
-// #include "font_provider.h"
-
 // For packing data into data atlases
 #ifndef STB_RECT_PACK_IMPLEMENTATION 
 #define STB_RECT_PACK_IMPLEMENTATION
@@ -19,61 +13,19 @@
 #include "__third_party/stb/stb_truetype.h"
 #endif
 
+// todo: Use this "stbtt_PackSetSkipMissingCodepoints"
+// todo: Have font provider give a null char that is set in the font file when we request a char that is not a part of the font
+
 #include "core/core_include.h"
 #include "core/core_include.cpp"
 
-// todo: Does it need this ???
 #include "os/win32.h"
 #include "os/win32.cpp"
 
-// todo: Move this into .h
 #include "render/render.h"
 #include "render/render.cpp"
 
-// todo: Use this "stbtt_PackSetSkipMissingCodepoints"
-
-struct FP_Codepoint_data {
-  Rect rect_on_atlas; // The bounding box for the codepoint glyph in the texture font atlas. todo: Write for what this shoud be used.
-  F32 bearing_x; // Positive
-  F32 bearing_y; // Positive
-  F32 advance;   
-};
-
-struct FP_Kerning_entry {
-  U64 codepoint1;
-  U64 codepoint2;
-  F32 advance; // Might be negative or positive, so just add it to the normal advance for a codepoint
-};
-
-struct FP_Font {
-  // ID3D11RenderTargetView* atlas_texture;
-  R_Target atlas_texture;
-
-  RangeU64 codepoint_range;
-  FP_Codepoint_data* codepoints_data_arr;
-  
-  FP_Kerning_entry* kerning_entries;
-  U64 kerning_entry_count;
-
-  F32 size;   
-  F32 ascent;  // Positive
-  F32 descent; // Positive
-};
-
-struct FP_Font_node {
-  FP_Font font;
-  FP_Font_node* next;
-  FP_Font_node* prev;
-};
-
-struct FP_State {
-  Arena* state_arena;
-  FP_Font_node* first_font;
-  FP_Font_node* last_font;
-  U64 font_count;
-};
-
-global FP_State* __fp_g_state = {};
+global FP_State* __fp_g_state = 0;
 
 FP_State* fp_get_state()
 {
@@ -123,7 +75,6 @@ B32 __fp_try_to_generate_grey_scale_font_atlas_image(
 }
 
 // todo: Trying to just load a font like in raylib
-// note: Returs all zeroes out Image struct memory on fail
 FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_to_load)
 {
   // note:
@@ -236,16 +187,16 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
         int advance   = 0;
         int bearing_x = 0;
         stbtt_GetCodepointHMetrics(&stb_font_info, (int)codepoint, &advance, &bearing_x); // todo: Remove the (int)
-        codepoint_data->bearing_x = f32_floor((F32)bearing_x * scale);
-        codepoint_data->advance           = f32_floor((F32)advance * scale);
+        codepoint_data->bearing_x = (F32)bearing_x * scale;
+        codepoint_data->advance   = (F32)advance * scale;
       }
 
       {
         int ascent = 0; int descent = 0; int line_gap = 0;
         stbtt_GetFontVMetrics(&stb_font_info, &ascent, &descent, &line_gap);
-        result_font->ascent  = f32_floor((F32)ascent * scale);
-        result_font->descent = f32_floor((F32)descent * scale * -1.0f);
-        // F32 fline_gap = f32_floor((F32)line_gap * scale);
+        result_font->ascent  = (F32)ascent * scale;
+        result_font->descent = (F32)descent * scale * -1.0f;
+        // F32 fline_gap = (F32)line_gap * scale;
       }
 
       Rect glyph_atlas_rect = rect_make((F32)packed_data->x0, (F32)packed_data->y0, (F32)(packed_data->x1 - packed_data->x0), (F32)(packed_data->y1 - packed_data->y0)); 
@@ -256,10 +207,10 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
       {
         int x0 = 0, y0 = 0, x1 = 0, y1 = 0;
         stbtt_GetCodepointBitmapBox(&stb_font_info, (int)codepoint, scale, scale, &x0, &y0, &x1, &y1); // todo: Remove the (int) here
-        F32 fx0 = f32_floor((F32)x0);
-        F32 fy0 = f32_floor((F32)y0);
-        F32 fx1 = f32_floor((F32)x1);
-        F32 fy1 = f32_floor((F32)y1);
+        F32 fx0 = (F32)x0;
+        F32 fy0 = (F32)y0;
+        F32 fx1 = (F32)x1;
+        F32 fy1 = (F32)y1;
         
         // if (codepoint == 'C') { BP; }
 
@@ -284,14 +235,12 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
     
     fp_entry->codepoint1 = stb_entry->glyph1;
     fp_entry->codepoint2 = stb_entry->glyph2;
-    fp_entry->advance    = f32_floor((F32)stb_entry->advance * scale);
+    fp_entry->advance    = (F32)stb_entry->advance * scale;
   }
 
   end_scratch(&scratch);
   return *result_font;
 }
-
-// todo: Have font provider give a null char that is set in the font file when we request a char that is not a part of the font
 
 FP_Codepoint_data fp_get_glyph_data(FP_Font font, U64 unicode_codepoint)
 {
@@ -320,7 +269,7 @@ FP_Kerning_entry fp_get_kerning(FP_Font font, U64 unicode_codepoint_1, U64 unico
 V2F32 fp_measure_text(Str8 str, FP_Font font)
 {
   V2F32 dims = {};
-  dims.y = font.ascent + font.descent;
+  dims.y = fp_get_font_height(font); 
   for (U64 ch_index = 0; ch_index < str.count; ch_index += 1)
   {
     U8 ch = str.data[ch_index];
@@ -330,14 +279,17 @@ V2F32 fp_measure_text(Str8 str, FP_Font font)
     if (ch_index < str.count - 1)
     {
       FP_Kerning_entry entry = fp_get_kerning(font, ch, str.data[ch_index + 1]);
-      if (!IsMemZero(entry)) { advance += entry.advance; }
+      advance += entry.advance;  
     } 
     dims.x += advance;
   }
   return dims;
 }
 
-
+F32 fp_get_font_height(FP_Font font)
+{
+  return font.ascent + font.descent;
+}
 
 
 

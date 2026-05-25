@@ -32,7 +32,7 @@ void pencil_init(Pencil_state* P)
   P->draw_texures_width  = (U32)os_get_client_area_dims__unsynched().x; // todo: Handle the case when the area is negative
   P->draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
 
-  P->draw_texture_always_fresh     = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  P->draw_texture_always_fresh = r_make_texture(P->draw_texures_width, P->draw_texures_height);
 
   // Putting everything into the free list since we already have a static buffer of draw records
   for EachIndex(i, DRAW_RECORDS_MAX_COUNT)
@@ -40,11 +40,53 @@ void pencil_init(Pencil_state* P)
     Draw_record* record = P->pool_of_draw_records + i;
     DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
   }
+
+  // Draw_record_registration_result record = register_new_draw_record(P);
 }
 
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode)
 {
   Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
+
+  if (is_ruler_mode)
+  {
+    static B32 is_mid_ruling      = false;
+    static V2F32 ruling_start_pos = {};
+    static V2F32 ruling_end_pos   = {};
+
+    if (!is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    {
+      is_mid_ruling = true;
+      ruling_start_pos = os_get_mouse_pos();
+      ruling_end_pos = ruling_start_pos;
+    }
+    else if (is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    {
+      ruling_end_pos = os_get_mouse_pos();
+    }
+    else if (is_mid_ruling && os_mouse_button_went_up(Mouse_button__left))
+    {
+      is_mid_ruling = false;
+      ruling_start_pos = {};
+      ruling_end_pos = {};
+    }
+
+    if (is_mid_ruling)
+    {
+      Rect ruler_rect = rect_from_range_v2f32(range_v2f32_as_bb(ruling_start_pos, ruling_end_pos));
+      d_draw_rect_inset_borders(ruler_rect, red(), 2.0f, v4f32_all(0.0f), 0.0f);
+
+      V2F32 ruler_rect_center = rect_get_center(ruler_rect);
+      V2F32 reler_dims        = rect_get_dims(ruler_rect);
+      FP_Font font            = ui_get_font();
+      V2F32 text_pos          = v2f32_sub(ruler_rect_center, v2f32(0.0f, (fp_get_font_height(font) / 2.0f))); 
+
+      d_draw_circle(ruler_rect_center, 3, green(), 2.0f);
+      d_draw_text_f("W: %.0f, H: %.0f", font, text_pos, white(), reler_dims.x, reler_dims.y);
+    }
+
+    return;
+  }
 
   // Handling signals
   {
@@ -130,7 +172,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   {
     dont_start_drawing_this_frame = true;
 
-    // todo: This is always 0 for some reason, some wrong with the list, fix it dude
     if (P->current_record != 0)
     {
       Draw_record* record = P->current_record;
@@ -194,7 +235,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
   if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
 
   // Starting a new draw record
-  if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left)) 
+  if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__left)) 
   {
     Draw_record_registration_result record_registation = register_new_draw_record(P);
     if (record_registation.succ)
@@ -204,7 +245,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     }
   }
   else // Updating active drawing 
-  if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__Left))
+  if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__left))
   {
     V2F32 new_pos  = os_get_mouse_pos();
     V2F32 prev_pos = os_get_prev_mouse_pos();
@@ -238,7 +279,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     if (P->is_erasing_mode) { d_pop_blend_kind(); }
   }
   else // Here we finalise the draw record that the user have been drawing
-  if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__Left))
+  if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__left))
   {
     Assert(P->current_record != 0);
     Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_after_we_affected));  // These are expected to already be allocated by this point
@@ -263,7 +304,7 @@ void pencil_render(const Pencil_state* P)
   rect.height = (F32)P->draw_texures_height;
   // D_Bxlend(D3D_Blend_kind__no_blend) 
   {
-    d_add_texture_command(P->draw_texture_always_fresh, rect, rect, false, V4F32{});
+    d_add_texture_command(P->draw_texture_always_fresh, rect, rect, white());
   }
 }
 
@@ -429,12 +470,17 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                       B32 interacted = false;
             
                       F32 new_r = 0.0f, new_g = 0.0f, new_b = 0.0f, new_a = 0.0f;
+                      
+                      slider_style.fmt_str = "R: %0.0f";
                       interacted |= ui_slider(Str8FromC("Slider for red color id"),   &slider_style, pen_color_rgba.r * 255.0f, 0.0f, 255.0f, &new_r);
                       ui_spacer(ui_px(10));
+                      slider_style.fmt_str = "G: %0.0f";
                       interacted |= ui_slider(Str8FromC("Slider for green color id"), &slider_style, pen_color_rgba.g * 255.0f, 0.0f, 255.0f, &new_g);
                       ui_spacer(ui_px(10));
+                      slider_style.fmt_str = "B: %0.0f";
                       interacted |= ui_slider(Str8FromC("Slider for blue color id"),  &slider_style, pen_color_rgba.b * 255.0f, 0.0f, 255.0f, &new_b);
                       ui_spacer(ui_px(10));
+                      slider_style.fmt_str = "A: %0.0f";
                       interacted |= ui_slider(Str8FromC("Slider for alpha color id"), &slider_style, pen_color_rgba.a * 255.0f, 0.0f, 255.0f, &new_a);
             
                       new_rga_value_0_255.r = new_r;

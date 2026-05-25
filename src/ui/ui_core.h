@@ -46,31 +46,31 @@ typedef U32 UI_Box_flags;
 
 // - Stacks for default settings
 struct UI_Box_flags_node  { UI_Box_flags v; UI_Box_flags_node* next; };
-struct UI_Box_flags_stack { UI_Box_flags_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Box_flags_stack { UI_Box_flags_node* first; U64 count; B32 pop_after_first_use; };
 //
 struct UI_Layout_axis_node  { Axis2 v; UI_Layout_axis_node* next; };
-struct UI_Layout_axis_stack { UI_Layout_axis_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Layout_axis_stack { UI_Layout_axis_node* first; U64 count; B32 pop_after_first_use; };
 //
 struct UI_Semantic_size_node  { UI_Size v; UI_Semantic_size_node* next; };
-struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to the shape of the box
 struct UI_Vertex_color_node  { V4F32 v; UI_Vertex_color_node* next; };
-struct UI_Vertex_color_stack { UI_Vertex_color_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Vertex_color_stack { UI_Vertex_color_node* first; U64 count; B32 pop_after_first_use; };
 //
 struct UI_Corner_radius_node  { V4F32 v; UI_Corner_radius_node* next; };
-struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop_after_first_use; };
 //
 struct UI_Softness_node  { F32 v; UI_Softness_node* next; };
-struct UI_Softness_stack { UI_Softness_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Softness_stack { UI_Softness_node* first; U64 count; B32 pop_after_first_use; };
 //
 struct UI_Border             { F32 width; V4F32 color; };
 struct UI_Border_style_node  { UI_Border v; UI_Border_style_node* next; };
-struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_get; };
+struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to text
 struct UI_Text_font_node  { FP_Font v; UI_Text_font_node* next; };
-struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_get; }; 
+struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_first_use; }; 
 
 struct UI_Box;
 
@@ -278,21 +278,25 @@ UI_Actions ui_actions_from_id(Str8 id);
 void         ui_push_flags(UI_Box_flags v);       
 void         ui_pop_flags(); 
 void         ui_set_next_flags(UI_Box_flags v);       
+void         ui_pop_single_usage_flags();
 UI_Box_flags ui_get_flags();
 //
 void  ui_push_layout_axis(Axis2 v);       
 void  ui_pop_layout_axis(); 
 void  ui_set_next_layout_axis(Axis2 v);       
+void  ui_pop_single_usage_layout_axis();
 Axis2 ui_get_layout_axis();
 //
 void    ui_push_size_x(UI_Size v);          
 void    ui_pop_size_x();      
 void    ui_set_next_size_x(UI_Size v);          
+void    ui_pop_single_usage_size_x();
 UI_Size ui_get_size_x();
 //
 void    ui_push_size_y(UI_Size v);          
 void    ui_pop_size_y();      
 void    ui_set_next_size_y(UI_Size v);          
+void    ui_pop_single_usage_size_y();
 UI_Size ui_get_size_y();
 
 #define UI_LayoutAxis(axis2)  DeferLoop(ui_push_layout_axis(axis2),       ui_pop_layout_axis())
@@ -303,25 +307,30 @@ UI_Size ui_get_size_y();
 void  ui_push_b_color_uv(UV uv, V4F32 v);     
 void  ui_pop_b_color_uv(UV uv);               
 void  ui_set_next_b_color_uv(UV uv, V4F32 v); 
+void  ui_pop_single_usage_b_color_uv(UV uv);
 V4F32 ui_get_b_color_uv(UV uv);               
 
 void ui_push_b_color(V4F32 v);
 void ui_pop_b_color();
 void ui_set_next_b_color(V4F32 v);
+void ui_pop_single_usage_b_color();
 
 void  ui_push_corner_r(V4F32 v);
 void  ui_pop_corner_r();
 void  ui_set_next_corner_r(V4F32 v);
+void  ui_pop_single_usage_corner_r();
 V4F32 ui_get_corner_r();
 
 void      ui_push_border(F32 width, V4F32 color);
 void      ui_pop_border();
 void      ui_set_next_border(F32 width, V4F32 color);
+void      ui_pop_single_usage_border();
 UI_Border ui_get_border();
 
 void ui_push_softness(F32 softness);
 void ui_pop_softness();
 void ui_set_next_softness(F32 softness);
+void ui_pop_single_usage_softness();
 F32  ui_get_softness();
 
 #define UI_BColor(v)            DeferLoop(ui_push_b_color(v),           ui_pop_color())
@@ -335,9 +344,10 @@ F32  ui_get_softness();
 // void ui_set_next_text_color(V4F32 v);
 // V4F32 ui_get_text_color();
 
-void ui_push_font(FP_Font v);
-void ui_pop_font();
-void ui_set_next_font(FP_Font v);
+void    ui_push_font(FP_Font v);
+void    ui_pop_font();
+void    ui_set_next_font(FP_Font v);
+void    ui_pop_single_usage_font();
 FP_Font ui_get_font();
 
 // #define UI_TextColor(color) DeferLoop(ui_push_text_color(color), ui_pop_text_color())

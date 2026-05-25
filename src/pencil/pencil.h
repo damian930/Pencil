@@ -15,6 +15,8 @@ struct Draw_record {
   Draw_record* prev;
 };
 
+// note: I be forgetting why i have an optional here. Its not for cases where the textures might not ge created, but
+//       rather for cases when the state of the Pencil might not be legal for creation of new draw records.
 struct Draw_record_registration_result {
   B32 succ;
   Draw_record* record;  
@@ -71,7 +73,7 @@ struct Pencil_state {
 
 // - Main passes
 void pencil_init(Pencil_state* P);
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse);
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode);
 void pencil_render(const Pencil_state* P);
 void pencil_do_ui(Pencil_state* P, FP_Font font);
 

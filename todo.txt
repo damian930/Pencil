@@ -1,17 +1,22 @@
-Looking into the pencil state and update loop:
- - Why does count_of_pool_draw_records_in_use inlude the free list, this is error prone,
-      -- This here seems liek the records is a list but with a 0 beeing a possible value when there is no element, but the access pattern is not great, this shoud be changed, either by having some accessors that would close the logic in there, or just by making a better data struct overall.
-   would it be possible to do a different design for this ?
-- The current record might be 0, this might be bad and error prone
-// ----
+- Major features:
+[ ] - Pen that fades away over some time
+[ ] - On screen reler 
+[ ] - On screen color picker
 
-[ ] - the issue with 0 draw rectord in the current record list. There i also a bug that if the screen has something on it 
-      and you draw and then go back you get a black sceen. This is bacause we dont draw into the before and after affected using the 
-      not_that_fresh texture at the end of draw, instead of the fresh texture at the sta[ ] - Fixrt of draw.
+- Stuff to fix or add next:
+[ ] - Remove the stacks from draw and just have a settings struct and a stack for that.
+      This way you dont have to duplicate code for each stack and mess with macros at all.
 
-[ ] - Test read and writes for more than 4 gigs on you pc, it takes to much time on the laptop
-[ ] - Remove the non-client arena for the window 
-
+- Minor fixes and additions:
+[ ] - Move the codebase into C. 
+      I like this syntax 
+      #define dr_rect(...) dr_draw_rect((Rect_Settings){ \
+        .softness      = 1.f,                          \
+        .corner_radius = 4.f,                          \
+        __VA_ARGS__                                     \
+    })
+    Its called -> "Designated initializer"
+      
 [ ] - When drawing have a pen like in cactus image viewer
 
 [ ] - Display the fps on the screen to have it be like in raylib  
@@ -19,19 +24,8 @@ Looking into the pencil state and update loop:
 [ ] - Start using V memory instead of malloc
 [ ] - https://github.com/mmozeiko/c_d2d_dwrite for DWrite,
       found this in Digital Grove 
-
-[ ] - Fix the bug that the circle that you draw dont get smoothed out at all, but ui does.
-
-Feature ideas:
-- Visible pen size
-- Customisation for shortcuts
-- Screen shot with the back of the desktop
-- Screen shot with just the drawn part
-- Arrow
-- Saving of 
-- Pixel ruller so i dont have to use a website for it
-
-
+[ ] - Start using wide chars for win32 stuff and not regular asci
+[ ] - Structure the code for core base 
 
 
 

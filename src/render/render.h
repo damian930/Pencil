@@ -62,7 +62,7 @@ struct R_Rect_unifrom_data {
 
 // - Stuff for the texture program
 struct R_Texture_instance_data {
-  V4F32 text_color;
+  V4F32 tint;
 
   V2F32 dest_rect_origin;
   V2F32 dest_rect_size;
@@ -72,14 +72,24 @@ struct R_Texture_instance_data {
   
   V2F32 src_texture_dims;
 
-  B32 is_text_texture;
-
-  F32 _padding_[2];
+  F32 _padding_[3];
 };
 //
 struct R_Texture_uniform_data {
   F32 u_window_width;
   F32 u_window_height;
+  F32 _padding_[2];
+};
+
+// - Stuff for the line program
+struct R_Line_instance_data {
+  V4F32 color;
+};
+
+struct R_Line_uniform_data {
+  F32 viewport_width;
+  F32 viewport_height;
+
   F32 _padding_[2];
 };
 
@@ -92,6 +102,12 @@ struct R_Program {
 enum R_Blend_kind {
   R_Blend_kind__alpha,
   R_Blend_kind__no_blend,
+};
+
+enum R_Fill_mode : U32 {
+  R_Fill_mode__solid,
+  R_Fill_mode__wireframe,
+  R_Fill_mode__COUNT,
 };
 
 struct R_Target {
@@ -113,17 +129,21 @@ struct D3D_State {
   ID3D11Device*        device;
   ID3D11DeviceContext* context;
   // 
-  ID3D11RasterizerState*  rasterizer_state;
+  ID3D11RasterizerState*  rasterizer_states[R_Fill_mode__COUNT];
   ID3D11BlendState*       alpha_blend_state;
   ID3D11SamplerState*     sampler;
   //
   ID3D11Buffer* rect_program_ia_buffer;
   ID3D11Buffer* rect_program_uniform_buffer;
-  R_Program   rect_program;
+  R_Program     rect_program;
   //
   ID3D11Buffer* texture_program_ia_buffer;
   ID3D11Buffer* texture_program_uniform_buffer;
-  R_Program   texture_program;
+  R_Program     texture_program;
+  // 
+  ID3D11Buffer* line_program_ia_buffer;
+  ID3D11Buffer* line_program_uniform_buffer;
+  R_Program     line_program;
 };
 
 extern global D3D_State __d3d_g_state;
@@ -188,16 +208,18 @@ D3D11_INPUT_ELEMENT_DESC __r_g_rect_program_input_assembler_element_desc[] =
   { "RECT_BORNER_THICKNESS", 0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(R_Rect_instance_data, border_thickness), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "SOFTNESS",              0, DXGI_FORMAT_R32_FLOAT,          0, TypeFieldOffset(R_Rect_instance_data, softness),         D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
-
 D3D11_INPUT_ELEMENT_DESC __r_g_texture_program_input_assembler_element_desc[] = 
 {
-  { "TEXT_COLOR",       0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(R_Texture_instance_data, text_color),       D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+  { "TINT",             0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(R_Texture_instance_data, tint),             D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "DEST_RECT_ORIGIN", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, dest_rect_origin), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "DEST_RECT_SIZE",   0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, dest_rect_size),   D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "SRC_RECT_ORIGIN",  0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, src_rect_origin),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
-  { "IS_TEXT_TEXTURE",  0, DXGI_FORMAT_R32_UINT,           0, TypeFieldOffset(R_Texture_instance_data, is_text_texture),  D3D11_INPUT_PER_INSTANCE_DATA, 1 },
+};
+D3D11_INPUT_ELEMENT_DESC __r_g_line_program_input_assembler_element_desc[] = 
+{
+  { "LINE_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(R_Line_instance_data, color), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
 
 #endif
