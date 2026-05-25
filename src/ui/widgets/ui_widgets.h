@@ -59,16 +59,24 @@ struct UI_Slider_style {
 B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, F32* out_opt_new_value)
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
+  UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
+
+  F32 corner_r_in_px = 4.0f;
+
+  F32 corner_r_in_norm = 0.0f;
+  if (slider_box_data.found) {
+    corner_r_in_norm = corner_r_in_px / (Min(slider_box_data.on_screen_rect.width, slider_box_data.on_screen_rect.height) / 2);
+  }
 
   if (slider_actions.is_hovered) { ui_set_next_b_color(slider_style->hover_color);} 
   else                           { ui_set_next_b_color(slider_style->no_hover_color); }
   ui_set_next_size_x(slider_style->size_x);
   ui_set_next_size_y(slider_style->size_y);
   ui_set_next_layout_axis(Axis2__x);
-  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__has_background); 
+  ui_set_next_corner_r(v4f32_all(corner_r_in_norm));
+  UI_Box* slider_box = ui_box_make(slider_id, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners); 
 
   F32 new_value = current_value;
-  UI_Box_data slider_box_data = ui_get_box_data_prev_frame_from_id(slider_id);
 
   B32 moved_slider = false;
   if (slider_box_data.found)
@@ -84,7 +92,8 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
       ui_set_next_size_x(ui_px(thumb_offset));
       ui_set_next_size_y(ui_px(slider_box_data.on_screen_rect.height));
       ui_set_next_b_color(slider_style->slided_part_color);
-      UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), UI_Box_flag__has_background);
+      ui_set_next_corner_r(v4f32_all(corner_r_in_px / (Min(thumb_offset, slider_box_data.on_screen_rect.height) / 2)));
+      UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
     }
   
     UI_Parent(slider_box)

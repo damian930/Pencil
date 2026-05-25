@@ -140,12 +140,12 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
     if (rect_outline_sdf < -softness) { discard; }
     else {
       // rect_inner_smoothing = smoothstep(-softness, softness, rect_outline_sdf);
-      rect_inner_smoothing = 1- smoothstep(-2*softness, 0.0, -rect_outline_sdf);
+      rect_inner_smoothing = 1 - smoothstep(-2*softness, 0.0, -rect_outline_sdf);
     }
   }  
 
   final_color.a *= rect_outline_smoothing;
-  final_color.a *= rect_inner_smoothing;
+  // final_color.a *= rect_inner_smoothing;
 
   return final_color;
 }

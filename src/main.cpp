@@ -167,8 +167,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //   font = fp_load_font(path_to_font, 128, range_u64_make(0, (U64)u8_max + 1));
   //   end_scratch(&scratch);
   // }
-  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
+  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 18, range_u64_make(0, (U64)u8_max + 1));
 
+  // R_Target pen_texture = r_load_texture_from_file(Str8FromC("../data/pen.png"));
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
   F64 prev_frame_duration_sec = 0.0;
@@ -190,15 +191,15 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     
     { // UI and Application update 
       pencil_do_ui(&P, font);
-      pencil_update(&P, !ui_has_active(), true);
+      pencil_update(&P, !ui_has_active(), false);
     }
 
     { // Rendering
       r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
-      if (!os_window_is_mouse_passthrough()) { ui_draw(); }
+      if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
     }
-    
+
     r_submit(window_frame_buffer_target, d_get_batch_list());
 
     d_end_batching();

@@ -38,6 +38,8 @@ struct OS_State {
   //
   OS_Key_state key_states[Key__COUNT];
   OS_Mouse_button_state mouse_button_states[Mouse_button__COUNT];
+  // 
+  F32 mouse_wheel_scroll_delta;
 };
 
 global OS_State* __os_g_state = 0;
@@ -326,6 +328,9 @@ void os_frame_begin()
     }
   }
 
+  // Resetting the mouse wheel scroll data
+  os_state->mouse_wheel_scroll_delta = 0.0f;
+
   // Creating frame events though the winproc
   for (MSG msg = {}; PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
   {
@@ -339,7 +344,7 @@ void os_frame_begin()
     for (U32 button = Mouse_button__NONE + 1; button < Mouse_button__COUNT; button += 1)
     {
       OS_Mouse_button_state state = os_get_mouse_button_state((Mouse_button)button);
-      if (state.is_down) { some_button_is_down = true; }
+      if (state.is_down) { some_button_is_down = true; break; }
     }
 
     HWND widnow_that_is_capturing_the_mouse = GetCapture();
@@ -538,6 +543,16 @@ B32 os_key_repeat_down(Key key)
   return state.repeat_down;
 }
 
+B32 os_wheel_got_scrolled()
+{
+  return (os_get_state()->mouse_wheel_scroll_delta != 0.0f); 
+}
+
+F32 os_get_wheel_scroll()
+{
+  return os_get_state()->mouse_wheel_scroll_delta;
+}
+
 Str8 str8_from_os_key(Key key)
 { 
   Str8 str = {};
@@ -731,7 +746,9 @@ LRESULT win32_proc(
     {
       Key key = {};
 
-      if ('A' <= w_param && w_param <= 'Z') { key = (Key)((U32)Key__A + (w_param - 'A')); }
+      if (0) {}
+      else if ('A' <= w_param && w_param <= 'Z') { key = (Key)((U32)Key__A + (w_param - 'A')); }
+      else if ('0' <= w_param && w_param <= '9') { key = (Key)((U32)Key__0 + (w_param - '0')); }
       else {
         switch (w_param)
         {
@@ -806,6 +823,13 @@ LRESULT win32_proc(
       button_state->is_down = went_down;
       button_state->is_up   = went_up;
     } break;
+
+    case WM_MOUSEWHEEL:
+    {
+      S16 wheel_delta = GET_WHEEL_DELTA_WPARAM(w_param) / WHEEL_DELTA;
+      win32_state->mouse_wheel_scroll_delta = (F32)wheel_delta;
+      // todo: l_param stored the mouse pos at the time of the scroll
+    }
 
     case WM_CAPTURECHANGED:
     {
@@ -904,6 +928,11 @@ OS_Cursor os_get_cursor()
   else if (cursor_handle == win32_hand)  { cursor = OS_Cursor__hand; }
   else if (cursor_handle == win32_cross) { cursor = OS_Cursor__crosshair; }
   return cursor;
+}
+
+void os_show_cursor(B32 show)
+{
+  ShowCursor(show);
 }
 
 #endif

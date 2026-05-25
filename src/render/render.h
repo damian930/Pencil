@@ -111,7 +111,8 @@ enum R_Fill_mode : U32 {
 };
 
 struct R_Target {
-  // This is shared for rtvs and swap chains
+  // This is shared for rtvs and swap chains 
+  // (There are no textures right now which are not also rtvs)
   ID3D11Texture2D*        texture;
   ID3D11RenderTargetView* texture_rtv;
 
@@ -132,6 +133,8 @@ struct D3D_State {
   ID3D11RasterizerState*  rasterizer_states[R_Fill_mode__COUNT];
   ID3D11BlendState*       alpha_blend_state;
   ID3D11SamplerState*     sampler;
+  //
+  // ID3D11Texture2D* magenta_black_d3d_texture;
   //
   ID3D11Buffer* rect_program_ia_buffer;
   ID3D11Buffer* rect_program_uniform_buffer;

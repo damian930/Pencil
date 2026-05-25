@@ -48,46 +48,6 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
 {
   Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
 
-  if (is_ruler_mode)
-  {
-    static B32 is_mid_ruling      = false;
-    static V2F32 ruling_start_pos = {};
-    static V2F32 ruling_end_pos   = {};
-
-    if (!is_mid_ruling && os_mouse_button_down(Mouse_button__left))
-    {
-      is_mid_ruling = true;
-      ruling_start_pos = os_get_mouse_pos();
-      ruling_end_pos = ruling_start_pos;
-    }
-    else if (is_mid_ruling && os_mouse_button_down(Mouse_button__left))
-    {
-      ruling_end_pos = os_get_mouse_pos();
-    }
-    else if (is_mid_ruling && os_mouse_button_went_up(Mouse_button__left))
-    {
-      is_mid_ruling = false;
-      ruling_start_pos = {};
-      ruling_end_pos = {};
-    }
-
-    if (is_mid_ruling)
-    {
-      Rect ruler_rect = rect_from_range_v2f32(range_v2f32_as_bb(ruling_start_pos, ruling_end_pos));
-      d_draw_rect_inset_borders(ruler_rect, red(), 2.0f, v4f32_all(0.0f), 0.0f);
-
-      V2F32 ruler_rect_center = rect_get_center(ruler_rect);
-      V2F32 reler_dims        = rect_get_dims(ruler_rect);
-      FP_Font font            = ui_get_font();
-      V2F32 text_pos          = v2f32_sub(ruler_rect_center, v2f32(0.0f, (fp_get_font_height(font) / 2.0f))); 
-
-      d_draw_circle(ruler_rect_center, 3, green(), 2.0f);
-      d_draw_text_f("W: %.0f, H: %.0f", font, text_pos, white(), reler_dims.x, reler_dims.y);
-    }
-
-    return;
-  }
-
   // Handling signals
   {
     if (P->signal_new_pen_size)
@@ -145,167 +105,231 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
 
   if (is_ui_capturing_mouse) { return; }
 
-  B32 dont_start_drawing_this_frame = false;
-
-  if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
-  {
-    dont_start_drawing_this_frame = true; 
-
-    // todo: Look into this case, might be not implemented well 
-    // This is here to be able to deal with current_record beeing 0
-    Draw_record* next_record = 0;
-    if (P->current_record == 0) {
-      next_record = P->first_record;
-    } 
-    else if (P->current_record->next != 0) {
-      next_record = P->current_record->next;
-    }
-
-    if (next_record)
-    {
-      r_copy_into_texture_from_texture(P->draw_texture_always_fresh, next_record->texture_after_we_affected, 0);
-      P->current_record = next_record;
-    }
+  if (os_key_went_down(Key__1)) {
+    P->current_mode = Pencil_mode__drawing;
+  } else if (os_key_went_down(Key__2)) {
+    P->current_mode = Pencil_mode__ruler;
   }
-  else // User wants to remove the last line they drew
-  if (!P->is_mid_drawing && os_key_down(Key__Control) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
-  {
-    dont_start_drawing_this_frame = true;
 
-    if (P->current_record != 0)
+  if (P->current_mode == Pencil_mode__drawing)
+  {
+    B32 dont_start_drawing_this_frame = false;
+  
+    // This is fine to do and keep doing the rest of the frmae update since this is not dependand on anything and can just be plugged in
+    if (os_wheel_got_scrolled())
     {
-      Draw_record* record = P->current_record;
-      r_copy_into_texture_from_texture(P->draw_texture_always_fresh, record->texture_before_we_affected, 0);
-      P->current_record = P->current_record->prev;
+      S64 scroll = (S64)os_get_wheel_scroll();
+      S64 current_pen_size = (S64)P->pen_size;
+      current_pen_size += scroll;
+      clamp_s64_inplace(&current_pen_size, (S64)MIN_PEN_SIZE, (S64)MAX_PEN_SIZE);
+      P->pen_size = (U32)current_pen_size;
     }
-  }
-  else // User want to clear the screen
-  if (!P->is_mid_drawing && os_key_went_up(Key__Delete))
-  {
-    dont_start_drawing_this_frame = true;
-
-    // Creating a new current record
-    Draw_record_registration_result record_reg = register_new_draw_record(P);
-    if (record_reg.succ)
-    {
-      P->current_record = record_reg.record;
     
-      U64 w = P->draw_texures_width;
-      U64 h = P->draw_texures_height;
-      
-      // Storing the texture before we clear it
-      r_copy_into_texture_from_texture(P->current_record->texture_before_we_affected, P->draw_texture_always_fresh, 0);
-
-      // Clearing the texture right here (not waiting for batching)
-      r_clear_target(P->draw_texture_always_fresh, transparent());
-      
-      // Storing the texture after clearing it 
-      r_copy_into_texture_from_texture(P->current_record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
-    }
-  }
-  else // User wants to start using the eraser pen 
-  if (!P->is_mid_drawing && os_key_went_down(Key__E))
-  {
-    // note: 
-    // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
-    // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
-    // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
-    // This was written on (18th May 2026)
-    dont_start_drawing_this_frame = true;
-    P->is_erasing_mode = true;
-  }
-  else // User wants to start using the brush/pen
-  if (!P->is_mid_drawing && os_key_went_down(Key__B))
-  {
-    // note: 
-    // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
-    // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
-    // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
-    // This was written on (18th May 2026)
-    dont_start_drawing_this_frame = true;
-    P->is_erasing_mode = false;
-    // end_frame_event_swap_to_pen = true; 
-  } 
-  else 
-  if (os_key_went_down(Key__Tab))
-  {
-    P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
-  }
-
-  if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
-
-  // Starting a new draw record
-  if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__left)) 
-  {
-    Draw_record_registration_result record_registation = register_new_draw_record(P);
-    if (record_registation.succ)
+    if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
     {
-      P->is_mid_drawing = true;
-      P->current_record = record_registation.record;
-    }
-  }
-  else // Updating active drawing 
-  if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__left))
-  {
-    V2F32 new_pos  = os_get_mouse_pos();
-    V2F32 prev_pos = os_get_prev_mouse_pos();
-    
-    V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
-    F32 pen_size = (F32)P->pen_size;
-    
-    if (P->is_erasing_mode) { 
-      d_push_blend_kind(R_Blend_kind__no_blend);
-      color_rgba = transparent(); 
-      pen_size = (F32)P->eraser_size; 
-    }
-
-    D_RenderTarget(P->draw_texture_always_fresh)
-    {
-      F32 dx     = new_pos.x - prev_pos.x;
-      F32 dy     = new_pos.y - prev_pos.y;
-      F32 length = sqrtf(dx * dx + dy * dy);
-      U64 steps  = (U64)length;
-
-      // Drawing a continuos line based on delta
-      for (U64 i = 0; i <= steps; i++) 
+      dont_start_drawing_this_frame = true; 
+  
+      // todo: Look into this case, might be not implemented well 
+      // This is here to be able to deal with current_record beeing 0
+      Draw_record* next_record = 0;
+      if (P->current_record == 0) {
+        next_record = P->first_record;
+      } 
+      else if (P->current_record->next != 0) {
+        next_record = P->current_record->next;
+      }
+  
+      if (next_record)
       {
-        F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
-        F32 x = prev_pos.x + dx * t;
-        F32 y = prev_pos.y + dy * t;
-        V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
-        d_draw_circle(v2f32(x, y), pen_size, color_rgba, 0.0f);
+        r_copy_into_texture_from_texture(P->draw_texture_always_fresh, next_record->texture_after_we_affected, 0);
+        P->current_record = next_record;
       }
     }
-    if (P->is_erasing_mode) { d_pop_blend_kind(); }
+    else // User wants to remove the last line they drew
+    if (!P->is_mid_drawing && os_key_down(Key__Control) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
+    {
+      dont_start_drawing_this_frame = true;
+  
+      if (P->current_record != 0)
+      {
+        Draw_record* record = P->current_record;
+        r_copy_into_texture_from_texture(P->draw_texture_always_fresh, record->texture_before_we_affected, 0);
+        P->current_record = P->current_record->prev;
+      }
+    }
+    else // User want to clear the screen
+    if (!P->is_mid_drawing && os_key_went_up(Key__Delete))
+    {
+      dont_start_drawing_this_frame = true;
+  
+      // Creating a new current record
+      Draw_record_registration_result record_reg = register_new_draw_record(P);
+      if (record_reg.succ)
+      {
+        P->current_record = record_reg.record;
+      
+        U64 w = P->draw_texures_width;
+        U64 h = P->draw_texures_height;
+        
+        // Storing the texture before we clear it
+        r_copy_into_texture_from_texture(P->current_record->texture_before_we_affected, P->draw_texture_always_fresh, 0);
+  
+        // Clearing the texture right here (not waiting for batching)
+        r_clear_target(P->draw_texture_always_fresh, transparent());
+        
+        // Storing the texture after clearing it 
+        r_copy_into_texture_from_texture(P->current_record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
+      }
+    }
+    else // User wants to start using the eraser pen 
+    if (!P->is_mid_drawing && os_key_went_down(Key__E))
+    {
+      // note: 
+      // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
+      // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
+      // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
+      // This was written on (18th May 2026)
+      dont_start_drawing_this_frame = true;
+      P->is_erasing_mode = true;
+    }
+    else // User wants to start using the brush/pen
+    if (!P->is_mid_drawing && os_key_went_down(Key__B))
+    {
+      // note: 
+      // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
+      // changed after the draw update loop, so i could make an event here to after the loop execute the frame event,
+      // but right now its fine, i tested it, and delay is fine. I cant press buttons that fast to notice it. 
+      // This was written on (18th May 2026)
+      dont_start_drawing_this_frame = true;
+      P->is_erasing_mode = false;
+      // end_frame_event_swap_to_pen = true; 
+    } 
+    else 
+    if (os_key_went_down(Key__Tab))
+    {
+      P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
+    }
+  
+    if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
+  
+    // Starting a new draw record
+    if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__left)) 
+    {
+      Draw_record_registration_result record_registation = register_new_draw_record(P);
+      if (record_registation.succ)
+      {
+        P->is_mid_drawing = true;
+        P->current_record = record_registation.record;
+      }
+    }
+    else // Updating active drawing 
+    if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__left))
+    {
+      V2F32 new_pos  = os_get_mouse_pos();
+      V2F32 prev_pos = os_get_prev_mouse_pos();
+      
+      V4F32 color_rgba = rgba_from_hsva(P->pen_color_hsva);
+      F32 pen_size = (F32)P->pen_size;
+      
+      if (P->is_erasing_mode) { 
+        d_push_blend_kind(R_Blend_kind__no_blend);
+        color_rgba = transparent(); 
+        pen_size = (F32)P->eraser_size; 
+      }
+  
+      D_RenderTarget(P->draw_texture_always_fresh)
+      {
+        F32 dx     = new_pos.x - prev_pos.x;
+        F32 dy     = new_pos.y - prev_pos.y;
+        F32 length = sqrtf(dx * dx + dy * dy);
+        U64 steps  = (U64)length;
+  
+        // Drawing a continuos line based on delta
+        for (U64 i = 0; i <= steps; i++) 
+        {
+          F32 t = (steps == 0) ? 0.0f : (F32)i / steps;
+          F32 x = prev_pos.x + dx * t;
+          F32 y = prev_pos.y + dy * t;
+          V4F32 corner_colors[UV__COUNT] = { color_rgba, color_rgba, color_rgba, color_rgba };
+          d_draw_circle(v2f32(x, y), pen_size, color_rgba, 0.0f);
+        }
+      }
+      if (P->is_erasing_mode) { d_pop_blend_kind(); }
+    }
+    else // Here we finalise the draw record that the user have been drawing
+    if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__left))
+    {
+      Assert(P->current_record != 0);
+      Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_after_we_affected));  // These are expected to already be allocated by this point
+      Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_before_we_affected)); // These are expected to already be allocated by this point
+  
+      P->is_mid_drawing = false;
+  
+      // note: By this point, the fresh draw texture is the new final version of what the user has draw
+      Draw_record* record = P->current_record;
+  
+      // Storing the new version of the draw texture
+      r_copy_into_texture_from_texture(record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
+    }
+  
+    __active_draw_update_routine_end__: {};
   }
-  else // Here we finalise the draw record that the user have been drawing
-  if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__left))
+  else 
+  if (P->current_mode == Pencil_mode__ruler)
   {
-    Assert(P->current_record != 0);
-    Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_after_we_affected));  // These are expected to already be allocated by this point
-    Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_before_we_affected)); // These are expected to already be allocated by this point
-
-    P->is_mid_drawing = false;
-
-    // note: By this point, the fresh draw texture is the new final version of what the user has draw
-    Draw_record* record = P->current_record;
-
-    // Storing the new version of the draw texture
-    r_copy_into_texture_from_texture(record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
+    if (!P->is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    {
+      P->is_mid_ruling    = true;
+      P->ruling_start_pos = os_get_mouse_pos();
+      P->ruling_end_pos   = os_get_mouse_pos();
+    }
+    else if (P->is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    {
+      P->ruling_end_pos = os_get_mouse_pos();
+    }
+    else if (P->is_mid_ruling && os_mouse_button_went_up(Mouse_button__left))
+    {
+      P->is_mid_ruling    = false;
+      // P->ruling_start_pos = {};
+      // P->ruling_end_pos   = {};
+    }
   }
-
-  __active_draw_update_routine_end__: {};
 }
 
 void pencil_render(const Pencil_state* P)
 {
-  Rect rect = {};
-  rect.width  = (F32)P->draw_texures_width;
-  rect.height = (F32)P->draw_texures_height;
-  // D_Bxlend(D3D_Blend_kind__no_blend) 
+  // Rendering the drawings
   {
+    Rect rect = {};
+    rect.width  = (F32)P->draw_texures_width;
+    rect.height = (F32)P->draw_texures_height;
     d_add_texture_command(P->draw_texture_always_fresh, rect, rect, white());
   }
+
+  // Rendering the ruller
+  {
+    if (P->current_mode == Pencil_mode__ruler)
+    {
+      Rect ruler_rect = rect_from_range_v2f32(range_v2f32_as_bb(P->ruling_start_pos, P->ruling_end_pos));
+      d_draw_rect_inset_borders(ruler_rect, red(), 2.0f, v4f32_all(0.0f), 0.0f);
+  
+      V2F32 ruler_rect_center = rect_get_center(ruler_rect);
+      V2F32 reler_dims        = rect_get_dims(ruler_rect);
+      FP_Font font            = ui_get_font();
+      V2F32 text_pos          = v2f32_sub(ruler_rect_center, v2f32(0.0f, (fp_get_font_height(font) / 2.0f))); 
+  
+      d_draw_circle(ruler_rect_center, 3, green(), 2.0f);
+      d_draw_text_f("W: %.0f, H: %.0f", font, text_pos, white(), reler_dims.x, reler_dims.y);
+    }
+  }
+
+
+  // os_show_cursor(false);
+  // d_draw_circle_inset_border(os_get_mouse_pos(), (F32)P->pen_size, red(), 1.0f, 0.0f);
+  // os_show_cursor(true);
+
+  ///
+
 }
 
 void pencil_do_ui(Pencil_state* P, FP_Font font)
@@ -398,8 +422,8 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
                 UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
                 {
                   UI_Slider_style slider_style = {};
-                  slider_style.size_x = ui_p_of_p(1.0, 0.0);
-                  slider_style.size_y = ui_px(40);
+                  slider_style.size_x = ui_px(100);//ui_p_of_p(1.0, 0.0);
+                  slider_style.size_y = ui_px(50);//ui_px(40);
                   slider_style.fmt_str = "%.0f";
                   slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
                   slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
@@ -613,7 +637,6 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P)
   if (P->is_mid_drawing) { InvalidCodePath(); return Draw_record_registration_result{}; }
 
   // Freeing all the records that are in front of the current one
-  if (P->current_record != 0)
   {
     // todo: I feel like releasing them here is fine, but i could also just reuse them since they are all the same size
     //       This would then also mean that i can just prealloc all of them at startup and just reuse by clearing them.
@@ -621,7 +644,7 @@ Draw_record_registration_result register_new_draw_record(Pencil_state* P)
     //       Hm. If this is possible then this shoud be way better, BUT, this might not work when we have 
     //       handling for screen or task bar resize, which shoud be handled, but for now isnt, so look into this
     //       when it is.
-    for (Draw_record* record = P->last_record; record != 0;) 
+    for (Draw_record* record = P->last_record;;) 
     {
       if (record == P->current_record) { break; }
       

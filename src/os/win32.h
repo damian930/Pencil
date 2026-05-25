@@ -138,19 +138,19 @@ enum Mouse_button : U32 {
   Mouse_button__COUNT,
 };
 
-enum OS_Event_modifier : U32 {
-  OS_Event_modifier__NONE,
-  OS_Event_modifier__Shift,
-  OS_Event_modifier__Control,
-};
-typedef U32 OS_Event_modifiers;
+// enum OS_Event_modifier : U32 {
+//   OS_Event_modifier__NONE,
+//   OS_Event_modifier__Shift,
+//   OS_Event_modifier__Control,
+// };
+// typedef U32 OS_Event_modifiers;
 
-enum OS_Event_kind {
-  OS_Event_kind__NONE,
-  OS_Event_kind__Key,
-  OS_Event_kind__Mouse_went_up,
-  OS_Event_kind__Mouse_went_down,
-};
+// enum OS_Event_kind {
+//   OS_Event_kind__NONE,
+//   OS_Event_kind__Key,
+//   OS_Event_kind__Mouse_went_up,
+//   OS_Event_kind__Mouse_went_down,
+// };
 
 struct OS_Key_state {
   Key key;
@@ -224,6 +224,8 @@ B32 os_key_up(Key key);
 B32 os_key_went_down(Key key);
 B32 os_key_went_up(Key key);
 B32 os_key_repeat_down(Key key);
+B32 os_wheel_got_scrolled();
+F32 os_get_wheel_scroll();
 Str8 str8_from_os_key(Key key);
 
 // - Inputs for mouse
@@ -256,5 +258,6 @@ Str8 os_get_path_to_system_fonts();
 Str8 str8_from_wstr(Arena* arena, WCHAR* wstr);
 void os_set_cursor(OS_Cursor cursor);
 OS_Cursor os_get_cursor();
+void os_show_cursor(B32 show);
 
 #endif

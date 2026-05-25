@@ -2,13 +2,18 @@
 [ ] - Pen that fades away over some time
 [ ] - On screen reler 
 [ ] - On screen color picker
+[ ] - All the features that are possible to be set in settings
+      are to be set via commands and optional shortcuts. This way 
+      the user might open up a text edit box and input a command like 
+      "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Stuff to fix or add next:
-[ ] - Remove the stacks from draw and just have a settings struct and a stack for that.
-      This way you dont have to duplicate code for each stack and mess with macros at all.
+[x] - Pen size on scroll wheel
+[ ] - Pen size on the screen when drawing
+[ ] - Way to swap between the ruler and the pen
 
 - Minor fixes and additions:
-[ ] - Move the codebase into C. 
+[ ] - The next project shoud be in C. 
       I like this syntax 
       #define dr_rect(...) dr_draw_rect((Rect_Settings){ \
         .softness      = 1.f,                          \

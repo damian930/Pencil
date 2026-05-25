@@ -104,8 +104,8 @@ D_Command_batch* d_get_or_add_batch_for_settings(D_Command_type command_type, R_
     || batch->blend_kind   != __d_get_current_blend_kind__defaults()
     || batch->fill_mode    != __d_get_current_fill_mode__defaults()
     || !r_target_match(batch->texture, texture)
-    || !r_target_match (batch->target, __d_get_current_render_target__defaults())
-    || !rect_match     (batch->scissor_rect, __d_get_current_scissor_rect__defaults())
+    || !r_target_match(batch->target, __d_get_current_render_target__defaults())
+    || !rect_match    (batch->scissor_rect, __d_get_current_scissor_rect__defaults())
   ) {
     batch = d_add_new_batch(command_type, texture);
   }
@@ -199,7 +199,7 @@ void d_draw_rect_outset_borders(Rect rect, V4F32 color, F32 thickness, V4F32 cor
 void d_draw_circle(V2F32 center, F32 r, V4F32 color, F32 softness)
 {
   Rect rect = rect_from_center(center, v2f32(r, r));
-  d_draw_rect_pro(rect, color, color, color, color, v4f32_all(1.0f), softness);
+  d_draw_rect_pro(rect, color, color, color, color, (r != 1.0f ? v4f32_all(1.0f) : v4f32_all(0.0f)), softness);
 }
 
 void d_draw_circle_inset_border(V2F32 center, F32 r, V4F32 color, F32 thickness, F32 softness)

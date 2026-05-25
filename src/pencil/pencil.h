@@ -4,6 +4,14 @@
 #include "core/core_include.h"
 #include "os/win32.h"
 
+const U32 MAX_PEN_SIZE = 100;
+const U32 MIN_PEN_SIZE = 1;
+
+enum Pencil_mode : U32 {
+  Pencil_mode__drawing,
+  Pencil_mode__ruler,
+};
+
 struct Draw_record {
   // These are allocated when done 
   R_Target texture_before_we_affected;
@@ -25,6 +33,8 @@ struct Draw_record_registration_result {
 struct Pencil_state {
   Arena* frame_arena;
   
+  Pencil_mode current_mode;
+
   U32 pen_size;
   V4F32 pen_color_hsva;
   U32 eraser_size;
@@ -47,8 +57,11 @@ struct Pencil_state {
   Draw_record* current_record;
 
   B32 is_mid_drawing;
-  
   B32 is_erasing_mode;
+
+  B32 is_mid_ruling;
+  V2F32 ruling_start_pos;
+  V2F32 ruling_end_pos;
 
   // Signals 
   //
