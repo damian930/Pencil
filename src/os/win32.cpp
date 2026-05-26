@@ -326,10 +326,10 @@ void os_frame_begin()
       button_state->was_down = button_state->is_down;
       button_state->was_up = button_state->is_up;
     }
+    
+    // Resetting the mouse wheel scroll data
+    os_state->mouse_wheel_scroll_delta = 0.0f;
   }
-
-  // Resetting the mouse wheel scroll data
-  os_state->mouse_wheel_scroll_delta = 0.0f;
 
   // Creating frame events though the winproc
   for (MSG msg = {}; PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
@@ -553,6 +553,25 @@ F32 os_get_wheel_scroll()
   return os_get_state()->mouse_wheel_scroll_delta;
 }
 
+Key key_from_modifier(Key_modifier mod)
+{
+  Key key = Key__NONE;
+  switch (mod) 
+  {
+    default: { InvalidCodePath(); } break;
+    case Key_modifier__NONE:    { key = Key__NONE;    } break;
+    case Key_modifier__shift:   { key = Key__Shift;   } break;
+    case Key_modifier__control: { key = Key__Control; } break;
+    case Key_modifier__alt:     { key = Key__Alt;     } break;
+  }
+  return key;
+}
+
+B32 is_key_modifier(Key key)
+{
+  return (key == Key__Shift || key == Key__Control || key == Key__Alt);
+}
+
 Str8 str8_from_os_key(Key key)
 { 
   Str8 str = {};
@@ -752,7 +771,7 @@ LRESULT win32_proc(
       else {
         switch (w_param)
         {
-          default:         { /*InvalidCodePath();*/  } break;
+          default:         { InvalidCodePath();  } break;
           case VK_SHIFT:   { key = Key__Shift;   } break;
           case VK_CONTROL: { key = Key__Control; } break;
           case VK_DELETE:  { key = Key__Delete;  } break;
@@ -774,7 +793,7 @@ LRESULT win32_proc(
 
         went_down = (transition_state == 0);
         went_up = (transition_state != 0);
-        XOR(went_down, went_up); // Just making sure
+        Assert(XOR(went_down, went_up)); // Just making sure
       }
 
       if (key != Key__NONE)
@@ -783,6 +802,11 @@ LRESULT win32_proc(
         
         OS_Key_state* key_state = win32_state->key_states + key;
         Assert(key_state->key == key);
+
+        // note: Windows only allows a single key to be considered repeat_down at a time.
+        //       If i hold down A and also D and ask the os api to give me the repeat_down keys,
+        //       only one of them will be repeat down, this is not a bug of this code here,
+        //       its just how windows works with the repeat events.
 
         if (went_down) { 
           if (key_state->was_down) { key_state->repeat_down = true; }  

@@ -47,12 +47,21 @@ struct OS_File { U64 u64; };
 // - Events
 // 
 // todo: This does not conform to the code style of this codebase, change the names for these and have Key__A be Key__a instead
+enum Key_modifier {
+  Key_modifier__NONE,
+  Key_modifier__shift,
+  Key_modifier__control,
+  Key_modifier__alt,
+  Key_modifier__COUNT,
+};
+
 enum Key : U32 {
   Key__NONE,
 
   // Mods
   Key__Shift,
   Key__Control,
+  Key__Alt,
 
   // Letters 
   Key__A,              // 'a'   shifted: 'A'
@@ -226,6 +235,8 @@ B32 os_key_went_up(Key key);
 B32 os_key_repeat_down(Key key);
 B32 os_wheel_got_scrolled();
 F32 os_get_wheel_scroll();
+Key key_from_modifier(Key_modifier mod);
+B32 is_key_modifier(Key key);
 Str8 str8_from_os_key(Key key);
 
 // - Inputs for mouse

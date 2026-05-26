@@ -20,6 +20,9 @@ abstract.
 #include "__third_party/stb/stb_image_write.h"
 #endif
 
+// #include "__third_party/cjson/cJSON.h"
+// #include "__third_party/cjson/cJSON.c"
+
 #include "core/core_include.h"
 #include "core/core_include.cpp"
 
@@ -104,7 +107,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
       "Pencil",
-      (MAIN_IS_DEBUGGING ? 0 : WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME)),
+      (MAIN_IS_DEBUGGING ? WS_OVERLAPPEDWINDOW : WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME)),
       // WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
       CW_USEDEFAULT, CW_USEDEFAULT,
       800, 600,
@@ -151,6 +154,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //
   Pencil_state P = {}; 
   pencil_init(&P);
+  add_shortcut(&P, Key_modifier__control, Key__W, COMMAND_NAME_TERMINATE_APP);
+  add_shortcut(&P, Key_modifier__control, Key__R, COMMAND_NAME_SWAP_TO_RULER);
+  add_shortcut(&P, Key_modifier__control, Key__D, COMMAND_NAME_SWAP_TO_DRAW);
 
   // Testing and working on font provider
   FP_Font font = {};
@@ -175,20 +181,31 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
   {
+    if (P.terminate_app) { break; }
+
     F64 frame_start_time_sec = os_get_time_for_timing_sec();
-    OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
+    // OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
 
     os_frame_begin();
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
-    if (!MAIN_IS_DEBUGGING)
-    if (hot_key_activated && !P.is_mid_drawing)
+    for (U64 i = 0; i < P.chord_count; i += 1)
     {
-      hot_key_activated = false;
-      os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
+      Shortcut_chord chord = P.chords[i];
+      if (os_key_down(key_from_modifier(chord.mod)) && (os_key_went_down(chord.key) || os_key_repeat_down(chord.key)))
+      {
+        run_command_from_name(&P, chord.command_name);
+      }
     }
-    
+
+    // if (!MAIN_IS_DEBUGGING)
+    // if (hot_key_activated && !P.is_mid_drawing)
+    // {
+    //   hot_key_activated = false;
+    //   os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
+    // }
+
     { // UI and Application update 
       pencil_do_ui(&P, font);
       pencil_update(&P, !ui_has_active(), false);

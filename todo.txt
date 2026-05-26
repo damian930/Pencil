@@ -8,14 +8,24 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Stuff to fix or add next:
-[ ] - Create clear bounds between modes (draw | ruller)
-[ ] - Ways to swap between modes (draw | ruler) with a shortcut
+[x] - Create clear bounds between modes (draw | ruller)
+[x] - Ways to swap between modes (draw | ruler) with a shortcut
+[x] - Have the ruler be able to size the screen by holding the mouse button and by pressing it for the first point and then for the second point. Leave the rect on the screen till the mode is changed or till a new sizing is began.
 [ ] - Start having shortcuts be stores somehow in a settings file
+      [x] - have a shortcut that would terminate the app fully
+      [ ] - have a list of shortcuts (mod + key), start with a normalized modifier and have a single key.
+      [ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
+      [ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)
+
 [ ] - Add more shortcutes (look at the next todo)
 [ ] - Have a shortcut resolver (use vscode as an example of the idea of what to do in case of a duplicate)
 [ ] - Pen size on the screen when drawing
 
 - Minor fixes and additions:
+[ ] - Have a way to create a window inside the win32.h/.cpp,
+      to then be able to create them inside the test_main and
+      test stuff. Right now i cant, since my window is not 
+      a part of the os layer.
 [ ] - The next project shoud be in C. 
       I like this syntax 
       #define dr_rect(...) dr_draw_rect((Rect_Settings){ \

@@ -46,10 +46,35 @@ void pencil_init(Pencil_state* P)
 
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode)
 {
-  Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
+  // Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
 
-  // Handling signals
+  // Handling signals (Right now only 1 per frame)
   {
+    if (P->signal_swap_to_draw)
+    {
+      // todo: We should have a more legic check for beeing in the middle of a thing like drawing or ruling
+      if (!P->is_mid_ruling && P->current_mode != Pencil_mode__draw)
+      {
+        P->current_mode = Pencil_mode__draw;
+        // todo: Rest the stuff that dont have to exist cross modes
+      }
+      P->signal_swap_to_draw = false; 
+    }
+    else 
+    if (P->signal_swap_to_ruler)
+    {
+      // todo: We should have a more legic check for beeing in the middle of a thing like drawing or ruling
+      if (!P->is_mid_drawing && P->current_mode != Pencil_mode__ruler)
+      {
+        P->current_mode     = Pencil_mode__ruler;
+        P->is_mid_ruling    = false;
+        P->ruling_start_pos = V2F32{};
+        P->ruling_end_pos   = V2F32{};
+        // todo: Rest the stuff that dont have to exist cross modes
+      }
+      P->signal_swap_to_ruler = false;
+    }
+    else 
     if (P->signal_new_pen_size)
     {
       Assert(P->is_mid_drawing == false); // Just making sure
@@ -100,18 +125,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
         P->signal_new_pen_color_hsva = false;
         P->pen_color_hsva = P->new_pen_color_hsva;
       }
-    }
+    }    
   }
 
   if (is_ui_capturing_mouse) { return; }
 
-  if (os_key_went_down(Key__1)) {
-    P->current_mode = Pencil_mode__drawing;
-  } else if (os_key_went_down(Key__2)) {
-    P->current_mode = Pencil_mode__ruler;
-  }
-
-  if (P->current_mode == Pencil_mode__drawing)
+  if (P->current_mode == Pencil_mode__draw)
   {
     B32 dont_start_drawing_this_frame = false;
   
@@ -277,21 +296,37 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
   else 
   if (P->current_mode == Pencil_mode__ruler)
   {
-    if (!P->is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    B32 end_ruling = false;
+
+    if (!P->is_mid_ruling && os_mouse_button_went_down(Mouse_button__left))
     {
       P->is_mid_ruling    = true;
       P->ruling_start_pos = os_get_mouse_pos();
       P->ruling_end_pos   = os_get_mouse_pos();
+      P->ruling_mode      = Pencil_ruling_mode__not_set;
     }
-    else if (P->is_mid_ruling && os_mouse_button_down(Mouse_button__left))
+    else // Figuring out how we gon go about user using the ruller, do we want them to hold the mouse button or press it to start and end  
+    if (P->is_mid_ruling && P->ruling_mode == Pencil_ruling_mode__not_set)
     {
-      P->ruling_end_pos = os_get_mouse_pos();
+      if (os_mouse_button_up(Mouse_button__left) && v2f32_match(P->ruling_start_pos, os_get_mouse_pos())) { 
+        P->ruling_mode = Pencil_ruling_mode__single_press;
+      }
+      else if (os_mouse_button_down(Mouse_button__left) && !v2f32_match(P->ruling_start_pos, os_get_mouse_pos())) {
+        P->ruling_mode = Pencil_ruling_mode__hold;
+      }
     }
-    else if (P->is_mid_ruling && os_mouse_button_went_up(Mouse_button__left))
+    else // Updating the ruling 
+    if (P->is_mid_ruling && P->ruling_mode != Pencil_ruling_mode__not_set)
     {
-      P->is_mid_ruling    = false;
-      // P->ruling_start_pos = {};
-      // P->ruling_end_pos   = {};
+      // Condition to end the ruling
+      if (   P->ruling_mode == Pencil_ruling_mode__hold         && os_mouse_button_up(Mouse_button__left)
+          || P->ruling_mode == Pencil_ruling_mode__single_press && os_mouse_button_went_up(Mouse_button__left)
+      ) {
+        P->is_mid_ruling = false;
+      } 
+      else {
+        P->ruling_end_pos = os_get_mouse_pos();
+      }
     }
   }
 }
@@ -707,6 +742,63 @@ Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_ne
     *result = Draw_record{};
   }
   return result;
+}
+
+void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name)
+{
+  Shortcut_chord* chord = 0;
+
+  // Might have the command or chord already set, so we will reset it 
+  for (U64 i = 0; i < P->chord_count; i += 1)
+  {
+    Shortcut_chord* test_chord = P->chords + i;
+    if (   str8_match(test_chord->command_name, command_name, 0) 
+        || (test_chord->mod == mod && test_chord->key == key)
+    ) { 
+      chord = test_chord;
+      break;
+    }
+  }
+
+  // No chord to reset, getting a new one
+  if (chord) { InvalidCodePath(); } // I dont want to handle this right now, since i dont have dynamic chords
+  else {
+    if (P->chord_count < MAX_CHORD_COUNT) {
+      chord = P->chords + (P->chord_count++);
+    }
+    if (chord == 0) { InvalidCodePath(); } // Need more space for chords
+    else {
+      chord->mod = mod;
+      chord->key = key;
+      chord->command_name = command_name;
+    }
+  }
+}
+
+void run_command_from_name(Pencil_state* P, Str8 command_name)
+{
+  if (0) {}
+  else if (str8_match(command_name, COMMAND_NAME_TERMINATE_APP, 0)) { command_terminate_app(P); }
+  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_RULER, 0)) { command_swap_to_ruller(P); }
+  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_DRAW, 0))  { command_swap_to_draw(P); }
+  else {
+    InvalidCodePath();
+  }
+}
+
+void command_terminate_app(Pencil_state* P)
+{
+  P->terminate_app = true;
+}
+
+void command_swap_to_ruller(Pencil_state* P)
+{
+  P->signal_swap_to_ruler = true;
+}
+
+void command_swap_to_draw(Pencil_state* P)
+{
+  P->signal_swap_to_draw = true;
 }
 
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
