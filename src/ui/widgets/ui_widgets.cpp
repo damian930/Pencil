@@ -329,6 +329,29 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
   }
 }
 
+///////////////////////////////////////////////////////////
+// - Image
+//
+struct _UI_Image_data {
+  R_Target texture;
+};
+
+void __ui_image_draw_func(UI_Box* box)
+{
+  _UI_Image_data* data = (_UI_Image_data*)box->custom_draw_data;
+  Rect dest_rect = box->final_on_screen_rect;
+  Rect source_rect = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(data->texture)); 
+  d_draw_texture_pro(data->texture, dest_rect, source_rect, white());
+}
+
+void ui_image(R_Target texture)
+{
+  UI_Box* image_box = ui_box_make(Str8{}, 0);
+  _UI_Image_data* data = ArenaPush(ui_get_build_arena(), _UI_Image_data);
+  data->texture = texture;
+  ui_box_set_custom_draw(image_box, __ui_image_draw_func, data);
+}
+
 // ///////////////////////////////////////////////////////////
 // // - Text input field
 // //

@@ -144,7 +144,10 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
     }
   }  
 
-  final_color.a *= rect_outline_smoothing;
+  // note: This is removed here, since rect_outline_smoothing makes the borders look white at some places for some reason.
+  //       I dont have the will to fix the shader to be honest, i have already spent so much time on it. 
+  //       Imma leave it for later
+  // final_color.a *= rect_outline_smoothing;
   // final_color.a *= rect_inner_smoothing;
 
   return final_color;

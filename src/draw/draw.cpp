@@ -211,8 +211,8 @@ void d_draw_circle_inset_border(V2F32 center, F32 r, V4F32 color, F32 thickness,
 void d_draw_texture(R_Target texture, V2F32 pos)
 {
   V2F32 texture_dims = r_get_target_dims(texture);
-  Rect source_rect   = rect_make_v(v2f32(0.0f, 0.0f), r_get_target_dims(texture));
-  Rect dest_rect     = rect_make_v(pos, texture_dims);
+  Rect source_rect   = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(texture));
+  Rect dest_rect     = rect_from_v(pos, texture_dims);
   d_add_texture_command(texture, dest_rect, source_rect, white());
 }
 

@@ -77,8 +77,7 @@ Compiler;
 	#undef BreakPointCond
 	#define BreakPointCond(cond) do { if (!(cond)) { BreakPoint(); } } while(0)  // only works for x86, x64, ARM, ARM64
 #endif
-// #define BP BreakPoint();
-#define BP
+#define BP BreakPoint();
 
 // todo: test cpp11 verson +, there it is a part of the standard
 #define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)
@@ -650,7 +649,7 @@ struct Rect {
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
-tu_specific Rect rect_make_v(V2F32 pos, V2F32 dims);
+tu_specific Rect rect_from_v(V2F32 pos, V2F32 dims);
 tu_specific Rect rect_from_center(V2F32 center, V2F32 dims);
 tu_specific V2F32 rect_get_origin(Rect rect);
 tu_specific V2F32 rect_get_dims(Rect rect);

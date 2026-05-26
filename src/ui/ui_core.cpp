@@ -878,7 +878,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   
   // todo: I dont fully like this if here, but for now its like this 
   if (root->custom_draw_func != 0) 
-  { 
+  {
     root->custom_draw_func(root); 
 
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)

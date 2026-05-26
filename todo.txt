@@ -11,9 +11,11 @@
 [x] - Create clear bounds between modes (draw | ruller)
 [x] - Ways to swap between modes (draw | ruler) with a shortcut
 [x] - Have the ruler be able to size the screen by holding the mouse button and by pressing it for the first point and then for the second point. Leave the rect on the screen till the mode is changed or till a new sizing is began.
+[ ] - Remove the raylib like key states and have an event list and then maybe make the states on the app side. 
+      Might also be a good idea to update the app per event and then just render. So if we have 3 events, then we just go over them 1 by one and update. That will enforce the order of events and the state of buttons at a moment of time will also be valid and in synch. 
 [ ] - Start having shortcuts be stores somehow in a settings file
       [x] - have a shortcut that would terminate the app fully
-      [ ] - have a list of shortcuts (mod + key), start with a normalized modifier and have a single key.
+      [x] - have a list of shortcuts (mod + key), start with a normalized modifier and have a single key.
       [ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
       [ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)
 
@@ -46,7 +48,9 @@
 [ ] - Structure the code for core base 
 
 
-
+- Some quick ideas:
+[ ] - The issue with the rounded corners and then their children poking out might be fixed with a little scissor, that all,
+      but that would require the gpu to switch contexts, since we would need to set a different scissor rect per each.
 
 
 

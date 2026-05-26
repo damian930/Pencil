@@ -139,8 +139,6 @@ struct UI_Box_data {
   Rect on_screen_rect;
 };
 
-
-
 struct UI_Context {
   // Persistent
   Arena* context_arena;

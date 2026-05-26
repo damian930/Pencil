@@ -43,6 +43,9 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
 void __ui_color_picker_sv_square_draw_func(UI_Box* box);
 void __ui_color_picker_h_draw_func(UI_Box* box);
 
+// - Image
+void ui_image(R_Target texture); // note: This gets the size from the ouside: ui_set_next_size_x/y
+
 // - Slider
 struct UI_Slider_style {
   UI_Size size_x;
@@ -137,10 +140,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   return moved_slider;
 }
 
-///////////////////////////////////////////////////////////
-// - Other old code
-//
-// // - Text input field 
+// - Text input field 
 // U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 
 // U64 __ui_move_with_control_right(Str8 str, U64 current_pos);
 

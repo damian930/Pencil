@@ -190,7 +190,7 @@ Rect rect_make(F32 x, F32 y, F32 width, F32 height)
 	return rect;
 }
 
-Rect rect_make_v(V2F32 pos, V2F32 dims)
+Rect rect_from_v(V2F32 pos, V2F32 dims)
 {
 	return rect_make(pos.x, pos.y, dims.x, dims.y);
 }
