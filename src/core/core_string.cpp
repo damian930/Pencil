@@ -49,6 +49,11 @@ Str8 str8_from_cstr(Arena* arena, U8* str)
   return result;
 }
 
+Str8 str8_from_cstr_copy(U8* str)
+{
+  return str8_manuall(str, strlen((char*)str));
+}
+
 Str8 str8_copy_alloc(Arena* arena, Str8 str)
 {
   Str8 copy = str8_from_cstr_len(arena, str.data, str.count);
@@ -148,7 +153,7 @@ U64 __str8_fmt_count_valist(const char* fmt, va_list valist_)
 
 
 ///////////////////////////////////////////////////////////
-// - substring 
+// - string editing 
 // 
 Str8 str8_substring(Str8 str, U64 start_index, U64 end_index)
 {
@@ -327,9 +332,33 @@ Str8 str8_trim(Str8 str)
   return str;
 }
 
+Str8 str8_to_lower(Arena* arena, Str8 str)
+{
+  Data_buffer buffer = data_buffer_make(arena, str.count);
+  for (U64 i = 0; i < str.count; i += 1)
+  {
+    buffer.data[i] = char_to_lower(str.data[i]);
+  }
+  *ArenaPush(arena, U8) = '\0';
+  ArenaPopType(arena, U8);
+  return buffer;
+}
+
+Str8 str8_to_upper(Arena* arena, Str8 str)
+{
+  Data_buffer buffer = data_buffer_make(arena, str.count);
+  for (U64 i = 0; i < str.count; i += 1)
+  {
+    buffer.data[i] = char_to_upper(str.data[i]);
+  }
+  *ArenaPush(arena, U8) = '\0';
+  ArenaPopType(arena, U8);
+  return buffer;
+}
 
 // todo: When done with this, move it to a proper place
-static inline RangeU64 str8_find(Str8 haystack, Str8 needle, Str8_match_flags match_flags) // notes: I asked claude for param names, it suggested me these
+static inline 
+RangeU64 str8_find(Str8 haystack, Str8 needle, Str8_match_flags match_flags) // notes: I asked claude for param names, it suggested me these
 {
   if (haystack.count < needle.count) { return RangeU64{}; }
 
@@ -351,8 +380,6 @@ static inline RangeU64 str8_find(Str8 haystack, Str8 needle, Str8_match_flags ma
 
   return range;
 }
-
-
 
 ///////////////////////////////////////////////////////////
 // - chars
@@ -483,9 +510,10 @@ Str8_list str8_split(Arena* arena, Str8 str, Str8 spliter, Str8_match_flags flag
           str8_list_append(arena, &result_list, new_substring);
         }
         word_start_index = i + spliter.count;
+        i = word_start_index;
       }  
     }
-    if (word_start_index < str.count - 1)
+    if (word_start_index < str.count)
     {
       Str8 new_substring = str8_substring(str, word_start_index, str.count);
       str8_list_append(arena, &result_list, new_substring);

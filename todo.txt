@@ -1,27 +1,34 @@
 - Major features:
 [ ] - Pen that fades away over some time
-[ ] - On screen reler 
+[ ] - On screen ruler 
 [ ] - On screen color picker
 [ ] - All the features that are possible to be set in settings
       are to be set via commands and optional shortcuts. This way 
       the user might open up a text edit box and input a command like 
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
-- Stuff to fix or add next:
-[x] - Create clear bounds between modes (draw | ruller)
-[x] - Ways to swap between modes (draw | ruler) with a shortcut
-[x] - Have the ruler be able to size the screen by holding the mouse button and by pressing it for the first point and then for the second point. Leave the rect on the screen till the mode is changed or till a new sizing is began.
-[ ] - Remove the raylib like key states and have an event list and then maybe make the states on the app side. 
-      Might also be a good idea to update the app per event and then just render. So if we have 3 events, then we just go over them 1 by one and update. That will enforce the order of events and the state of buttons at a moment of time will also be valid and in synch. 
-[ ] - Start having shortcuts be stores somehow in a settings file
-      [x] - have a shortcut that would terminate the app fully
-      [x] - have a list of shortcuts (mod + key), start with a normalized modifier and have a single key.
-      [ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
-      [ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)
+- Current feature working progress:
+[ ] - Increase the number of drawng tha you make. Change how you do redo, undo. You have to make it be 
+      something like a queue or textures that you draw in. 
+      So you will have the initial last state for the texture that you have. 
+      It will be empty at first. If you have 5 draw record max and you draw the 6th, the oldest 1 will
+      get drawing into the intial state texture and the new one will be the new 5th. So for static they work the same,
+      you just have to compose them each frame, should be fine. 
+      For faded textures, you would have to have them be updated and then also composed in.
+      Those will get removed from the queue when they fade out. If you have 5 max and the olders 1 is the faded one,
+      but it is still fading and you draw a new one, you just remove the oldest one. This is not the clenest way, sure,
+      but if you get to have enought space for the list of texture to never be filled up, then you shoud be fine.
 
-[ ] - Add more shortcutes (look at the next todo)
-[ ] - Have a shortcut resolver (use vscode as an example of the idea of what to do in case of a duplicate)
-[ ] - Pen size on the screen when drawing
+      - You could just have 50 textures and compose all 50 each frame. 
+        If this is too slow for some reason, then just have the draw record store the old and the new texture like 
+        right now, but just dont use them for faded, since they get composed in. This will allow you to not have to deal
+        with 50 textures each frame when you do regular drawings.
+
+- Stuff to fix or add next:
+[ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
+[ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)
+[ ] - do we need the d3d context to switch for every batch or would it be fine for it to only switch the setting
+      that is differnt, might be faster, google and test this when you add a profiler in.
 
 - Minor fixes and additions:
 [ ] - Have a way to create a window inside the win32.h/.cpp,
@@ -47,11 +54,9 @@
 [ ] - Start using wide chars for win32 stuff and not regular asci
 [ ] - Structure the code for core base 
 
-
 - Some quick ideas:
 [ ] - The issue with the rounded corners and then their children poking out might be fixed with a little scissor, that all,
       but that would require the gpu to switch contexts, since we would need to set a different scissor rect per each.
-
 
 
 

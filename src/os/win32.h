@@ -46,50 +46,41 @@ struct OS_File { U64 u64; };
 ///////////////////////////////////////////////////////////
 // - Events
 // 
-// todo: This does not conform to the code style of this codebase, change the names for these and have Key__A be Key__a instead
-enum Key_modifier {
-  Key_modifier__NONE,
-  Key_modifier__shift,
-  Key_modifier__control,
-  Key_modifier__alt,
-  Key_modifier__COUNT,
-};
-
 enum Key : U32 {
   Key__NONE,
 
   // Mods
-  Key__Shift,
-  Key__Control,
-  Key__Alt,
+  Key__shift,
+  Key__control,
+  Key__alt,
 
   // Letters 
-  Key__A,              // 'a'   shifted: 'A'
-  Key__B,              // 'b'   shifted: 'B'
-  Key__C,              // 'c'   shifted: 'C'
-  Key__D,              // 'd'   shifted: 'D'
-  Key__E,              // 'e'   shifted: 'E'
-  Key__F,              // 'f'   shifted: 'F'
-  Key__G,              // 'P'   shifted: 'P'
-  Key__H,              // 'h'   shifted: 'H'
-  Key__I,              // 'i'   shifted: 'I'
-  Key__J,              // 'j'   shifted: 'J'
-  Key__K,              // 'k'   shifted: 'K'
-  Key__L,              // 'l'   shifted: 'L'
-  Key__M,              // 'm'   shifted: 'M'
-  Key__N,              // 'n'   shifted: 'N'
-  Key__O,              // 'o'   shifted: 'O'
-  Key__P,              // 'p'   shifted: 'P'
-  Key__Q,              // 'q'   shifted: 'Q'
-  Key__R,              // 'r'   shifted: 'R'
-  Key__S,              // 's'   shifted: 'S'
-  Key__T,              // 't'   shifted: 'T'
-  Key__U,              // 'u'   shifted: 'U'
-  Key__V,              // 'v'   shifted: 'V'
-  Key__W,              // 'w'   shifted: 'W'
-  Key__X,              // 'x'   shifted: 'X'
-  Key__Y,              // 'y'   shifted: 'Y'
-  Key__Z,              // 'z'   shifted: 'Z'
+  Key__a,              // 'a'   shifted: 'A'
+  Key__b,              // 'b'   shifted: 'B'
+  Key__c,              // 'c'   shifted: 'C'
+  Key__d,              // 'd'   shifted: 'D'
+  Key__e,              // 'e'   shifted: 'E'
+  Key__f,              // 'f'   shifted: 'F'
+  Key__g,              // 'P'   shifted: 'P'
+  Key__h,              // 'h'   shifted: 'H'
+  Key__i,              // 'i'   shifted: 'I'
+  Key__j,              // 'j'   shifted: 'J'
+  Key__k,              // 'k'   shifted: 'K'
+  Key__l,              // 'l'   shifted: 'L'
+  Key__m,              // 'm'   shifted: 'M'
+  Key__n,              // 'n'   shifted: 'N'
+  Key__o,              // 'o'   shifted: 'O'
+  Key__p,              // 'p'   shifted: 'P'
+  Key__q,              // 'q'   shifted: 'Q'
+  Key__r,              // 'r'   shifted: 'R'
+  Key__s,              // 's'   shifted: 'S'
+  Key__t,              // 't'   shifted: 'T'
+  Key__u,              // 'u'   shifted: 'U'
+  Key__v,              // 'v'   shifted: 'V'
+  Key__w,              // 'w'   shifted: 'W'
+  Key__x,              // 'x'   shifted: 'X'
+  Key__y,              // 'y'   shifted: 'Y'
+  Key__z,              // 'z'   shifted: 'Z'
 
   // Numbers
   Key__0,              // '0'   shifted: ')'
@@ -104,35 +95,35 @@ enum Key : U32 {
   Key__9,              // '9'   shifted: '('
 
   // Other printable 
-  Key__Space,          // ' '   shifted: ' '
-  Key__Backtick,       // '`'   shifted: '~'
-  Key__Minus,          // '-'   shifted: '_'
-  Key__Equals,         // '='   shifted: '+'
-  Key__Left_bracket,   // '['   shifted: '{'
-  Key__Right_bracket,  // ']'   shifted: '}'
-  Key__Backslash,      // '\'   shifted: '|'
-  Key__Semicolon,      // ';'   shifted: ':'
-  Key__Apostrophe,     // '\''  shifted: '"'
-  Key__Comma,          // ','   shifted: '<'
-  Key__Period,         // '.'   shifted: '>'
-  Key__Slash,          // '/'   shifted: '?'
+  Key__space,          // ' '   shifted: ' '
+  Key__backtick,       // '`'   shifted: '~'
+  Key__minus,          // '-'   shifted: '_'
+  Key__equals,         // '='   shifted: '+'
+  Key__left_bracket,   // '['   shifted: '{'
+  Key__right_bracket,  // ']'   shifted: '}'
+  Key__backslash,      // '\'   shifted: '|'
+  Key__semicolon,      // ';'   shifted: ':'
+  Key__apostrophe,     // '\''  shifted: '"'
+  Key__comma,          // ','   shifted: '<'
+  Key__period,         // '.'   shifted: '>'
+  Key__slash,          // '/'   shifted: '?'
 
   // Other 
-  Key__Left_arrow,
-  Key__Right_arrow,
-  Key__Up_arrow,
-  Key__Down_arrow,
-  Key__Home,
-  Key__End,
-  Key__Page_up,
-  Key__Page_down,
-  Key__Backspace,
-  Key__Delete,
-  Key__Insert,
-  Key__Escape,
-  Key__Tab,
-  Key__Enter,
-  Key__Caps_lock,
+  Key__left_arrow,
+  Key__right_arrow,
+  Key__up_arrow,
+  Key__down_arrow,
+  Key__home,
+  Key__end,
+  Key__page_up,
+  Key__page_down,
+  Key__backspace,
+  Key__delete,
+  Key__insert,
+  Key__escape,
+  Key__tab,
+  Key__enter,
+  Key__caps_lock,
 
   Key__COUNT,
 };
@@ -147,19 +138,46 @@ enum Mouse_button : U32 {
   Mouse_button__COUNT,
 };
 
-// enum OS_Event_modifier : U32 {
-//   OS_Event_modifier__NONE,
-//   OS_Event_modifier__Shift,
-//   OS_Event_modifier__Control,
-// };
-// typedef U32 OS_Event_modifiers;
+// todo: List of events that this shoud support
+enum OS_Event_modifier : U32 {
+  OS_Event_modifier__NONE    = (1 << 0),
+  OS_Event_modifier__shift   = (1 << 1),
+  OS_Event_modifier__control = (1 << 2),
+};
+typedef U32 OS_Event_modifiers;
 
-// enum OS_Event_kind {
-//   OS_Event_kind__NONE,
-//   OS_Event_kind__Key,
-//   OS_Event_kind__Mouse_went_up,
-//   OS_Event_kind__Mouse_went_down,
-// };
+enum OS_Event_kind : U32 {
+  OS_Event_kind__NONE,
+  OS_Event_kind__mouse,
+  OS_Event_kind__key,
+  OS_Event_kind__wheel,
+};
+
+struct OS_Event {
+  OS_Event_kind kind;
+  B32 is_consumed;
+
+  union {
+    struct {
+      OS_Event_modifiers modifiers;
+      Mouse_button button;
+      B32 went_down;
+      B32 went_up;
+      V2F32 mouse_pos;
+    } mouse_event;
+  
+    struct {
+      Key key;
+      B32 went_down;
+      B32 went_up;
+      B32 repeat_down;
+    } key_event;
+  
+    struct {
+      F32 scroll_data;
+    } wheel_event;
+  };
+};
 
 struct OS_Key_state {
   Key key;
@@ -214,6 +232,7 @@ Str8 os_get_current_dir_path(Arena* arena);
 // - Frame
 void os_frame_begin();
 void os_frame_end();
+F32 os_get_time_since_last_frame();
 
 // - Windowing
 V2F32 os_get_window_dims();
@@ -226,25 +245,10 @@ void os_window_maximize();
 void os_window_minimize();
 B32 os_window_is_transparent();
 
-// - Inputs for keyboard
-OS_Key_state os_get_key_state(Key key);
-B32 os_key_down(Key key);
-B32 os_key_up(Key key);
-B32 os_key_went_down(Key key);
-B32 os_key_went_up(Key key);
-B32 os_key_repeat_down(Key key);
-B32 os_wheel_got_scrolled();
-F32 os_get_wheel_scroll();
-Key key_from_modifier(Key_modifier mod);
-B32 is_key_modifier(Key key);
-Str8 str8_from_os_key(Key key);
-
-// - Inputs for mouse
-OS_Mouse_button_state os_get_mouse_button_state(Mouse_button button);
-B32 os_mouse_button_down(Mouse_button button);
-B32 os_mouse_button_up(Mouse_button button);
-B32 os_mouse_button_went_down(Mouse_button button);
-B32 os_mouse_button_went_up(Mouse_button button);
+// Key stuff
+Key key_from_str8(Str8 str);
+Str8 str8_from_key(Key key);
+OS_Event_modifier os_modifier_from_key(Key key);
 
 // - Time
 Readable_time os_get_readable_time();

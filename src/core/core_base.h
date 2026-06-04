@@ -183,6 +183,7 @@ typedef double F64;
 #define EachArrElement(it, static_arr)                (U64 it = 0; i < ArrayCount(static_arr); it += 1)
 #define EachInRange(it, range_min, range_max)         (U64 it = range_min; it < range_max; it += 1)
 #define EachEnumRange(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)it + 1))	
+#define EachEnum1ToCount(Type, it) EachEnumRange(it, Type, (Type)1, Type##__COUNT)
 
 /* NOTES:
   Stack here is a list that only has the "first" node pointer. Nodes only have the "next" pointer.

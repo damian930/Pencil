@@ -1,6 +1,9 @@
 #ifndef RENDERER_D3D11_CPP
 #define RENDERER_D3D11_CPP
 
+// todos:
+// [] - Do we need the d3d context to switch for every batch or would it be fine for it to only switch the setting.
+
 // D3D
 #pragma comment (lib, "d3d11.lib")
 #pragma comment (lib, "dxgi.lib")

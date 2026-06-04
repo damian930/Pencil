@@ -1,6 +1,9 @@
 #ifndef PENCIL_CPP
 #define PENCIL_CPP
 
+#include "__third_party/cjson/cJSON.h"
+#include "__third_party/cjson/cJSON.c"
+
 #include "os/win32.h"
 #include "os/win32.cpp"
 
@@ -10,11 +13,11 @@
 #include "draw/draw.h"
 #include "draw/draw.cpp"
 
-#include "ui/widgets/ui_widgets.h"
-#include "ui/widgets/ui_widgets.cpp"
+// #include "ui/ui_core.h"
+// #include "ui/ui_core.cpp"
 
-#include "ui/ui_core.h"
-#include "ui/ui_core.cpp"
+// #include "ui/widgets/ui_widgets.h"
+// #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil.h"
 
@@ -33,6 +36,9 @@ void pencil_init(Pencil_state* P)
   P->draw_texures_height = (U32)os_get_client_area_dims__unsynched().y; // todo: Handle the case when the area is negative
 
   P->draw_texture_always_fresh = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  
+  P->temp_drawing_texture = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+  P->current_mode         = Pencil_mode__temp_texture;
 
   // Putting everything into the free list since we already have a static buffer of draw records
   for EachIndex(i, DRAW_RECORDS_MAX_COUNT)
@@ -41,12 +47,169 @@ void pencil_init(Pencil_state* P)
     DllPushBack_Name(P, record, first_free_draw_record, last_free_draw_record, next, prev);
   }
 
-  // Draw_record_registration_result record = register_new_draw_record(P);
+  // todo: Open a json file with shortcutes, read shortcuts, use them if present, use defaults if not, dont use at all if error
+  // Shortcuts from the json settings file
+  {
+    Scratch scratch = get_scratch(0, 0); 
+    
+    Data_buffer buffer = {};
+    OS_FileOpenClose(settings_file, Str8FromC("../data/settings.json"), OS_File_access__visible_read)
+    {
+      buffer = data_buffer_make(scratch.arena, os_file_get_props(settings_file).size);
+      *ArenaPush(scratch.arena, U8) = '\0';
+      os_file_read(settings_file, &buffer);
+      ArenaPopType(scratch.arena, U8);
+    }
+
+    cJSON* settings_json = cJSON_Parse((char*)buffer.data);
+    if (settings_json)
+    {
+      cJSON* shortcuts_arr = cJSON_GetObjectItemCaseSensitive(settings_json, "shortcuts");      
+      if (cJSON_IsArray(shortcuts_arr))
+      {
+        for (int array_index = 0; array_index < cJSON_GetArraySize(shortcuts_arr); array_index += 1)
+        {
+          cJSON* shortcut = cJSON_GetArrayItem(shortcuts_arr, array_index);
+          if (cJSON_IsObject(shortcut))
+          {
+            cJSON* combination = cJSON_GetObjectItemCaseSensitive(shortcut, "combination");      
+            cJSON* command = cJSON_GetObjectItemCaseSensitive(shortcut, "command");      
+
+            if (   cJSON_IsString(combination)
+                && cJSON_IsString(command)
+            ) {
+              Str8 combination_str = str8_from_cstr_copy((U8*)cJSON_GetStringValue(combination));
+              Str8 command_name_str = str8_from_cstr_copy((U8*)cJSON_GetStringValue(command));
+
+              Str8_list str_list = str8_split(scratch.arena, combination_str, Str8FromC("+"), 0);
+              if (str_list.node_count == 2)
+              {
+                Str8 modifier_key_str      = str_list.first->str;
+                Str8 other_key_str         = str_list.last->str;
+                Key modifier_key           = key_from_str8(modifier_key_str);
+                Key other_key              = key_from_str8(other_key_str);
+                OS_Event_modifier modifier = os_modifier_from_key(modifier_key);
+                if (modifier != OS_Event_modifier__NONE && other_key != Key__NONE)
+                {
+                  add_shortcut(P, modifier, other_key, command_name_str);
+                } else { InvalidCodePath(); }
+              } else { InvalidCodePath(); }
+            } else { InvalidCodePath(); }
+          } else { InvalidCodePath(); }
+        } 
+      } else { InvalidCodePath(); }
+    } else {
+      // todo:
+      // const char *error_ptr = cJSON_GetErrorPtr();
+      // if (error_ptr != NULL) {
+      //     printf("Error: %s\n", error_ptr);
+      // }
+    }
+    cJSON_Delete(settings_json);
+
+    end_scratch(&scratch);
+  }
 }
 
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode)
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 {
-  // Assert(NAND(is_ui_capturing_mouse, P->is_mid_drawing));
+  // Mouse updates
+  struct Pencil_mouse_button_state {
+    B32 was_up = true;
+    B32 was_down;
+
+    B32 is_up = true;
+    B32 is_down;
+    
+    B32 went_down;
+    B32 went_up;
+  };
+  static Pencil_mouse_button_state mouse_states[Mouse_button__COUNT] = {};
+  // Ressing the mouse frame data
+  for EachEnum1ToCount(Mouse_button, button)
+  {
+    mouse_states[button].was_up    = mouse_states[button].is_up; 
+    mouse_states[button].was_down  = mouse_states[button].is_down; 
+    mouse_states[button].went_down = false;
+    mouse_states[button].went_up   = false;
+  }
+  // Updating mouse frame data based on the new os frame events
+  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  {
+    OS_Event* event = os_get_state()->frame_events + i;
+    if (event->kind == OS_Event_kind__mouse && !event->is_consumed)
+    {
+      Pencil_mouse_button_state* button = mouse_states + event->mouse_event.button;
+      if (event->mouse_event.went_down) { button->went_down = true; button->is_down = true; button->is_up = false;}
+      if (event->mouse_event.went_up) { button->went_up = true; button->is_up = true; button->is_down = false; }
+      
+      event->is_consumed = true;
+    }
+  }
+  //
+  //
+  // Key updates
+  struct Pencil_key_states {
+    B32 was_up = true;
+    B32 was_down;
+
+    B32 is_up = true;
+    B32 is_down;
+    
+    B32 went_down;
+    B32 went_up;
+
+    B32 repeat_down;
+  };
+  static Pencil_key_states key_states[Key__COUNT] = {};
+  // Resetting the key frame data
+  for EachEnum1ToCount(Key, key)
+  {
+    key_states[key].was_up      = key_states[key].is_up; 
+    key_states[key].was_down    = key_states[key].is_down; 
+    key_states[key].went_down   = false;
+    key_states[key].went_up     = false;
+    key_states[key].repeat_down = false;
+
+  }
+  // Updating key frame data based on the new os frame events
+  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  {
+    OS_Event* event = os_get_state()->frame_events + i;
+    if (event->kind == OS_Event_kind__key && !event->is_consumed)
+    {
+      Pencil_key_states* key = key_states + event->key_event.key;
+      if (event->key_event.went_down) { key->went_down = true; key->is_down = true; key->is_up = false;}
+      if (event->key_event.went_up) { key->went_up = true; key->is_up = true; key->is_down = false; }
+      if (event->key_event.repeat_down) { key->repeat_down = true; }
+
+      event->is_consumed = true;
+    }
+  }
+  //
+  //
+  // Wheel stuff
+  F32 wheel_scroll = 0.0f;
+  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  {
+    OS_Event* event = os_get_state()->frame_events + i;
+    if (event->kind == OS_Event_kind__wheel && event->is_consumed)
+    {
+      wheel_scroll = event->wheel_event.scroll_data;
+      event->is_consumed = true;
+      break;
+    }
+  }
+
+  // Running shortcuts
+  for (U64 i = 0; i < P->chord_count; i += 1)
+  {
+    Shortcut_chord chord = P->chords[i];
+    if (key_states[key_from_os_event_mod(chord.mod)].is_down && (key_states[chord.key].went_down))
+    {
+      run_command_from_name(P, str8_manuall(chord.command_name_buffer, chord.command_name_buffer_count));
+    }
+  }
 
   // Handling signals (Right now only 1 per frame)
   {
@@ -135,16 +298,16 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
     B32 dont_start_drawing_this_frame = false;
   
     // This is fine to do and keep doing the rest of the frmae update since this is not dependand on anything and can just be plugged in
-    if (os_wheel_got_scrolled())
+    if (wheel_scroll != 0.0f)
     {
-      S64 scroll = (S64)os_get_wheel_scroll();
+      S64 scroll = (S64)wheel_scroll;
       S64 current_pen_size = (S64)P->pen_size;
       current_pen_size += scroll;
       clamp_s64_inplace(&current_pen_size, (S64)MIN_PEN_SIZE, (S64)MAX_PEN_SIZE);
       P->pen_size = (U32)current_pen_size;
     }
     
-    if (!P->is_mid_drawing && os_key_down(Key__Control) && os_key_down(Key__Shift) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
+    if (!P->is_mid_drawing && key_states[Key__control].is_down && key_states[Key__shift].is_down && (key_states[Key__z].went_down || key_states[Key__z].repeat_down)) 
     {
       dont_start_drawing_this_frame = true; 
   
@@ -165,7 +328,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       }
     }
     else // User wants to remove the last line they drew
-    if (!P->is_mid_drawing && os_key_down(Key__Control) && (os_key_went_down(Key__Z) || os_key_repeat_down(Key__Z))) 
+    if (!P->is_mid_drawing && key_states[Key__control].is_down && (key_states[Key__z].went_down || key_states[Key__z].repeat_down)) 
     {
       dont_start_drawing_this_frame = true;
   
@@ -177,7 +340,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       }
     }
     else // User want to clear the screen
-    if (!P->is_mid_drawing && os_key_went_up(Key__Delete))
+    if (!P->is_mid_drawing && key_states[Key__delete].went_down)
     {
       dont_start_drawing_this_frame = true;
   
@@ -201,7 +364,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       }
     }
     else // User wants to start using the eraser pen 
-    if (!P->is_mid_drawing && os_key_went_down(Key__E))
+    if (!P->is_mid_drawing && key_states[Key__r].went_down)
     {
       // note: 
       // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
@@ -212,7 +375,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       P->is_erasing_mode = true;
     }
     else // User wants to start using the brush/pen
-    if (!P->is_mid_drawing && os_key_went_down(Key__B))
+    if (!P->is_mid_drawing && key_states[Key__b].went_down)
     {
       // note: 
       // There might be a sligh delay here, since we check the is_mid_drawing == false, but it might get
@@ -224,7 +387,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       // end_frame_event_swap_to_pen = true; 
     } 
     else 
-    if (os_key_went_down(Key__Tab))
+    if (key_states[Key__tab].went_down)
     {
       P->show_brush_ui_menu = ToggleBool(P->show_brush_ui_menu);
     }
@@ -232,18 +395,26 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
     if (dont_start_drawing_this_frame) { goto __active_draw_update_routine_end__; }
   
     // Starting a new draw record
-    if (!P->is_mid_drawing && os_mouse_button_down(Mouse_button__left)) 
+    if (!P->is_mid_drawing && (mouse_states[Mouse_button__left].is_down || mouse_states[Mouse_button__right].is_down)) 
     {
       Draw_record_registration_result record_registation = register_new_draw_record(P);
       if (record_registation.succ)
       {
         P->is_mid_drawing = true;
         P->current_record = record_registation.record;
+        if (mouse_states[Mouse_button__right].is_down) { 
+          P->is_erasing_mode = true; 
+          P->is_erasing_mode_for_a_single_drawing = true; 
+        }
       }
     }
     else // Updating active drawing 
-    if (P->is_mid_drawing && os_mouse_button_down(Mouse_button__left))
-    {
+    if (   P->is_mid_drawing 
+        && (
+              (!P->is_erasing_mode_for_a_single_drawing && mouse_states[Mouse_button__left].is_down)
+           || (P->is_erasing_mode_for_a_single_drawing && mouse_states[Mouse_button__right].is_down)
+          )
+    ) {
       V2F32 new_pos  = os_get_mouse_pos();
       V2F32 prev_pos = os_get_prev_mouse_pos();
       
@@ -276,8 +447,12 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
       if (P->is_erasing_mode) { d_pop_blend_kind(); }
     }
     else // Here we finalise the draw record that the user have been drawing
-    if (P->is_mid_drawing && os_mouse_button_went_up(Mouse_button__left))
-    {
+    if (   P->is_mid_drawing 
+        && (
+              (!P->is_erasing_mode_for_a_single_drawing && mouse_states[Mouse_button__left].went_up)
+           || (P->is_erasing_mode_for_a_single_drawing && mouse_states[Mouse_button__right].went_up)
+          )
+    ) {
       Assert(P->current_record != 0);
       Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_after_we_affected));  // These are expected to already be allocated by this point
       Assert(!r_target_match(r_target_zero_handle(), P->current_record->texture_before_we_affected)); // These are expected to already be allocated by this point
@@ -289,44 +464,64 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode
   
       // Storing the new version of the draw texture
       r_copy_into_texture_from_texture(record->texture_after_we_affected, P->draw_texture_always_fresh, 0);
+    
+      if (P->is_erasing_mode_for_a_single_drawing) { 
+        P->is_erasing_mode = false;
+        P->is_erasing_mode_for_a_single_drawing = false; 
+      }
     }
   
     __active_draw_update_routine_end__: {};
   }
-  else 
+  else
   if (P->current_mode == Pencil_mode__ruler)
   {
-    B32 end_ruling = false;
-
-    if (!P->is_mid_ruling && os_mouse_button_went_down(Mouse_button__left))
+    if (!P->is_mid_ruling)
     {
-      P->is_mid_ruling    = true;
-      P->ruling_start_pos = os_get_mouse_pos();
-      P->ruling_end_pos   = os_get_mouse_pos();
-      P->ruling_mode      = Pencil_ruling_mode__not_set;
-    }
-    else // Figuring out how we gon go about user using the ruller, do we want them to hold the mouse button or press it to start and end  
-    if (P->is_mid_ruling && P->ruling_mode == Pencil_ruling_mode__not_set)
-    {
-      if (os_mouse_button_up(Mouse_button__left) && v2f32_match(P->ruling_start_pos, os_get_mouse_pos())) { 
-        P->ruling_mode = Pencil_ruling_mode__single_press;
+      if (mouse_states[Mouse_button__left].went_down)
+      {
+        P->is_mid_ruling    = true;
+        P->ruling_start_pos = os_get_mouse_pos();
+        P->ruling_end_pos   = os_get_mouse_pos();
       }
-      else if (os_mouse_button_down(Mouse_button__left) && !v2f32_match(P->ruling_start_pos, os_get_mouse_pos())) {
-        P->ruling_mode = Pencil_ruling_mode__hold;
+      else if (mouse_states[Mouse_button__right].went_down) // Resetting the ruler to remove it from the screen
+      {
+        P->ruling_start_pos = {};
+        P->ruling_end_pos   = {};
       }
     }
     else // Updating the ruling 
-    if (P->is_mid_ruling && P->ruling_mode != Pencil_ruling_mode__not_set)
+    if (P->is_mid_ruling)
     {
       // Condition to end the ruling
-      if (   P->ruling_mode == Pencil_ruling_mode__hold         && os_mouse_button_up(Mouse_button__left)
-          || P->ruling_mode == Pencil_ruling_mode__single_press && os_mouse_button_went_up(Mouse_button__left)
-      ) {
+      if (mouse_states[Mouse_button__left].is_up) {
         P->is_mid_ruling = false;
       } 
       else {
         P->ruling_end_pos = os_get_mouse_pos();
       }
+    }
+  }
+  else 
+  if (P->current_mode == Pencil_mode__temp_texture)
+  {
+    if (!P->is_mid_drawing && mouse_states[Mouse_button__left].is_down)
+    {
+      P->is_mid_drawing = true;
+      P->temp_drawing_texture = r_make_texture(P->draw_texures_width, P->draw_texures_height);
+      P->temp_texture_initial_time_to_fade = 1.0f;
+      P->temp_texture_time_left_to_fade = 1.0f;
+    }
+    else if (P->is_mid_drawing && mouse_states[Mouse_button__left].is_down)
+    {
+      D_RenderTarget(P->temp_drawing_texture)
+      {
+        d_draw_circle(os_get_mouse_pos(), (F32)P->pen_size, rgba_from_hsva(P->pen_color_hsva), 2.0f);
+      }
+    }
+    else if (P->is_mid_drawing && mouse_states[Mouse_button__left].is_up)
+    {
+      P->is_mid_drawing = false;
     }
   }
 }
@@ -341,6 +536,18 @@ void pencil_render(const Pencil_state* P)
     d_add_texture_command(P->draw_texture_always_fresh, rect, rect, white());
   }
 
+  // Rending a demo for a temporary texture
+  if (P->current_mode == Pencil_mode__temp_texture)
+  {
+    Pencil_state* ps = (Pencil_state*)P;
+    ps->temp_texture_time_left_to_fade -= os_get_time_since_last_frame();
+    if (ps->temp_texture_time_left_to_fade < 0.0f) { ps->temp_texture_time_left_to_fade = 0.0f; }
+    Rect rect = {};
+    rect.width  = (F32)P->draw_texures_width;
+    rect.height = (F32)P->draw_texures_height;
+    d_add_texture_command(P->temp_drawing_texture, rect, rect, v4f32(1.0f, 1.0f, 1.0f, P->temp_texture_time_left_to_fade/P->temp_texture_initial_time_to_fade));
+  }
+
   // Rendering the ruller
   {
     if (P->current_mode == Pencil_mode__ruler)
@@ -350,7 +557,7 @@ void pencil_render(const Pencil_state* P)
   
       V2F32 ruler_rect_center = rect_get_center(ruler_rect);
       V2F32 reler_dims        = rect_get_dims(ruler_rect);
-      FP_Font font            = ui_get_font();
+      FP_Font font            = {};//ui_get_font();
       V2F32 text_pos          = v2f32_sub(ruler_rect_center, v2f32(0.0f, (fp_get_font_height(font) / 2.0f))); 
   
       d_draw_circle(ruler_rect_center, 3, green(), 2.0f);
@@ -358,15 +565,9 @@ void pencil_render(const Pencil_state* P)
     }
   }
 
-
-  // os_show_cursor(false);
-  // d_draw_circle_inset_border(os_get_mouse_pos(), (F32)P->pen_size, red(), 1.0f, 0.0f);
-  // os_show_cursor(true);
-
-  ///
-
 }
 
+/*
 void pencil_do_ui(Pencil_state* P, FP_Font font)
 { 
   V4F32 pen_color_rgba = rgba_from_hsva(P->pen_color_hsva);
@@ -653,6 +854,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
   ui_end_build();
 }
+*/
 
 ///////////////////////////////////////////////////////////
 // - Other
@@ -744,7 +946,7 @@ Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_ne
   return result;
 }
 
-void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name)
+void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_name)
 {
   Shortcut_chord* chord = 0;
 
@@ -752,7 +954,7 @@ void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name)
   for (U64 i = 0; i < P->chord_count; i += 1)
   {
     Shortcut_chord* test_chord = P->chords + i;
-    if (   str8_match(test_chord->command_name, command_name, 0) 
+    if (   str8_match(str8_manuall(test_chord->command_name_buffer, test_chord->command_name_buffer_count), command_name, 0) 
         || (test_chord->mod == mod && test_chord->key == key)
     ) { 
       chord = test_chord;
@@ -765,12 +967,11 @@ void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name)
   else {
     if (P->chord_count < MAX_CHORD_COUNT) {
       chord = P->chords + (P->chord_count++);
-    }
-    if (chord == 0) { InvalidCodePath(); } // Need more space for chords
-    else {
       chord->mod = mod;
       chord->key = key;
-      chord->command_name = command_name;
+      for (U64 i = 0; i < Min(command_name.count, ArrayCount(chord->command_name_buffer)); i += 1) { chord->command_name_buffer[i] = command_name.data[i]; }
+      chord->command_name_buffer_count = Min((U8)command_name.count, ArrayCount(chord->command_name_buffer));
+      // todo: This cuts off the command names for now
     }
   }
 }
@@ -778,9 +979,9 @@ void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name)
 void run_command_from_name(Pencil_state* P, Str8 command_name)
 {
   if (0) {}
-  else if (str8_match(command_name, COMMAND_NAME_TERMINATE_APP, 0)) { command_terminate_app(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_RULER, 0)) { command_swap_to_ruller(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_DRAW, 0))  { command_swap_to_draw(P); }
+  else if (str8_match(command_name, COMMAND_NAME_TERMINATE_APP, Str8_match__ignore_case)) { command_terminate_app(P); }
+  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_RULER, Str8_match__ignore_case)) { command_swap_to_ruller(P); }
+  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_DRAW,  Str8_match__ignore_case)) { command_swap_to_draw(P); }
   else {
     InvalidCodePath();
   }

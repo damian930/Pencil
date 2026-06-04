@@ -32,10 +32,10 @@ tu_specific void arena_release(Arena* arena);
 
 tu_specific U8* arena_push_nozero(Arena* arena, U64 size_to_push);
 tu_specific U8* arena_push(Arena* arena, U64 size_to_push);
-#define ArenaPush(arena_p, Type)           (Type*)arena_push(arena_p, sizeof(Type))
-#define ArenaPushArr(arena_p, Type, count) (Type*)arena_push(arena_p, sizeof(Type) * count)
-#define ArenaCurrentAddressP(arena_p, Type) ArenaPushArr(arena_p, Type, 0)
-#define ArenaCurrentAddressU64(arena_p)     (U64)ArenaPushArr(arena_p, U8, 0)
+#define ArenaPush(arena_p, Type)           ((Type*)arena_push(arena_p, sizeof(Type)))
+#define ArenaPushArr(arena_p, Type, count) ((Type*)arena_push(arena_p, sizeof(Type) * count))
+#define ArenaCurrentAddressP(arena_p, Type) (ArenaPushArr(arena_p, Type, 0))
+#define ArenaCurrentAddressU64(arena_p)     ((U64)ArenaPushArr(arena_p, U8, 0))
 
 tu_specific B32 arena_is_consumed(Arena* arena);
 tu_specific B32 arena_can_fit(Arena* arena, U64 size);

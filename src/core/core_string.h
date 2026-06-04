@@ -49,6 +49,7 @@ typedef Str8 Data_buffer;
 tu_specific Data_buffer data_buffer_make(Arena* arena, U64 count);
 
 // - str8 makers
+// todo: Really need better names for deep copies and copies
 #define CStrCount(clit) ArrayCount(clit) - 1
 #define MakeSureClit(clit) "" clit "" 
 #define Str8FromC(clit) Str8 { (U8*)MakeSureClit(clit), ArrayCount(clit) - 1 }
@@ -56,6 +57,7 @@ tu_specific Data_buffer data_buffer_make(Arena* arena, U64 count);
 tu_specific Str8 str8_manuall(U8* buffer, U64 count);
 tu_specific Str8 str8_from_cstr_len(Arena* arena, U8* str, U64 len);
 tu_specific Str8 str8_from_cstr(Arena* arena, U8* str);
+tu_specific Str8 str8_from_cstr_copy(U8* str);
 tu_specific Str8 str8_copy_alloc(Arena* arena, Str8 str);
 tu_specific Str8 str8_from_list(Arena* arena, Str8_list* list); // todo: There is not point in the list beeing passed by a pointer here. It shoud either be by value. Or a const pointer
 tu_specific Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_before, Str8 str_to_put_between, Str8 str_to_put_after); 
@@ -64,7 +66,7 @@ tu_specific Str8 str8_valist(Arena* arena, const char* fmt, va_list valist);
 tu_specific U64 str8_fmt_count(const char* fmt, ...);
 tu_specific U64 __str8_fmt_count_valist(const char* fmt, va_list valist);
 
-// - substrings
+// - string editing
 tu_specific Str8 str8_substring(Str8 str, U64 start_index, U64 end_index);
 tu_specific Str8 str8_substring_range(Str8 str, RangeU64 range);
 tu_specific B32 str8_match(Str8 str, Str8 other, Str8_match_flags flags);
@@ -80,6 +82,8 @@ tu_specific Str8 str8_back(Str8 str, U64 n);
 tu_specific Str8 str8_trim_front(Str8 str);
 tu_specific Str8 str8_trim_back(Str8 str);
 tu_specific Str8 str8_trim(Str8 str);
+tu_specific Str8 str8_to_lower(Arena* arena, Str8 str);
+tu_specific Str8 str8_to_upper(Arena* arena, Str8 str);
 
 // - chars
 tu_specific B32 char_is_lower(U8 ch);

@@ -1,8 +1,11 @@
 #ifndef PENCIL_H
 #define PENCIL_H
 
+#include "__third_party/cjson/cJSON.h"
+
 #include "core/core_include.h"
 #include "os/win32.h"
+#include "render/render.h"
 
 const U32 MAX_PEN_SIZE = 100;
 const U32 MIN_PEN_SIZE = 1;
@@ -10,6 +13,7 @@ const U32 MIN_PEN_SIZE = 1;
 enum Pencil_mode : U32 {
   Pencil_mode__draw,
   Pencil_mode__ruler,
+  Pencil_mode__temp_texture,
 };
 
 struct Draw_record {
@@ -30,20 +34,15 @@ struct Draw_record_registration_result {
   Draw_record* record;  
 };
 
-enum Pencil_ruling_mode : U32 {
-  Pencil_ruling_mode__not_set,
-  Pencil_ruling_mode__hold,
-  Pencil_ruling_mode__single_press,
-};
-
 #define COMMAND_NAME_TERMINATE_APP  Str8FromC("Terminate app")
 #define COMMAND_NAME_SWAP_TO_RULER  Str8FromC("Swap to ruller")
 #define COMMAND_NAME_SWAP_TO_DRAW   Str8FromC("Swap to draw")
 
 struct Shortcut_chord {
-  Key_modifier mod;
+  OS_Event_modifier mod;
   Key key;
-  Str8 command_name;
+  U8 command_name_buffer[32];
+  U8 command_name_buffer_count;
 };
 
 struct Pencil_state {
@@ -59,6 +58,11 @@ struct Pencil_state {
   U32 draw_texures_height;
   R_Target draw_texture_always_fresh; // todo: Rename this to be a less complicated name since now we only have 1 of them (no non_fresh_texture)
 
+  // Testing this for now
+  R_Target temp_drawing_texture;
+  F32 temp_texture_initial_time_to_fade;
+  F32 temp_texture_time_left_to_fade;
+
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
   Draw_record pool_of_draw_records[DRAW_RECORDS_MAX_COUNT];
@@ -71,17 +75,17 @@ struct Pencil_state {
 
   B32 is_mid_drawing;
   B32 is_erasing_mode;
+  B32 is_erasing_mode_for_a_single_drawing;
 
   // Some state for the rulling mode to go over
   B32 is_mid_ruling;
-  Pencil_ruling_mode ruling_mode;
   V2F32 ruling_start_pos;
   V2F32 ruling_end_pos;
 
   #define MAX_CHORD_COUNT 50
   Shortcut_chord chords[MAX_CHORD_COUNT];
   U64 chord_count;
-
+  //
   B32 terminate_app;
 
   // Signals 
@@ -111,14 +115,14 @@ struct Pencil_state {
 
 // - Main passes
 void pencil_init(Pencil_state* P);
-void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse, B32 is_ruler_mode);
+void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse);
 void pencil_render(const Pencil_state* P);
 void pencil_do_ui(Pencil_state* P, FP_Font font);
 
 // - Other
 Draw_record_registration_result register_new_draw_record(Pencil_state* P);
 Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P);
-void add_shortcut(Pencil_state* P, Key_modifier mod, Key key, Str8 command_name);
+void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_name);
 void run_command_from_name(Pencil_state* P, Str8 command_name);
 void command_terminate_app(Pencil_state* P);
 void command_swap_to_ruller(Pencil_state* P);

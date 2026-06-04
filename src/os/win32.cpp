@@ -30,16 +30,14 @@ struct OS_State {
   OS_Window window;
 
   // Frame data
-  // Arena* frame_events_arena;
-  // OS_Event_list frame_events;
+  OS_Event frame_events[64];
+  U64 frame_event_count;
   //
-  V2S32 this_frame_mouse_pos;
-  V2S32 prev_frame_mouse_pos;
-  //
-  OS_Key_state key_states[Key__COUNT];
-  OS_Mouse_button_state mouse_button_states[Mouse_button__COUNT];
+  V2F32 this_frame_mouse_pos; // Relative to the client area of the window
+  V2F32 prev_frame_mouse_pos; // Relative to the client area of the window
   // 
-  F32 mouse_wheel_scroll_delta;
+  F32 start_time_for_prev_frame;
+  F32 start_time_for_this_frame;
 };
 
 global OS_State* __os_g_state = 0;
@@ -58,25 +56,7 @@ void os_init()
   BOOL succ = QueryPerformanceFrequency(&freq_lr); Assert(succ);
   __os_g_state->perf_freq_count_per_sec = freq_lr.QuadPart;
 
-  // Setting keys
-  StaticAssert(ArrayCount(__os_g_state->key_states) == Key__COUNT);
-  for (U64 i = 0; i < Key__COUNT; i += 1) 
-  {
-    OS_Key_state* key_state = __os_g_state->key_states + i;
-    key_state->key = (Key)((U32)Key__NONE + i);
-    key_state->is_up = true;
-  }
-
-  // Setting mouse buttons
-  StaticAssert(ArrayCount(__os_g_state->mouse_button_states) == Mouse_button__COUNT);
-  for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
-  {
-    OS_Mouse_button_state* button_state = __os_g_state->mouse_button_states + i;
-    button_state->button = (Mouse_button)((U32)Mouse_button__NONE + i);
-    button_state->is_up = true;
-  }
-
-  // Getting the folder path in win32
+  // Getting the folder path in win32 to system fonts
   {
     WCHAR* wstr = 0;
     HRESULT hr = SHGetKnownFolderPath(FOLDERID_Fonts, 0, 0, &wstr);
@@ -307,28 +287,13 @@ void os_frame_begin()
 {
   OS_State* os_state = os_get_state();
   
-  // Setting prev frame's input data to the new frame's fresh input data
+  // Resetting data from the prev frame
   {
-    StaticAssert(ArrayCount(os_state->key_states) == Key__COUNT);
-    for (U64 i = 0; i < Key__COUNT; i += 1) 
-    {
-      OS_Key_state* key_state = __os_g_state->key_states + i;
-      key_state->was_down    = key_state->is_down;
-      key_state->was_up      = key_state->is_up;
-      key_state->repeat_down = false;
-    }
+    for (U64 i = 0; i < os_state->frame_event_count; i += 1) { os_state->frame_events[i] = OS_Event{}; }
+    os_state->frame_event_count = 0;
 
-    // Setting mouse buttons
-    StaticAssert(ArrayCount(os_state->mouse_button_states) == Mouse_button__COUNT);
-    for (U64 i = 0; i < Mouse_button__COUNT; i += 1) 
-    {
-      OS_Mouse_button_state* button_state = os_state->mouse_button_states + i;
-      button_state->was_down = button_state->is_down;
-      button_state->was_up = button_state->is_up;
-    }
-    
-    // Resetting the mouse wheel scroll data
-    os_state->mouse_wheel_scroll_delta = 0.0f;
+    os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
+    os_state->this_frame_mouse_pos = v2f32(f32_neg_inf(), f32_neg_inf());
   }
 
   // Creating frame events though the winproc
@@ -340,11 +305,22 @@ void os_frame_begin()
 
   // Capturing the mouse when if pressed 
   {
-    B32 some_button_is_down = false;
-    for (U32 button = Mouse_button__NONE + 1; button < Mouse_button__COUNT; button += 1)
+    static B32 mouse_button_is_down_states[Mouse_button__COUNT] = {};
+
+    for (U64 i = 0; i < os_state->frame_event_count; i += 1)
     {
-      OS_Mouse_button_state state = os_get_mouse_button_state((Mouse_button)button);
-      if (state.is_down) { some_button_is_down = true; break; }
+      OS_Event event = os_state->frame_events[i];
+      if (event.kind == OS_Event_kind__mouse && event.mouse_event.went_down) { mouse_button_is_down_states[event.mouse_event.button] = true; }
+      if (event.kind == OS_Event_kind__mouse && event.mouse_event.went_up) { mouse_button_is_down_states[event.mouse_event.button] = false; }
+    }
+
+    B32 some_button_is_down = false;
+    for EachEnumRange(button, Mouse_button, Mouse_button__NONE, Mouse_button__COUNT)
+    {
+      if (mouse_button_is_down_states[button]) {
+        some_button_is_down = true;
+        break;
+      }
     }
 
     HWND widnow_that_is_capturing_the_mouse = GetCapture();
@@ -356,14 +332,13 @@ void os_frame_begin()
   }
 
   // Mouse positions
-  os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
   {
     POINT p = {};
     BOOL succ = {};
-    succ = GetCursorPos(&p); Assert(succ);
-    succ = ScreenToClient(os_get_state()->window.handle, &p); Assert(succ);
+    succ |= GetCursorPos(&p); Assert(succ);
+    succ |= ScreenToClient(os_get_state()->window.handle, &p); Assert(succ);
     Handle(succ); 
-    os_state->this_frame_mouse_pos = v2s32(p.x, p.y);
+    os_state->this_frame_mouse_pos = v2f32((F32)p.x, (F32)p.y);
   }
 
   // Window dims
@@ -381,9 +356,22 @@ void os_frame_begin()
     V2F32 dims = v2f32((F32)(rect.right - rect.left), (F32)(rect.bottom - rect.top));
     os_state->window.client_area_dims = dims;
   }
+
+  // Getting frame time 
+  {
+    os_state->start_time_for_prev_frame = os_state->start_time_for_this_frame;
+    os_state->start_time_for_this_frame = (F32)os_get_time_for_timing_sec();
+  }
 }
 
 void os_frame_end() {}
+
+F32 os_get_time_since_last_frame()
+{
+  OS_State* os_state = os_get_state();
+  F32 diff = os_state->start_time_for_this_frame - os_state->start_time_for_prev_frame;
+  return diff;
+}
 
 ///////////////////////////////////////////////////////////
 // - Windowing
@@ -410,16 +398,12 @@ V2F32 os_get_client_area_dims__unsynched()
 
 V2F32 os_get_mouse_pos()
 {
-  V2S32 s32_pos = os_get_state()->this_frame_mouse_pos;
-  V2F32 f32_pos = v2f32((F32)s32_pos.x, (F32)s32_pos.y);
-  return f32_pos;
+  return os_get_state()->this_frame_mouse_pos;
 }
 
 V2F32 os_get_prev_mouse_pos()
 {
-  V2S32 s32_pos = os_get_state()->prev_frame_mouse_pos;
-  V2F32 f32_pos = v2f32((F32)s32_pos.x, (F32)s32_pos.y);
-  return f32_pos;
+  return os_get_state()->prev_frame_mouse_pos;
 }
 
 V2F32 os_get_mouse_delta()
@@ -452,6 +436,192 @@ void os_window_minimize()
 B32 os_window_is_transparent()
 {
   return os_get_state()->window.is_transparent;
+}
+
+///////////////////////////////////////////////////////////
+// - Key stuff 
+//
+Key key_from_str8(Str8 str)
+{
+  Key result_key = Key__NONE;
+  
+  str = str8_trim(str);
+  if (0) {}
+
+  // Mods
+  else if (str8_match(Str8FromC("shift"), str, Str8_match__ignore_case))   { result_key = Key__shift; }
+  else if (str8_match(Str8FromC("control"), str, Str8_match__ignore_case)) { result_key = Key__control; }
+  else if (str8_match(Str8FromC("alt"), str, Str8_match__ignore_case))     { result_key = Key__alt; }
+
+  // Letters
+  else if (str8_match(Str8FromC("a"), str, Str8_match__ignore_case)) { result_key = Key__a; }
+  else if (str8_match(Str8FromC("b"), str, Str8_match__ignore_case)) { result_key = Key__b; }
+  else if (str8_match(Str8FromC("c"), str, Str8_match__ignore_case)) { result_key = Key__c; }
+  else if (str8_match(Str8FromC("d"), str, Str8_match__ignore_case)) { result_key = Key__d; }
+  else if (str8_match(Str8FromC("e"), str, Str8_match__ignore_case)) { result_key = Key__e; }
+  else if (str8_match(Str8FromC("f"), str, Str8_match__ignore_case)) { result_key = Key__f; }
+  else if (str8_match(Str8FromC("g"), str, Str8_match__ignore_case)) { result_key = Key__g; }
+  else if (str8_match(Str8FromC("h"), str, Str8_match__ignore_case)) { result_key = Key__h; }
+  else if (str8_match(Str8FromC("i"), str, Str8_match__ignore_case)) { result_key = Key__i; }
+  else if (str8_match(Str8FromC("j"), str, Str8_match__ignore_case)) { result_key = Key__j; }
+  else if (str8_match(Str8FromC("k"), str, Str8_match__ignore_case)) { result_key = Key__k; }
+  else if (str8_match(Str8FromC("l"), str, Str8_match__ignore_case)) { result_key = Key__l; }
+  else if (str8_match(Str8FromC("m"), str, Str8_match__ignore_case)) { result_key = Key__m; }
+  else if (str8_match(Str8FromC("n"), str, Str8_match__ignore_case)) { result_key = Key__n; }
+  else if (str8_match(Str8FromC("o"), str, Str8_match__ignore_case)) { result_key = Key__o; }
+  else if (str8_match(Str8FromC("p"), str, Str8_match__ignore_case)) { result_key = Key__p; }
+  else if (str8_match(Str8FromC("q"), str, Str8_match__ignore_case)) { result_key = Key__q; }
+  else if (str8_match(Str8FromC("r"), str, Str8_match__ignore_case)) { result_key = Key__r; }
+  else if (str8_match(Str8FromC("s"), str, Str8_match__ignore_case)) { result_key = Key__s; }
+  else if (str8_match(Str8FromC("t"), str, Str8_match__ignore_case)) { result_key = Key__t; }
+  else if (str8_match(Str8FromC("u"), str, Str8_match__ignore_case)) { result_key = Key__u; }
+  else if (str8_match(Str8FromC("v"), str, Str8_match__ignore_case)) { result_key = Key__v; }
+  else if (str8_match(Str8FromC("w"), str, Str8_match__ignore_case)) { result_key = Key__w; }
+  else if (str8_match(Str8FromC("x"), str, Str8_match__ignore_case)) { result_key = Key__x; }
+  else if (str8_match(Str8FromC("y"), str, Str8_match__ignore_case)) { result_key = Key__y; }
+  else if (str8_match(Str8FromC("z"), str, Str8_match__ignore_case)) { result_key = Key__z; }
+
+  // Numbers
+  else if (str8_match(Str8FromC("0"), str, Str8_match__ignore_case)) { result_key = Key__0; }
+  else if (str8_match(Str8FromC("1"), str, Str8_match__ignore_case)) { result_key = Key__1; }
+  else if (str8_match(Str8FromC("2"), str, Str8_match__ignore_case)) { result_key = Key__2; }
+  else if (str8_match(Str8FromC("3"), str, Str8_match__ignore_case)) { result_key = Key__3; }
+  else if (str8_match(Str8FromC("4"), str, Str8_match__ignore_case)) { result_key = Key__4; }
+  else if (str8_match(Str8FromC("5"), str, Str8_match__ignore_case)) { result_key = Key__5; }
+  else if (str8_match(Str8FromC("6"), str, Str8_match__ignore_case)) { result_key = Key__6; }
+  else if (str8_match(Str8FromC("7"), str, Str8_match__ignore_case)) { result_key = Key__7; }
+  else if (str8_match(Str8FromC("8"), str, Str8_match__ignore_case)) { result_key = Key__8; }
+  else if (str8_match(Str8FromC("9"), str, Str8_match__ignore_case)) { result_key = Key__9; }
+
+  // Printable
+  else if (str8_match(Str8FromC("space"), str, Str8_match__ignore_case))           { result_key = Key__space; }
+  else if (str8_match(Str8FromC("backtick"), str, Str8_match__ignore_case))        { result_key = Key__backtick; }
+  else if (str8_match(Str8FromC("minus"), str, Str8_match__ignore_case))           { result_key = Key__minus; }
+  else if (str8_match(Str8FromC("equals"), str, Str8_match__ignore_case))          { result_key = Key__equals; }
+  else if (str8_match(Str8FromC("left_bracket"), str, Str8_match__ignore_case))    { result_key = Key__left_bracket; }
+  else if (str8_match(Str8FromC("right_bracket"), str, Str8_match__ignore_case))   { result_key = Key__right_bracket; }
+  else if (str8_match(Str8FromC("backslash"), str, Str8_match__ignore_case))       { result_key = Key__backslash; }
+  else if (str8_match(Str8FromC("semicolon"), str, Str8_match__ignore_case))       { result_key = Key__semicolon; }
+  else if (str8_match(Str8FromC("apostrophe"), str, Str8_match__ignore_case))      { result_key = Key__apostrophe; }
+  else if (str8_match(Str8FromC("comma"), str, Str8_match__ignore_case))           { result_key = Key__comma; }
+  else if (str8_match(Str8FromC("period"), str, Str8_match__ignore_case))          { result_key = Key__period; }
+  else if (str8_match(Str8FromC("slash"), str, Str8_match__ignore_case))           { result_key = Key__slash; }
+
+  // Special
+  else if (str8_match(Str8FromC("left_arrow"), str, Str8_match__ignore_case)) { result_key = Key__left_arrow; }
+  else if (str8_match(Str8FromC("right_arrow"), str, Str8_match__ignore_case)) { result_key = Key__right_arrow; }
+  else if (str8_match(Str8FromC("up_arrow"), str, Str8_match__ignore_case)) { result_key = Key__up_arrow; }
+  else if (str8_match(Str8FromC("down_arrow"), str, Str8_match__ignore_case)) { result_key = Key__down_arrow; }
+  else if (str8_match(Str8FromC("home"), str, Str8_match__ignore_case)) { result_key = Key__home; }
+  else if (str8_match(Str8FromC("end"), str, Str8_match__ignore_case)) { result_key = Key__end; }
+  else if (str8_match(Str8FromC("page_up"), str, Str8_match__ignore_case)) { result_key = Key__page_up; }
+  else if (str8_match(Str8FromC("page_down"), str, Str8_match__ignore_case)) { result_key = Key__page_down; }
+  else if (str8_match(Str8FromC("backspace"), str, Str8_match__ignore_case)) { result_key = Key__backspace; }
+  else if (str8_match(Str8FromC("delete"), str, Str8_match__ignore_case)) { result_key = Key__delete; }
+  else if (str8_match(Str8FromC("insert"), str, Str8_match__ignore_case)) { result_key = Key__insert; }
+  else if (str8_match(Str8FromC("escape"), str, Str8_match__ignore_case)) { result_key = Key__escape; }
+  else if (str8_match(Str8FromC("tab"), str, Str8_match__ignore_case)) { result_key = Key__tab; }
+  else if (str8_match(Str8FromC("enter"), str, Str8_match__ignore_case)) { result_key = Key__enter; }
+  else if (str8_match(Str8FromC("caps_lock"), str, Str8_match__ignore_case)) { result_key = Key__caps_lock; }
+
+  return result_key;
+}
+
+Str8 str8_from_key(Key key)
+{
+  Str8 result = {};
+
+  if (0) {}
+
+  // Mods
+  else if (key == Key__shift)   { result = Str8FromC("shift"); }
+  else if (key == Key__control) { result = Str8FromC("control"); }
+  else if (key == Key__alt)     { result = Str8FromC("alt"); }
+
+  // Letters
+  else if (key == Key__a) { result = Str8FromC("a"); }
+  else if (key == Key__b) { result = Str8FromC("b"); }
+  else if (key == Key__c) { result = Str8FromC("c"); }
+  else if (key == Key__d) { result = Str8FromC("d"); }
+  else if (key == Key__e) { result = Str8FromC("e"); }
+  else if (key == Key__f) { result = Str8FromC("f"); }
+  else if (key == Key__g) { result = Str8FromC("g"); }
+  else if (key == Key__h) { result = Str8FromC("h"); }
+  else if (key == Key__i) { result = Str8FromC("i"); }
+  else if (key == Key__j) { result = Str8FromC("j"); }
+  else if (key == Key__k) { result = Str8FromC("k"); }
+  else if (key == Key__l) { result = Str8FromC("l"); }
+  else if (key == Key__m) { result = Str8FromC("m"); }
+  else if (key == Key__n) { result = Str8FromC("n"); }
+  else if (key == Key__o) { result = Str8FromC("o"); }
+  else if (key == Key__p) { result = Str8FromC("p"); }
+  else if (key == Key__q) { result = Str8FromC("q"); }
+  else if (key == Key__r) { result = Str8FromC("r"); }
+  else if (key == Key__s) { result = Str8FromC("s"); }
+  else if (key == Key__t) { result = Str8FromC("t"); }
+  else if (key == Key__u) { result = Str8FromC("u"); }
+  else if (key == Key__v) { result = Str8FromC("v"); }
+  else if (key == Key__w) { result = Str8FromC("w"); }
+  else if (key == Key__x) { result = Str8FromC("x"); }
+  else if (key == Key__y) { result = Str8FromC("y"); }
+  else if (key == Key__z) { result = Str8FromC("z"); }
+
+  // Numbers
+  else if (key == Key__0) { result = Str8FromC("0"); }
+  else if (key == Key__1) { result = Str8FromC("1"); }
+  else if (key == Key__2) { result = Str8FromC("2"); }
+  else if (key == Key__3) { result = Str8FromC("3"); }
+  else if (key == Key__4) { result = Str8FromC("4"); }
+  else if (key == Key__5) { result = Str8FromC("5"); }
+  else if (key == Key__6) { result = Str8FromC("6"); }
+  else if (key == Key__7) { result = Str8FromC("7"); }
+  else if (key == Key__8) { result = Str8FromC("8"); }
+  else if (key == Key__9) { result = Str8FromC("9"); }
+
+  // Printable
+  else if (key == Key__space)         { result = Str8FromC("space"); }
+  else if (key == Key__backtick)      { result = Str8FromC("backtick"); }
+  else if (key == Key__minus)         { result = Str8FromC("minus"); }
+  else if (key == Key__equals)        { result = Str8FromC("equals"); }
+  else if (key == Key__left_bracket)  { result = Str8FromC("left_bracket"); }
+  else if (key == Key__right_bracket) { result = Str8FromC("right_bracket"); }
+  else if (key == Key__backslash)     { result = Str8FromC("backslash"); }
+  else if (key == Key__semicolon)     { result = Str8FromC("semicolon"); }
+  else if (key == Key__apostrophe)    { result = Str8FromC("apostrophe"); }
+  else if (key == Key__comma)         { result = Str8FromC("comma"); }
+  else if (key == Key__period)        { result = Str8FromC("period"); }
+  else if (key == Key__slash)         { result = Str8FromC("slash"); }
+
+  // Special
+  else if (key == Key__left_arrow)  { result = Str8FromC("left_arrow"); }
+  else if (key == Key__right_arrow) { result = Str8FromC("right_arrow"); }
+  else if (key == Key__up_arrow)    { result = Str8FromC("up_arrow"); }
+  else if (key == Key__down_arrow)  { result = Str8FromC("down_arrow"); }
+  else if (key == Key__home)        { result = Str8FromC("home"); }
+  else if (key == Key__end)         { result = Str8FromC("end"); }
+  else if (key == Key__page_up)     { result = Str8FromC("page_up"); }
+  else if (key == Key__page_down)   { result = Str8FromC("page_down"); }
+  else if (key == Key__backspace)   { result = Str8FromC("backspace"); }
+  else if (key == Key__delete)      { result = Str8FromC("delete"); }
+  else if (key == Key__insert)      { result = Str8FromC("insert"); }
+  else if (key == Key__escape)      { result = Str8FromC("escape"); }
+  else if (key == Key__tab)         { result = Str8FromC("tab"); }
+  else if (key == Key__enter)       { result = Str8FromC("enter"); }
+  else if (key == Key__caps_lock)   { result = Str8FromC("caps_lock"); }
+
+  return result;
+}
+
+OS_Event_modifier os_modifier_from_key(Key key)
+{
+  OS_Event_modifier mod = OS_Event_modifier__NONE;
+  switch (key)
+  {
+    default: {  } break;
+    case Key__shift:   { mod = OS_Event_modifier__shift;   } break;  
+    case Key__control: { mod = OS_Event_modifier__control; } break;
+  }
+  return mod;
 }
 
 void os_window_set_mouse_passthrough(B32 enable)
@@ -503,192 +673,17 @@ B32 os_window_is_mouse_passthrough()
 //                  SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
 // }
 
-///////////////////////////////////////////////////////////
-// - Inputs for keyboard
-//
-OS_Key_state os_get_key_state(Key key)
-{
-  OS_State* os = os_get_state();
-  OS_Key_state key_state = os->key_states[key];
-  return key_state;
-}
-
-B32 os_key_down(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return state.is_down;
-}
-
-B32 os_key_up(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return state.is_up;
-}
-
-B32 os_key_went_down(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return (state.was_up && state.is_down );
-}
-
-B32 os_key_went_up(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return (state.was_down && state.is_up);
-}
-
-B32 os_key_repeat_down(Key key)
-{
-  OS_Key_state state = os_get_key_state(key);
-  return state.repeat_down;
-}
-
-B32 os_wheel_got_scrolled()
-{
-  return (os_get_state()->mouse_wheel_scroll_delta != 0.0f); 
-}
-
-F32 os_get_wheel_scroll()
-{
-  return os_get_state()->mouse_wheel_scroll_delta;
-}
-
-Key key_from_modifier(Key_modifier mod)
+Key key_from_os_event_mod(OS_Event_modifier mod)
 {
   Key key = Key__NONE;
-  switch (mod) 
+  switch (mod)
   {
     default: { InvalidCodePath(); } break;
-    case Key_modifier__NONE:    { key = Key__NONE;    } break;
-    case Key_modifier__shift:   { key = Key__Shift;   } break;
-    case Key_modifier__control: { key = Key__Control; } break;
-    case Key_modifier__alt:     { key = Key__Alt;     } break;
+    case OS_Event_modifier__NONE:    { key = Key__NONE;    } break;
+    case OS_Event_modifier__shift:   { key = Key__shift;   } break;
+    case OS_Event_modifier__control: { key = Key__control; } break;
   }
   return key;
-}
-
-B32 is_key_modifier(Key key)
-{
-  return (key == Key__Shift || key == Key__Control || key == Key__Alt);
-}
-
-Str8 str8_from_os_key(Key key)
-{ 
-  Str8 str = {};
-  switch (key)
-  {
-    default: { str = Str8FromC("__UNMATCHED__"); Assert(0); } break;
-
-    case Key__NONE:    { str = Str8FromC("__NONE__");    } break;
-    case Key__Shift:   { str = Str8FromC("__SHIFT__");   } break;
-    case Key__Control: { str = Str8FromC("__CONTROL__"); } break;
-
-    // Letters a-z
-    case Key__A: { str = Str8FromC("a"); } break;
-    case Key__B: { str = Str8FromC("b"); } break;
-    case Key__C: { str = Str8FromC("c"); } break;
-    case Key__D: { str = Str8FromC("d"); } break;
-    case Key__E: { str = Str8FromC("e"); } break;
-    case Key__F: { str = Str8FromC("f"); } break;
-    case Key__G: { str = Str8FromC("P"); } break;
-    case Key__H: { str = Str8FromC("h"); } break;
-    case Key__I: { str = Str8FromC("i"); } break;
-    case Key__J: { str = Str8FromC("j"); } break;
-    case Key__K: { str = Str8FromC("k"); } break;
-    case Key__L: { str = Str8FromC("l"); } break;
-    case Key__M: { str = Str8FromC("m"); } break;
-    case Key__N: { str = Str8FromC("n"); } break;
-    case Key__O: { str = Str8FromC("o"); } break;
-    case Key__P: { str = Str8FromC("p"); } break;
-    case Key__Q: { str = Str8FromC("q"); } break;
-    case Key__R: { str = Str8FromC("r"); } break;
-    case Key__S: { str = Str8FromC("s"); } break;
-    case Key__T: { str = Str8FromC("t"); } break;
-    case Key__U: { str = Str8FromC("u"); } break;
-    case Key__V: { str = Str8FromC("v"); } break;
-    case Key__W: { str = Str8FromC("w"); } break;
-    case Key__X: { str = Str8FromC("x"); } break;
-    case Key__Y: { str = Str8FromC("y"); } break;
-    case Key__Z: { str = Str8FromC("z"); } break;
-
-    // Numbers 0-9
-    case Key__0: { str = Str8FromC("0"); } break;
-    case Key__1: { str = Str8FromC("1"); } break;
-    case Key__2: { str = Str8FromC("2"); } break;
-    case Key__3: { str = Str8FromC("3"); } break;
-    case Key__4: { str = Str8FromC("4"); } break;
-    case Key__5: { str = Str8FromC("5"); } break;
-    case Key__6: { str = Str8FromC("6"); } break;
-    case Key__7: { str = Str8FromC("7"); } break;
-    case Key__8: { str = Str8FromC("8"); } break;
-    case Key__9: { str = Str8FromC("9"); } break;
-
-    // Other printable
-    case Key__Space:         { str = Str8FromC(" ");  } break;
-    case Key__Backtick:      { str = Str8FromC("`");  } break;
-    case Key__Minus:         { str = Str8FromC("-");  } break;
-    case Key__Equals:        { str = Str8FromC("=");  } break;
-    case Key__Left_bracket:  { str = Str8FromC("[");  } break;
-    case Key__Right_bracket: { str = Str8FromC("]");  } break;
-    case Key__Backslash:     { str = Str8FromC("\\"); } break;
-    case Key__Semicolon:     { str = Str8FromC(";");  } break;
-    case Key__Apostrophe:    { str = Str8FromC("'");  } break;
-    case Key__Comma:         { str = Str8FromC(",");  } break;
-    case Key__Period:        { str = Str8FromC(".");  } break;
-    case Key__Slash:         { str = Str8FromC("/");  } break;
-
-    // Non-printable
-    case Key__Left_arrow:    { str = Str8FromC("__LEFT_ARROW__");  } break;
-    case Key__Right_arrow:   { str = Str8FromC("__RIGHT_ARROW__"); } break;
-    case Key__Up_arrow:      { str = Str8FromC("__UP_ARROW__");    } break;
-    case Key__Down_arrow:    { str = Str8FromC("__DOWN_ARROW__");  } break;
-    case Key__Home:          { str = Str8FromC("__HOME__");        } break;
-    case Key__End:           { str = Str8FromC("__END__");         } break;
-    case Key__Page_up:       { str = Str8FromC("__PAGE_UP__");     } break;
-    case Key__Page_down:     { str = Str8FromC("__PAGE_DOWN__");   } break;
-    case Key__Backspace:     { str = Str8FromC("__BACKSPACE__");   } break;
-    case Key__Delete:        { str = Str8FromC("__DELETE__");      } break;
-    case Key__Insert:        { str = Str8FromC("__INSERT__");      } break;
-    case Key__Escape:        { str = Str8FromC("__ESCAPE__");      } break;
-    case Key__Tab:           { str = Str8FromC("__TAB__");         } break;
-    case Key__Enter:         { str = Str8FromC("__ENTER__");       } break;
-    case Key__Caps_lock:     { str = Str8FromC("__CAPS_LOCK__");   } break;
-  }
-  return str;
-}
-
-///////////////////////////////////////////////////////////
-// - Inputs for mouse 
-//
-OS_Mouse_button_state os_get_mouse_button_state(Mouse_button button)
-{
-  OS_State* os = os_get_state();
-  OS_Mouse_button_state button_state = os->mouse_button_states[button];
-  return button_state;
-}
-
-B32 os_mouse_button_down(Mouse_button button)
-{
-  OS_Mouse_button_state state = os_get_mouse_button_state(button);
-  return state.is_down;
-}
-
-B32 os_mouse_button_up(Mouse_button button)
-{
-  OS_Mouse_button_state state = os_get_mouse_button_state(button);
-  return state.is_up;
-}
-
-B32 os_mouse_button_went_down(Mouse_button button)
-{
-  OS_Mouse_button_state state = os_get_mouse_button_state(button);
-  return (state.is_down && state.was_up);
-}
-
-B32 os_mouse_button_went_up(Mouse_button button)
-{
-  OS_Mouse_button_state state = os_get_mouse_button_state(button);
-  return (state.is_up && state.was_down);
 }
 
 ///////////////////////////////////////////////////////////
@@ -755,6 +750,9 @@ LRESULT win32_proc(
 ) { 
   OS_State* win32_state = os_get_state();
 
+  B32 is_event_made = false;
+  OS_Event event = {};
+
   LRESULT result = {};
   switch (message)
   {
@@ -765,61 +763,53 @@ LRESULT win32_proc(
     {
       Key key = {};
 
+      // Getting the key
       if (0) {}
-      else if ('A' <= w_param && w_param <= 'Z') { key = (Key)((U32)Key__A + (w_param - 'A')); }
+      else if ('A' <= w_param && w_param <= 'Z') { key = (Key)((U32)Key__a + (w_param - 'A')); }
       else if ('0' <= w_param && w_param <= '9') { key = (Key)((U32)Key__0 + (w_param - '0')); }
       else {
         switch (w_param)
         {
           default:         { InvalidCodePath();  } break;
-          case VK_SHIFT:   { key = Key__Shift;   } break;
-          case VK_CONTROL: { key = Key__Control; } break;
-          case VK_DELETE:  { key = Key__Delete;  } break;
-          case VK_TAB:     { key = Key__Tab;     } break;
+          case VK_SHIFT:   { key = Key__shift;   } break;
+          case VK_CONTROL: { key = Key__control; } break;
+          case VK_DELETE:  { key = Key__delete;  } break;
+          case VK_TAB:     { key = Key__tab;     } break;
         }
       }
-      // Assert(key != Key__NONE);
 
       // Unwrapping the message data
-      B32 went_down = false;
-      B32 went_up   = false;
+      B32 went_down   = false;
+      B32 got_up      = false;
+      B32 repeat_down = false;
       {
-        U16 key_repeat_count = (U16)l_param;
+        U16 key_repeat_count = (U16)l_param; 
         U8 scan_code         = (U8)(l_param >> 16);
-        B32 is_extended_key  = l_param & bit_24;
-        B32 context_code     = l_param & bit_29;
-        B32 prev_key_state   = l_param & bit_30;
-        B32 transition_state = l_param & bit_31; // Always 0 for WM_KEYDOWN
+        B32 is_extended_key  = !!(l_param & bit_24);
+        B32 context_code     = !!(l_param & bit_29);
+        B32 prev_key_state   = !!(l_param & bit_30);
+        B32 transition_state = !!(l_param & bit_31); // Always 0 for WM_KEYDOWN
 
-        went_down = (transition_state == 0);
-        went_up = (transition_state != 0);
-        Assert(XOR(went_down, went_up)); // Just making sure
+        got_up      = (transition_state != 0);
+        went_down   = (message == WM_KEYDOWN && prev_key_state == 0); 
+        repeat_down = (message == WM_KEYDOWN && prev_key_state == 1); 
+        
+        // Just making sure
+        if (!repeat_down) { Assert(XOR(went_down, got_up)); }
+        if (!got_up) { Assert(XOR(went_down, repeat_down)); }
       }
 
       if (key != Key__NONE)
       {
-        // note: was down/up are not touched here, since they are updated in the frame_begin routine
-        
-        OS_Key_state* key_state = win32_state->key_states + key;
-        Assert(key_state->key == key);
+        is_event_made = true;
+        event.kind = OS_Event_kind__key;
+        event.key_event.key         = key;
+        event.key_event.went_down   = went_down;
+        event.key_event.went_up      = got_up;
+        event.key_event.repeat_down = repeat_down;
 
-        // note: Windows only allows a single key to be considered repeat_down at a time.
-        //       If i hold down A and also D and ask the os api to give me the repeat_down keys,
-        //       only one of them will be repeat down, this is not a bug of this code here,
-        //       its just how windows works with the repeat events.
-
-        if (went_down) { 
-          if (key_state->was_down) { key_state->repeat_down = true; }  
-          key_state->is_down = true;
-          key_state->is_up   = false;
-        }
-        else if (went_up) {
-          key_state->is_down     = false;
-          key_state->is_up       = true;
-          key_state->repeat_down = false;
-        }
+        is_event_made = true;
       }
-
     } break;
 
     case WM_LBUTTONDOWN: case WM_LBUTTONUP: 
@@ -827,32 +817,54 @@ LRESULT win32_proc(
     case WM_MBUTTONDOWN: case WM_MBUTTONUP:
     case WM_XBUTTONDOWN: case WM_XBUTTONUP:
     {
-      Mouse_button button = Mouse_button__NONE;
-      B8 went_down = false;
-      B8 went_up = false;
+      OS_Event_modifiers modifiers = {};
+      Mouse_button button          = {};
+      B32 went_down                = {};
+      B32 got_up                   = {};
+      V2F32 mouse_pos              = {};
 
-      if (message == WM_LBUTTONDOWN) { button = Mouse_button__left;   went_down = true; }
-      if (message == WM_RBUTTONDOWN) { button = Mouse_button__right;  went_down = true; }
-      if (message == WM_MBUTTONDOWN) { button = Mouse_button__middle; went_down = true; }
-      if (message == WM_XBUTTONDOWN) { InvalidCodePath(); }
+      U64 win32_event_modifiers = w_param;
+      if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) { button = Mouse_button__left; went_down = (message == WM_LBUTTONDOWN); got_up = (message == WM_LBUTTONUP); }
+      if (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP) { button = Mouse_button__right; went_down = (message == WM_RBUTTONDOWN); got_up = (message == WM_RBUTTONUP); }
+      if (message == WM_MBUTTONDOWN || message == WM_MBUTTONUP) { button = Mouse_button__middle; went_down = (message == WM_MBUTTONDOWN); got_up = (message == WM_MBUTTONUP); }
+      if (message == WM_XBUTTONDOWN || message == WM_XBUTTONUP) 
+      { 
+        win32_event_modifiers = (U64)GET_KEYSTATE_WPARAM(w_param); 
+        if (GET_XBUTTON_WPARAM(w_param) == XBUTTON1) { button = Mouse_button__side_near; }
+        if (GET_XBUTTON_WPARAM(w_param) == XBUTTON2) { button = Mouse_button__side_far; }
+        went_down = (message == WM_XBUTTONDOWN); 
+        got_up = (message == WM_XBUTTONUP); 
+      }
 
-      if (message == WM_LBUTTONUP) { button = Mouse_button__left;   went_up = true; }
-      if (message == WM_RBUTTONUP) { button = Mouse_button__right;  went_up = true; }
-      if (message == WM_MBUTTONUP) { button = Mouse_button__middle; went_up = true; }
-      if (message == WM_XBUTTONUP) { InvalidCodePath(); }
+      // note: We are making the mouse positions relative to windows that they are for, 
+      //       so relative to the client areas. l_param is relative to a client area already.
+      mouse_pos = v2f32((F32)GET_X_LPARAM(l_param), (F32)GET_Y_LPARAM(l_param));
+      
+      if (win32_event_modifiers & MK_SHIFT) { modifiers |= OS_Event_modifier__shift; }            
+      if (win32_event_modifiers & MK_CONTROL) { modifiers |= OS_Event_modifier__control; }          
 
-      // was down/up are not touched here, since they are updated in the frame_begin routine
+      event.kind      = OS_Event_kind__mouse;
+      event.mouse_event.modifiers = modifiers;
+      event.mouse_event.button    = button;
+      event.mouse_event.went_down = went_down;
+      event.mouse_event.went_up    = got_up;
+      event.mouse_event.mouse_pos = mouse_pos;
 
-      OS_Mouse_button_state* button_state = win32_state->mouse_button_states + button;
-      button_state->is_down = went_down;
-      button_state->is_up   = went_up;
+      is_event_made = true;
+      result = TRUE;
     } break;
 
     case WM_MOUSEWHEEL:
     {
-      S16 wheel_delta = GET_WHEEL_DELTA_WPARAM(w_param) / WHEEL_DELTA;
-      win32_state->mouse_wheel_scroll_delta = (F32)wheel_delta;
-      // todo: l_param stored the mouse pos at the time of the scroll
+      // note: Not using any other data that is provided by the event since i dont know if i need it yet
+      U32 other_key_states = (U32)GET_KEYSTATE_WPARAM(w_param);
+      F32 wheel_delta = (F32)(GET_WHEEL_DELTA_WPARAM(w_param) / WHEEL_DELTA);
+      V2F32 mous_pos = v2f32((F32)GET_X_LPARAM(l_param), (F32)GET_Y_LPARAM(l_param));
+      
+      event.kind                    = OS_Event_kind__wheel;
+      event.wheel_event.scroll_data = wheel_delta;
+
+      is_event_made = true;
     }
 
     case WM_CAPTURECHANGED:
@@ -897,10 +909,14 @@ LRESULT win32_proc(
     } break;
   }
 
-  // OS_Event* ev = ArenaPush(win32_state->frame_events_arena, OS_Event);
-  // memcpy(ev, &new_ev, sizeof(OS_Event));
-
-  // DllPushBack(&win32_state->frame_events, ev);
+  if (is_event_made)
+  {
+    if (win32_state->frame_event_count < ArrayCount(win32_state->frame_events)) 
+    {
+      win32_state->frame_events[win32_state->frame_event_count++] = event;
+    } 
+    else { BreakPoint(); }
+  } 
 
   return result;
 }

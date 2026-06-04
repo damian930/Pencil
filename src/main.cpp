@@ -20,9 +20,6 @@ abstract.
 #include "__third_party/stb/stb_image_write.h"
 #endif
 
-// #include "__third_party/cjson/cJSON.h"
-// #include "__third_party/cjson/cJSON.c"
-
 #include "core/core_include.h"
 #include "core/core_include.cpp"
 
@@ -38,11 +35,11 @@ abstract.
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
 
-#include "ui/ui_core.h"
-#include "ui/ui_core.cpp"
+// #include "ui/ui_core.h"
+// #include "ui/ui_core.cpp"
 
-#include "ui/widgets/ui_widgets.h"
-#include "ui/widgets/ui_widgets.cpp"
+// #include "ui/widgets/ui_widgets.h"
+// #include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil/pencil.h"
 #include "pencil/pencil.cpp"
@@ -63,7 +60,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   r_init(); 
   d_init();
   fp_init();
-  ui_init();
+  // ui_init();
 
   { // Making sure that the app is not being run more than once
     HANDLE mutex_h = CreateMutexA(Null, false, APP_MUTEX_NAME_WIN32);
@@ -153,11 +150,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // - App loop
   //
   Pencil_state P = {}; 
+  P.current_mode = Pencil_mode__draw;
   pencil_init(&P);
-  add_shortcut(&P, Key_modifier__control, Key__W, COMMAND_NAME_TERMINATE_APP);
-  add_shortcut(&P, Key_modifier__control, Key__R, COMMAND_NAME_SWAP_TO_RULER);
-  add_shortcut(&P, Key_modifier__control, Key__D, COMMAND_NAME_SWAP_TO_DRAW);
-
+  
   // Testing and working on font provider
   FP_Font font = {};
   // {
@@ -190,15 +185,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
-    for (U64 i = 0; i < P.chord_count; i += 1)
-    {
-      Shortcut_chord chord = P.chords[i];
-      if (os_key_down(key_from_modifier(chord.mod)) && (os_key_went_down(chord.key) || os_key_repeat_down(chord.key)))
-      {
-        run_command_from_name(&P, chord.command_name);
-      }
-    }
-
     // if (!MAIN_IS_DEBUGGING)
     // if (hot_key_activated && !P.is_mid_drawing)
     // {
@@ -207,14 +193,15 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     // }
 
     { // UI and Application update 
-      pencil_do_ui(&P, font);
-      pencil_update(&P, !ui_has_active(), false);
+      // pencil_do_ui(&P, font);
+      pencil_update(&P, false);
+      // pencil_update(&P, !ui_has_active(), false);
     }
 
     { // Rendering
       r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
-      if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
+      // if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
     }
 
     r_submit(window_frame_buffer_target, d_get_batch_list());
@@ -229,10 +216,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     #if DEBUG_MODE
     {
-      if (os_key_down(Key__Shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
+      // if (os_key_down(Key__shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
         // __debug_export_current_record_images(&P);
-        BP;
-      }
+        // BP;
+      // }
     }
     #endif
   }
