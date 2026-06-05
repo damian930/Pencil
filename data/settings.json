@@ -11,10 +11,19 @@
     {
       "combination": "Control+D",
       "command": "Swap to draw"
+    },
+    {
+      "combination": "Control+F",
+      "command": "Swap to fading"
+    },
+    {
+      "combination": "Control+E",
+      "command": "Swap to eraser"
     }
   ]
 }
 
+// TODO: doesnt support invaid command or any error yet
 
 
 

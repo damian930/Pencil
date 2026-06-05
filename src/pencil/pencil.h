@@ -13,13 +13,18 @@ const U32 MIN_PEN_SIZE = 1;
 enum Pencil_mode : U32 {
   Pencil_mode__draw,
   Pencil_mode__ruler,
-  Pencil_mode__temp_texture,
+  // Pencil_mode__temp_texture,
 };
 
 struct Draw_record {
   // These are allocated when done 
-  R_Target texture_before_we_affected;
-  R_Target texture_after_we_affected;
+  R_Target drawing_texture;
+
+  // Fat struct data
+  B32 is_delete_texture;
+  B32 is_eraser_texture;
+  B32 is_fading_texture;
+  F32 time_left_till_full_fade_sec;
 
   // These are used in general to have a list of drawings 
   // and are also used for managing a free list 
@@ -34,9 +39,11 @@ struct Draw_record_registration_result {
   Draw_record* record;  
 };
 
-#define COMMAND_NAME_TERMINATE_APP  Str8FromC("Terminate app")
-#define COMMAND_NAME_SWAP_TO_RULER  Str8FromC("Swap to ruller")
-#define COMMAND_NAME_SWAP_TO_DRAW   Str8FromC("Swap to draw")
+#define COMMAND_NAME_TERMINATE_APP   Str8FromC("Terminate app")
+#define COMMAND_NAME_SWAP_TO_RULER   Str8FromC("Swap to ruller")
+#define COMMAND_NAME_SWAP_TO_DRAW    Str8FromC("Swap to draw")
+#define COMMAND_NAME_SWAP_TO_FADING  Str8FromC("Swap to fading")
+#define COMMAND_NAME_SWAP_TO_ERASER  Str8FromC("Swap to eraser")
 
 struct Shortcut_chord {
   OS_Event_modifier mod;
@@ -56,12 +63,10 @@ struct Pencil_state {
 
   U32 draw_texures_width;
   U32 draw_texures_height;
-  R_Target draw_texture_always_fresh; // todo: Rename this to be a less complicated name since now we only have 1 of them (no non_fresh_texture)
+  // R_Target draw_texture_always_fresh; // todo: Rename this to be a less complicated name since now we only have 1 of them (no non_fresh_texture)
+  R_Target current_initial_draw_texture; // This is the state of the texture that was before every draw in the current draw records pool happened 
 
-  // Testing this for now
-  R_Target temp_drawing_texture;
-  F32 temp_texture_initial_time_to_fade;
-  F32 temp_texture_time_left_to_fade;
+  F32 fading_texture_fade_time;
 
   // Pool of draw records
   #define DRAW_RECORDS_MAX_COUNT 50
@@ -71,11 +76,12 @@ struct Pencil_state {
   
   Draw_record* first_record;
   Draw_record* last_record;
-  Draw_record* current_record; // This might be zero, i dont know if i dislike it yet
+  Draw_record* current_record; // This might be zero. TH
 
   B32 is_mid_drawing;
   B32 is_erasing_mode;
-  B32 is_erasing_mode_for_a_single_drawing;
+  B32 is_erasing_mode_for_a_single_drawing; // todo: This no longer works
+  B32 is_make_new_texture_fading;
 
   // Some state for the rulling mode to go over
   B32 is_mid_ruling;
@@ -106,6 +112,8 @@ struct Pencil_state {
   B32 signal_swap_to_ruler;
   // 
   B32 signal_swap_to_draw;
+  // 
+  B32 signal_swap_to_fading;
 
   // Misc
   // Font font_texture_for_ui;
@@ -122,11 +130,14 @@ void pencil_do_ui(Pencil_state* P, FP_Font font);
 // - Other
 Draw_record_registration_result register_new_draw_record(Pencil_state* P);
 Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P);
+void delete_draw_record__invalidates_record(Pencil_state* P, Draw_record* record_to_delete);
 void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_name);
 void run_command_from_name(Pencil_state* P, Str8 command_name);
 void command_terminate_app(Pencil_state* P);
 void command_swap_to_ruller(Pencil_state* P);
 void command_swap_to_draw(Pencil_state* P);
+void command_swap_to_fading(Pencil_state* P);
+void command_swap_to_eraser(Pencil_state* P);
 //
 //
 #if DEBUG_MODE

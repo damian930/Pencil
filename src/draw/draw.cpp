@@ -172,6 +172,14 @@ void d_add_line_command(V4F32 color)
 ///////////////////////////////////////////////////////////
 // - Higher level draw commands that dont require the caller to know how the shader works 
 //
+void d_fill_with_color(V4F32 color)
+{
+  V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
+  R_Target target                = __d_get_current_render_target__defaults();
+  Rect rect                      = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(target));
+  d_add_rect_command(rect, corner_colors, {}, {}, {}, {});
+}
+
 void d_draw_rect(Rect rect, V4F32 color)
 {
   V4F32 corner_colors[UV__COUNT] = { color, color, color, color };

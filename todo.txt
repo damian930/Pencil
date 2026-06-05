@@ -23,6 +23,9 @@
         If this is too slow for some reason, then just have the draw record store the old and the new texture like 
         right now, but just dont use them for faded, since they get composed in. This will allow you to not have to deal
         with 50 textures each frame when you do regular drawings.
+[x] - Have draw textures be a uniform struct.
+[ ] - Faded once are never in the queue so deleting shoud be fine. There now will be a current queue recoed and the one that we are in the moment of drawing. Those are 2 different once.
+[ ] - Have a flag for ignoring drawing faded so when you run out of pool textures you dont draw in the fading once
 
 - Stuff to fix or add next:
 [ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)

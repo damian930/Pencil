@@ -108,18 +108,44 @@ void r_init()
     HR(hr);
   }
 
-  // Alpha blending
+  // Blending states
   {
-    D3D11_BLEND_DESC desc = {};
-    desc.RenderTarget[0].BlendEnable           = TRUE;
-    desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
-    desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
-    desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
-    desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
-    d3d->device->CreateBlendState(&desc, &d3d->alpha_blend_state);
+    // Alpha blend
+    {
+      // todo: Have this be a real alpha blend with the alpha chanell not squared and see the diff for the new version with the old version
+      D3D11_BLEND_DESC desc = {};
+      desc.RenderTarget[0].BlendEnable           = TRUE;
+      desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_SRC_ALPHA;
+      desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+      desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_SRC_ALPHA;
+      desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+      desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+      d3d->device->CreateBlendState(&desc, &d3d->blend_states[R_Blend_kind__alpha]);
+    }
+
+    // No blend
+    {
+      D3D11_BLEND_DESC desc = {};
+      desc.RenderTarget[0].BlendEnable = FALSE;
+      desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL; 
+      d3d->device->CreateBlendState(&desc, &d3d->blend_states[R_Blend_kind__no_blend]);
+    }
+  
+    // Dest out (Keeps the destination pixels that are not covered by source pixels. Discards destination pixels that are covered by source pixels. Discards all source pixels.)
+    {
+      D3D11_BLEND_DESC desc = {};
+      desc.RenderTarget[0].BlendEnable           = TRUE;
+      desc.RenderTarget[0].SrcBlend              = D3D11_BLEND_ZERO;
+      desc.RenderTarget[0].DestBlend             = D3D11_BLEND_INV_SRC_ALPHA;
+      desc.RenderTarget[0].BlendOp               = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].SrcBlendAlpha         = D3D11_BLEND_ZERO;
+      desc.RenderTarget[0].DestBlendAlpha        = D3D11_BLEND_INV_SRC_ALPHA;
+      desc.RenderTarget[0].BlendOpAlpha          = D3D11_BLEND_OP_ADD;
+      desc.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+      d3d->device->CreateBlendState(&desc, &d3d->blend_states[R_Blend_kind__dest_out]);
+    }
   }
 
   // Sampler
@@ -391,6 +417,15 @@ void r_prepare_canvas(R_Target* chain)
   }
 }
 
+// todo: This should not have to use a target here, since this implies that we are rendering into something like a frame buffer,
+//       when in reality we have already made commands to the draw layer that knows into what we have to render, so this shoud just
+//       render that in. 
+//       Right now d_begin_batching takes in a target for a frame buffer or rather for the initial target, the one that we use as 
+//       the default target. We might have to handle a null handle there and be fine or just have it still be specified, but then hav 
+//       the frame buffer not passed in here like this. This really has nothing to do with the frame buffer directly, other than the fact
+//       that i render into it in the end.
+//       -- When fixing this api, go int othe draw layer and see what the target that is passed in there is used for to know the 
+//       data flow better and not change this with no detailed knowlage about the depending system.
 void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
 {
   if (!__r_is_target_valid_target(target)) { BP; return; }
@@ -422,9 +457,7 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
     d3d->context->RSSetScissorRects(0, 0); // TODO: SCISSOR IS PRESENT, BUT DONT WORK YET
     d3d->context->RSSetState(d3d->rasterizer_states[batch->fill_mode]);
 
-    if (0)                                                  {}
-    else if (batch->blend_kind == R_Blend_kind__alpha)    { d3d->context->OMSetBlendState(d3d->alpha_blend_state, Null, ~0U); }
-    else if (batch->blend_kind == R_Blend_kind__no_blend) { d3d->context->OMSetBlendState(Null, Null, ~0U); }
+    d3d->context->OMSetBlendState(d3d->blend_states[batch->blend_kind], Null, ~0U);
 
     if (batch->command_type == D_Command_type__Rect)
     {
@@ -611,7 +644,9 @@ void r_present(R_Target target, B32 vsync)
 R_Target r_make_texture(U32 width, U32 height)
 {
   D3D_State* d3d = r_get_state();
+
   ID3D11Texture2D* texture = 0;
+  DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
   {
     D3D11_TEXTURE2D_DESC desc = {};
     desc.Width      = width;
@@ -623,7 +658,22 @@ R_Target r_make_texture(U32 width, U32 height)
     desc.Usage      = D3D11_USAGE_DEFAULT;
     desc.BindFlags  = D3D11_BIND_RENDER_TARGET | D3D11_BIND_SHADER_RESOURCE;
     
-    d3d->device->CreateTexture2D(&desc, Null, &texture);
+    // note: Not sure if i have to do this, but it says in the docs before we first draw into the texture the data in the texture
+    //       is undefined. I would like to expect it to just be all 0s. This is for that.
+    //       Thought it seems that it still just puts 0s in there, but i will still keep this since it says that its undefined.
+    //       --
+    //       It did help after all. When i was uploading a texture to the cpu and had to have it for staging and then be read,
+    //       it would have some weird couple of pixels that would have some brownish color in the top left, after adding the 
+    //       default data myself that stopped.
+    Handle(desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM); // note: Only this is supported right now
+    Data_buffer buffer = data_buffer_make(scratch.arena, width * height * 4); 
+
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem          = buffer.data;
+    data.SysMemPitch      = width * 4;
+    data.SysMemSlicePitch = Null; // note: Not used for 2d textures, only used for 3d textures
+
+    d3d->device->CreateTexture2D(&desc, &data, &texture);
   }
 
   ID3D11RenderTargetView* rtv = 0;
@@ -713,6 +763,8 @@ R_Program r_program_from_file(const WCHAR* shader_program_file,
   return program;
 }
 
+// note: Not sure how i feel about this, i would rather maybe have this be in the queue with batching and not just here like this,
+//       kind of makes it harder to track when you draw and when you blit
 void r_clear_target(R_Target target, V4F32 color)
 {
   if (!__r_is_target_valid_target(target)) { BP; return; }
@@ -732,9 +784,10 @@ Image r_image_from_texture(Arena* arena, R_Target texture)
   Scratch          scratch      = get_scratch(0, 0);
   ID3D11Texture2D* copy_texture = 0;
 
-  U64 texture_height = 0;
-  U64 texture_width  = 0;
-  DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
+  U32 texture_height  = 0;
+  U32 texture_width   = 0;
+  DXGI_FORMAT format  = DXGI_FORMAT_UNKNOWN;
+  U32 bytes_per_pixel = 0;
   {
     D3D11_TEXTURE2D_DESC desc = {};
     texture.texture->GetDesc(&desc);
@@ -742,19 +795,25 @@ Image r_image_from_texture(Arena* arena, R_Target texture)
     desc.Usage          = D3D11_USAGE_STAGING;
     desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
 
-    texture_height = (U64)desc.Height;
-    texture_width  = (U64)desc.Width;
+    texture_height = desc.Height;
+    texture_width  = desc.Width;
     format         = desc.Format;
+    // note: For now only this one
+    HandleLater(format == DXGI_FORMAT_R8G8B8A8_UNORM);
+    bytes_per_pixel = 4;
 
-    hr = d3d->device->CreateTexture2D(&desc, 0, &copy_texture);
+    Data_buffer buffer = data_buffer_make(scratch.arena, texture_width * texture_height * bytes_per_pixel);
+    
+    D3D11_SUBRESOURCE_DATA data = {};
+    data.pSysMem          = buffer.data;
+    data.SysMemPitch      = texture_width * bytes_per_pixel;
+    data.SysMemSlicePitch = Null; // note: Not used for 2d textures, only used for 3d textues
+
+    hr = d3d->device->CreateTexture2D(&desc, &data, &copy_texture);
     HandleLater(hr == S_OK);
 
     d3d->context->CopyResource(copy_texture, texture.texture);
   }
-
-  // note: For now only this one
-  HandleLater(format == DXGI_FORMAT_R8G8B8A8_UNORM);
-  U64 bytes_per_pixel = 4;
 
   Image image = {};
   {
@@ -762,10 +821,9 @@ Image r_image_from_texture(Arena* arena, R_Target texture)
     hr = d3d->context->Map(copy_texture, 0, D3D11_MAP_READ, 0, &mapped);
     {
       U64 size_for_image = texture_height * texture_width * bytes_per_pixel;
-      image.bytes_per_pixel = bytes_per_pixel;
-      // image.row_stride      = (U64)mapped.RowPitch; 
-      image.width_in_px     = texture_width;
-      image.height_in_px    = texture_height;
+      image.bytes_per_pixel = (U64)bytes_per_pixel;
+      image.width_in_px     = (U64)texture_width;
+      image.height_in_px    = (U64)texture_height;
       image.data            = ArenaPushArr(arena, U8, size_for_image);
 
       HandleLater(hr == S_OK);
@@ -790,15 +848,24 @@ Image r_image_from_texture(Arena* arena, R_Target texture)
   return image;
 }
 
-void r_export_texture(R_Target texture, Str8 file_path)
+void r_export_texture(R_Target texture, Str8 file_name)
 {
   if (!__r_is_target_valid_target(texture)) { BP; return; }
 
   Scratch scratch = get_scratch(0, 0);
   Image image = r_image_from_texture(scratch.arena, texture);
 
-  Str8 file_path_nt = str8_copy_alloc(scratch.arena, file_path);
+  Str8 file_path_nt = str8_copy_alloc(scratch.arena, file_name);
   int succ = stbi_write_png((char*)file_path_nt.data, (int)image.width_in_px, (int)image.height_in_px, (int)image.bytes_per_pixel, image.data, (int)(image.width_in_px * image.bytes_per_pixel));
+  Handle(succ);
+  end_scratch(&scratch);
+}
+
+void r_export_image(Image image, Str8 file_name)
+{
+  Scratch scratch   = get_scratch(0, 0);
+  Str8 file_path_nt = str8_copy_alloc(scratch.arena, file_name);
+  int succ          = stbi_write_png((char*)file_path_nt.data, (int)image.width_in_px, (int)image.height_in_px, (int)image.bytes_per_pixel, image.data, (int)(image.width_in_px * image.bytes_per_pixel));
   Handle(succ);
   end_scratch(&scratch);
 }

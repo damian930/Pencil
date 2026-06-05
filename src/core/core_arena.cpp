@@ -112,6 +112,8 @@ Temp_arena temp_arena_begin(Arena* arena)
 
 void temp_arena_end(Temp_arena* temp)
 {
+  if (temp->arena == 0) { InvalidCodePath("This shoud no happend, but it doesnt break the code, so dev time assert is fine"); return;  }
+
   temp->arena->bytes_used = temp->stored_index;
   *temp = {};
 }

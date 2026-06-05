@@ -102,6 +102,8 @@ struct R_Program {
 enum R_Blend_kind {
   R_Blend_kind__alpha,
   R_Blend_kind__no_blend,
+  R_Blend_kind__dest_out,
+  R_Blend_kind__COUNT,
 };
 
 enum R_Fill_mode : U32 {
@@ -131,7 +133,7 @@ struct D3D_State {
   ID3D11DeviceContext* context;
   // 
   ID3D11RasterizerState*  rasterizer_states[R_Fill_mode__COUNT];
-  ID3D11BlendState*       alpha_blend_state;
+  ID3D11BlendState*       blend_states[R_Blend_kind__COUNT];
   ID3D11SamplerState*     sampler;
   //
   // ID3D11Texture2D* magenta_black_d3d_texture;
@@ -179,6 +181,7 @@ R_Program r_program_from_file(const WCHAR* shader_program_file,
 void r_clear_target(R_Target target, V4F32 color);
 Image r_image_from_texture(Arena* arena, R_Target texture);
 void r_export_texture(R_Target texture, Str8 file_path);
+void r_export_image(Image image, Str8 file_name);
 R_Target r_load_texture_from_file(Str8 file_name);
 R_Target r_load_texture_from_image(Image image);
 void r_copy_into_texture_from_texture(R_Target dest_texture, R_Target src_texture, B32* out_opt_is_succ);

@@ -110,6 +110,8 @@ void d_add_texture_command(R_Target texture, Rect dest_rect, Rect src_rect, V4F3
 void d_add_line_command(V4F32 color);
 
 // - Higher level draw commands that dont require the caller to know how the shader works
+void d_fill_with_color(V4F32 color);
+
 void d_draw_rect(Rect rect, V4F32 color);
 void d_draw_rect_pro(Rect rect, V4F32 color_x0y0, V4F32 color_x1y0, V4F32 color_x0y1, V4F32 color_x1y1, V4F32 corner_radii, F32 softness);
 
@@ -128,7 +130,7 @@ void d_draw_text_f(const char* fmt, FP_Font font, V2F32 pos, V4F32 color, ...);
 void         d_push_blend_kind(R_Blend_kind blend_kind);
 void         d_pop_blend_kind();
 R_Blend_kind __d_get_current_blend_kind__defaults();
-#define      D_Blend(blend_kind) DeferLoop(d_push_blend_kind(blend_kind), d_pop_blend_kind())
+#define      D_BlendKind(blend_kind) DeferLoop(d_push_blend_kind(blend_kind), d_pop_blend_kind())
 
 void     d_push_render_target(R_Target target);
 void     d_pop_render_target();
