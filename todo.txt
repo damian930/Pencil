@@ -1,6 +1,4 @@
 - Major features:
-[ ] - Pen that fades away over some time
-[ ] - On screen ruler 
 [ ] - On screen color picker
 [ ] - All the features that are possible to be set in settings
       are to be set via commands and optional shortcuts. This way 
@@ -8,25 +6,18 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
-[ ] - Increase the number of drawng tha you make. Change how you do redo, undo. You have to make it be 
-      something like a queue or textures that you draw in. 
-      So you will have the initial last state for the texture that you have. 
-      It will be empty at first. If you have 5 draw record max and you draw the 6th, the oldest 1 will
-      get drawing into the intial state texture and the new one will be the new 5th. So for static they work the same,
-      you just have to compose them each frame, should be fine. 
-      For faded textures, you would have to have them be updated and then also composed in.
-      Those will get removed from the queue when they fade out. If you have 5 max and the olders 1 is the faded one,
-      but it is still fading and you draw a new one, you just remove the oldest one. This is not the clenest way, sure,
-      but if you get to have enought space for the list of texture to never be filled up, then you shoud be fine.
-
-      - You could just have 50 textures and compose all 50 each frame. 
-        If this is too slow for some reason, then just have the draw record store the old and the new texture like 
-        right now, but just dont use them for faded, since they get composed in. This will allow you to not have to deal
-        with 50 textures each frame when you do regular drawings.
-[x] - Have draw textures be a uniform struct.
-[ ] - Faded once are never in the queue so deleting shoud be fine. There now will be a current queue recoed and the one that we are in the moment of drawing. Those are 2 different once.
-[ ] - Have a flag for ignoring drawing faded so when you run out of pool textures you dont draw in the fading once
-
+[ ] - Have the window be full screen. 
+[ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.
+[ ] - Try the app a bit and if it works then start making the ui for it.
+      [ ] - Command input field.
+            [ ] - Text edit box
+            [ ] - Box with possible commands
+            [ ] - Have the commands that have shortcuts assigned to them show the shortcuts like in vscode 
+            [ ] - Finish with shortcuts
+                  [ ] - You cant have 2 shortcuts to the same thing at the same time, have to unbound the older one
+                  [ ] - Check for other bug cases, just have the shortcuts be working fine so we can forget about them 
+                        and focus on finish up other things.
+                        
 - Stuff to fix or add next:
 [ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
 [ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)

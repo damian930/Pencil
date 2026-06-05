@@ -291,9 +291,10 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
       }
     }    
     else 
-    if (P->signal_swap_to_fading)
+    if (P->signal_toggle_line_fade)
     {
-      P->is_make_new_texture_fading = true;
+      P->signal_toggle_line_fade = false;
+      P->is_make_new_texture_fading = ToggleBool(P->is_make_new_texture_fading);
     }
   }
 
@@ -1014,7 +1015,7 @@ void run_command_from_name(Pencil_state* P, Str8 command_name)
   else if (str8_match(command_name, COMMAND_NAME_TERMINATE_APP, Str8_match__ignore_case)) { command_terminate_app(P); }
   else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_RULER, Str8_match__ignore_case)) { command_swap_to_ruller(P); }
   else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_DRAW,  Str8_match__ignore_case)) { command_swap_to_draw(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_FADING, Str8_match__ignore_case)) { command_swap_to_fading(P); }
+  else if (str8_match(command_name, COMMAND_NAME_TOGGLE_LINE_FADE, Str8_match__ignore_case)) { command_toggle_line_fade(P); }
   else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_ERASER, Str8_match__ignore_case)) { command_swap_to_eraser(P); }
   else {
     InvalidCodePath();
@@ -1036,9 +1037,9 @@ void command_swap_to_draw(Pencil_state* P)
   P->signal_swap_to_draw = true;
 }
 
-void command_swap_to_fading(Pencil_state* P)
+void command_toggle_line_fade(Pencil_state* P)
 {
-  P->signal_swap_to_fading = true;
+  P->signal_toggle_line_fade = true;
 }
 
 void command_swap_to_eraser(Pencil_state* P)

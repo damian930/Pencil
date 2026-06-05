@@ -39,11 +39,11 @@ struct Draw_record_registration_result {
   Draw_record* record;  
 };
 
-#define COMMAND_NAME_TERMINATE_APP   Str8FromC("Terminate app")
-#define COMMAND_NAME_SWAP_TO_RULER   Str8FromC("Swap to ruller")
-#define COMMAND_NAME_SWAP_TO_DRAW    Str8FromC("Swap to draw")
-#define COMMAND_NAME_SWAP_TO_FADING  Str8FromC("Swap to fading")
-#define COMMAND_NAME_SWAP_TO_ERASER  Str8FromC("Swap to eraser")
+#define COMMAND_NAME_TERMINATE_APP     Str8FromC("Terminate app")
+#define COMMAND_NAME_SWAP_TO_RULER     Str8FromC("Swap to ruller")
+#define COMMAND_NAME_SWAP_TO_DRAW      Str8FromC("Swap to draw")
+#define COMMAND_NAME_TOGGLE_LINE_FADE  Str8FromC("Toggle line fade")
+#define COMMAND_NAME_SWAP_TO_ERASER    Str8FromC("Swap to eraser")
 
 struct Shortcut_chord {
   OS_Event_modifier mod;
@@ -113,7 +113,7 @@ struct Pencil_state {
   // 
   B32 signal_swap_to_draw;
   // 
-  B32 signal_swap_to_fading;
+  B32 signal_toggle_line_fade;
 
   // Misc
   // Font font_texture_for_ui;
@@ -136,7 +136,7 @@ void run_command_from_name(Pencil_state* P, Str8 command_name);
 void command_terminate_app(Pencil_state* P);
 void command_swap_to_ruller(Pencil_state* P);
 void command_swap_to_draw(Pencil_state* P);
-void command_swap_to_fading(Pencil_state* P);
+void command_toggle_line_fade(Pencil_state* P);
 void command_swap_to_eraser(Pencil_state* P);
 //
 //

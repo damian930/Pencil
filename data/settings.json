@@ -14,7 +14,7 @@
     },
     {
       "combination": "Control+F",
-      "command": "Swap to fading"
+      "command": "Toggle line fade"
     },
     {
       "combination": "Control+E",
