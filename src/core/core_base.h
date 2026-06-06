@@ -660,6 +660,8 @@ tu_specific Rect rect_padded(Rect rect, F32 padd);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end);
+tu_specific Rect intersect_rects_on_axis(Rect rect, Rect other, Axis2 axis);
+tu_specific Rect intersect_rects(Rect rect, Rect other);
 
 struct RangeV2F32 {
 	V2F32 min;

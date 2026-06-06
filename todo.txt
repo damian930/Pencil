@@ -6,6 +6,9 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
+[ ] - for UI_Box_flag__clip_x draw it with scissoring based on the clip rect and recursive intersection
+[ ] - for UI_Box_flag__clip_x get recursive intersection rect to do inputs against
+
 [ ] - Have the window be full screen. 
 [ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.
 [ ] - Try the app a bit and if it works then start making the ui for it.
@@ -52,6 +55,16 @@
 [ ] - The issue with the rounded corners and then their children poking out might be fixed with a little scissor, that all,
       but that would require the gpu to switch contexts, since we would need to set a different scissor rect per each.
 
+- Some notes:
+* -- The Alt/F10 logic works like this:
+      Alt or F10 — enters "menu mode", focusing the menu bar and highlighting the first item. The app is now in a keyboard navigation state.
+      Arrow keys — left/right moves between top-level items, down opens the dropdown for the focused item.
+      Enter — activates the focused item.
+      Escape — steps back one level (closes dropdown → back to menu bar → exits menu mode).
+      Alt+letter — jumps directly to a menu item by its underlined letter (called an accelerator or mnemonic), e.g. Alt+F opens "File". These underlines are hidden by default in modern Windows and only appear once you press Alt.
+      The way Windows handles this under the hood is through a WM_SYSKEYDOWN message for Alt (rather than WM_KEYDOWN), and the default window procedure (DefWindowProc) implements all of this menu bar navigation logic for you automatically if you have a menu attached to the window. F10 specifically sends a WM_SYSKEYDOWN with VK_F10, which DefWindowProc also handles.
+      --
+      So in practice if you're building a standard Win32 window with a HMENU attached, you get all of this for free without writing any of the navigation logic yourself.
 
 
 

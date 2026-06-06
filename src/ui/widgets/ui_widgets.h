@@ -140,474 +140,501 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   return moved_slider;
 }
 
-// - Text input field 
-// U64 __ui_move_with_control_left(Str8 str, U64 current_pos); 
-// U64 __ui_move_with_control_right(Str8 str, U64 current_pos);
+///////////////////////////////////////////////////////////
+// ---- WORK IN PROGRESS FOR A TEXT INPUT FIELD
+//
+enum UI_Text_op_kind : U32 {  
+  UI_Text_op_kind__NONE,
+  UI_Text_op_kind__move_cursor,
+  UI_Text_op_kind__delete_section,
+  UI_Text_op_kind__copy_section,
+  UI_Text_op_kind__paste_at_cursor,
+  UI_Text_op_kind__insert_char_at_cursor, 
+};
 
-// enum UI_Text_op_kind {  
-//   UI_Text_op_kind__NONE,
-//   UI_Text_op_kind__move_cursor,
-//   UI_Text_op_kind__delete_section,
-//   UI_Text_op_kind__copy_section,
-//   UI_Text_op_kind__paste_at_cursor,
-//   UI_Text_op_kind__insert_char_at_cursor, 
-// };
+enum UI_Text_op_move_specifier : U32 {
+  UI_Text_op_move_specifier___NONE,
+  UI_Text_op_move_specifier___move_1_char_left,                     
+  UI_Text_op_move_specifier___move_1_char_right,                    
+  UI_Text_op_move_specifier___move_1_word_left,                     
+  UI_Text_op_move_specifier___move_1_word_right,                    
+  UI_Text_op_move_specifier___move_to_line_start,                   
+  UI_Text_op_move_specifier___move_to_line_end,                     
+};
 
-// enum UI_Text_op_move_specifier {
-//   UI_Text_op_move_specifier___NONE,
-//   UI_Text_op_move_specifier___move_1_char_left,                     
-//   UI_Text_op_move_specifier___move_1_char_right,                    
-//   UI_Text_op_move_specifier___move_1_word_left,                     
-//   UI_Text_op_move_specifier___move_1_word_right,                    
-//   UI_Text_op_move_specifier___move_to_line_start,                   
-//   UI_Text_op_move_specifier___move_to_line_end,                     
-// };
+struct UI_Text_op {
+  UI_Text_op_kind kind;
 
-// struct UI_Text_op {
-//   UI_Text_op_kind kind;
+  // Fat struct data
+  U8 char_to_insert;               
+  B8 keep_section_start_after_op; 
+  B8 dont_move_if_section;
+  B8 override_move_and_move_to_section_min_if_ending_section;
+  B8 override_move_and_move_to_section_max_if_ending_section;
+  UI_Text_op_move_specifier move_specifier;
 
-//   // Fat struct data
-//   U8 char_to_insert;               
-//   B8 keep_section_start_after_op; 
-//   B8 dont_move_if_section;
-//   B8 override_move_and_move_to_section_min_if_ending_section;
-//   B8 override_move_and_move_to_section_max_if_ending_section;
-//   UI_Text_op_move_specifier move_specifier;
+  UI_Text_op* next;
+  UI_Text_op* prev;
 
-//   UI_Text_op* next;
-//   UI_Text_op* prev;
-// };
+  // todo: Store an event here or just consume an event from the os to never use it twice
+};
 
-// struct UI_Text_op_list {
-//   UI_Text_op* first;
-//   UI_Text_op* last;
-//   U64 count;
-// };
+struct UI_Text_op_list {
+  UI_Text_op* first;
+  UI_Text_op* last;
+  U64 count;
+};
 
-// UI_Text_op* ui_text_op_list_push(Arena* arena, UI_Text_op_list* list, UI_Text_op_kind kind);
-// UI_Text_op_list ui_text_op_list_from_rli_events(Arena* arena, RLI_Event_list* event_list);
-// void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start);
+// todo: This is here right now, but this shoud be removed and i shoud use win32 WM_CHAR events for text 
+U8 u8_from_key(Key key, B32 is_shift_down, B32* out_is_printable)
+{
+  static B32 is_initialised = false;
+  static struct {
+    U8 ch;
+    U8 ch_shift;
+    B8 printable;
+  } key_print_data_arr[Key__COUNT];
 
-// ///////////////////////////////////////////////////////////
-// // - Attempt to redo text edit box again (this shoud like like the text edit box for the search bar on youtube)
-// //
-// struct UI_Text_edit_box_style {
-//   F32 width_in_px;
-//   Font font;
-//   F32 font_size;
-//   // V4 text_color;
-//   // add: value that specifies how many simbols are minimum on a side to start changing clip offset
-// };
-// struct UI_Text_edit_box_state {
-//   // F32 non_used_space_right;
+  if (!is_initialised) 
+  {
+    is_initialised = true;
 
-//   // F32 walled_part_space;
+    for (U32 i = 0; i < Key__COUNT; i++) {
+      key_print_data_arr[i] = {'\0', '\0', false};
+    }
 
-//   // F32 visible_extra_space_left;
-//   // F32 visible_extra_space_right;
-
-//   // U64 wall_index_left;  // These indexes are kind of like cursor, so the range is [left, right) to get he walled string
-//   // U64 wall_index_right;
-// };
-// void ui_text_edit_box(
-//   UI_Text_edit_box_state* state,
-//   const UI_Text_edit_box_style* edit_box_style, 
-//   U8* text_buffer, 
-//   U64 text_buffer_max_size, // todo: I feel like for displaying this is not really needed 
-//   U64 text_buffer_current_size, 
-//   U64 cursor, 
-//   U64 section,
-//   RLI_Event_list* rli_events
-//   // U64* left_wall_index,
-//   // U64* right_wall_index 
-// ) {
-//   /* fix:
-//     - i want you to understand the code for the ui widget completely
-//   */
-
-//   /* add:
-//     - cursor size setting
-//   */
+    key_print_data_arr[Key__space]         = {' ',  ' ',  true};
+    key_print_data_arr[Key__a]             = {'a',  'A',  true};
+    key_print_data_arr[Key__b]             = {'b',  'B',  true};
+    key_print_data_arr[Key__c]             = {'c',  'C',  true};
+    key_print_data_arr[Key__d]             = {'d',  'D',  true};
+    key_print_data_arr[Key__e]             = {'e',  'E',  true};
+    key_print_data_arr[Key__f]             = {'f',  'F',  true};
+    key_print_data_arr[Key__g]             = {'P',  'P',  true};
+    key_print_data_arr[Key__h]             = {'h',  'H',  true};
+    key_print_data_arr[Key__i]             = {'i',  'I',  true};
+    key_print_data_arr[Key__j]             = {'j',  'J',  true};
+    key_print_data_arr[Key__k]             = {'k',  'K',  true};
+    key_print_data_arr[Key__l]             = {'l',  'L',  true};
+    key_print_data_arr[Key__m]             = {'m',  'M',  true};
+    key_print_data_arr[Key__n]             = {'n',  'N',  true};
+    key_print_data_arr[Key__o]             = {'o',  'O',  true};
+    key_print_data_arr[Key__p]             = {'p',  'P',  true};
+    key_print_data_arr[Key__q]             = {'q',  'Q',  true};
+    key_print_data_arr[Key__r]             = {'r',  'R',  true};
+    key_print_data_arr[Key__s]             = {'s',  'S',  true};
+    key_print_data_arr[Key__t]             = {'t',  'T',  true};
+    key_print_data_arr[Key__u]             = {'u',  'U',  true};
+    key_print_data_arr[Key__v]             = {'v',  'V',  true};
+    key_print_data_arr[Key__w]             = {'w',  'W',  true};
+    key_print_data_arr[Key__x]             = {'x',  'X',  true};
+    key_print_data_arr[Key__y]             = {'y',  'Y',  true};
+    key_print_data_arr[Key__z]             = {'z',  'Z',  true};
+    key_print_data_arr[Key__0]             = {'0',  ')',  true};
+    key_print_data_arr[Key__1]             = {'1',  '!',  true};
+    key_print_data_arr[Key__2]             = {'2',  '@',  true};
+    key_print_data_arr[Key__3]             = {'3',  '#',  true};
+    key_print_data_arr[Key__4]             = {'4',  '$',  true};
+    key_print_data_arr[Key__5]             = {'5',  '%',  true};
+    key_print_data_arr[Key__6]             = {'6',  '^',  true};
+    key_print_data_arr[Key__7]             = {'7',  '&',  true};
+    key_print_data_arr[Key__8]             = {'8',  '*',  true};
+    key_print_data_arr[Key__9]             = {'9',  '(',  true};
+    key_print_data_arr[Key__backtick]      = {'`',  '~',  true};
+    key_print_data_arr[Key__minus]         = {'-',  '_',  true};
+    key_print_data_arr[Key__equals]        = {'=',  '+',  true};
+    key_print_data_arr[Key__left_bracket]  = {'[',  '{',  true};
+    key_print_data_arr[Key__right_bracket] = {']',  '}',  true};
+    key_print_data_arr[Key__backslash]     = {'\\', '|',  true};
+    key_print_data_arr[Key__semicolon]     = {';',  ':',  true};
+    key_print_data_arr[Key__apostrophe]    = {'\'', '"',  true};
+    key_print_data_arr[Key__comma]         = {',',  '<',  true};
+    key_print_data_arr[Key__period]        = {'.',  '>',  true};
+    key_print_data_arr[Key__slash]         = {'/',  '?',  true};
+  }
   
-//   /* idea:
-//     - split the edit box space into 3 things, "extra on the left", "extra on the right", "walled in the middle".
-//       All these sizes are stored in retained state, which allows then for easy checking for change.
-//       We then might know if something was added or removed.
-//       The left and right extra spaces might be 0 sized and have to be the same between updates.
-//       This way we only update them in the update loop and check the walled part since that is the only
-//       part in which addition was possible.ddfdklfjsdklfjsdkl;jfkl;asjf 
+  if (out_is_printable) { *out_is_printable = key_print_data_arr[key].printable; } ;
+  U8 ch = key_print_data_arr[key].ch;
+  if (is_shift_down) { ch = key_print_data_arr[key].ch_shift; }
+  return ch;
+}
 
-//     - you might just make 2 different boxes and the cursor box will draw ouside the box.
-//       This will allow the caller if they specify a large cursor to just pad the box up and have the 
-//       cursor still be on the next character and not the prev
-//   */
+U64 __ui_move_with_control_left(Str8 str, U64 current_pos) 
+{
+  // note: CTRL+left moves to the start of a word.
+  //       If cursor is at the middle of a word, then we move to the start of the word the cursos is in the middle of.
+  //       If we are outside of a word, then we move to the start of the first word we find by moving left.
+  //       If we reach the start of a string, then we leave the cursor there.
+  if (current_pos > str.count) { InvalidCodePath(); current_pos = str.count; }
+  if (current_pos == 0) { return 0; }
 
-//   Str8 text_buffer_as_str = str8_manuall(text_buffer, text_buffer_current_size);
+  B32 is_middle_of_word = char_is_word_char(str.data[current_pos - 1]);
+  if (!is_middle_of_word) 
+  {
+    for (;;) { // Getting to the end of the prev word
+      if (current_pos == 0) { break; }
+      if (char_is_word_char(str.data[current_pos - 1])) { break; }
+      current_pos -= 1;
+    }
+  }
 
-//   // ---- Testing this 
-//   static F32 non_used_space_right = 0.0f;
+  for (;;) // Just moving to the start of the current word
+  {
+    if (current_pos == 0) { break; }
+    if (!char_is_word_char(str.data[current_pos - 1])) { break; }
+    current_pos -= 1;
+  }
 
-//   // ---- Testing this 
-//   static F32 cursor_offset_from_left_wall = 0.0f;
+  return current_pos;
+}
 
-//   // State
-//   static F32 walled_part_space = 0.0f;
-//   // 
-//   static F32 visible_extra_space_left = 0.0f;
-//   static F32 visible_extra_space_right = 0.0f;
-//   // 
-//   static U64 wall_index_left = 0;  // These indexes are kind of like cursor, so the range is [left, right) to get he walled string
-//   static U64 wall_index_right = 0;
+U64 __ui_move_with_control_right(Str8 str, U64 current_pos) 
+{
+  // note: CTRL+right moves to the start of a word.
+  //       If cursor is at the middle of a word, then we move to the start of the the next word that comes after the word the cursor is in the middle of.
+  //       If cursor is outside a word, then we move to the start of the first word we find by moving right.
+  //       If we reach the end of a string, then we leave the cursor there.
+  if (current_pos > str.count) { InvalidCodePath(); current_pos = str.count; }
+  if (current_pos == str.count) { return str.count; }
 
-//   // Updating state
-//   if (cursor > wall_index_right)
-//   {
-//     // When we move over the right wall, we make the new position be the right wall.
-//     // The right extra space shoud also become 0, since now start rendering px perfect char end and the 
-//     // cursor on it. On the left side there might be additional part of char that cant fit into the walled 
-//     // part but is still visible. That is represented by the additional space left. Additional space right
-//     // has to be 0. 
-//     // 
-//     // todo: What about when we have text that is smaller than the box, what about that space ???
+  B32 is_middle_of_word = char_is_word_char(str.data[current_pos]);
+  if (is_middle_of_word) 
+  {
+    for (;;) { // Getting out of the current word
+      if (current_pos == str.count) { break; }
+      if (!char_is_word_char(str.data[current_pos])) { break; }
+      current_pos += 1;
+    }
+  }
 
-//     wall_index_right = cursor;
-//     visible_extra_space_right = 0.0f;  
-    
-//     // This shoud be true, since thats the only way that it is smaller than cursor, to which we then set it
-//     Assert(wall_index_right > 0); 
+  for (;;) // Moving to the start of the next word
+  {
+    if (current_pos == str.count) { break; }
+    if (char_is_word_char(str.data[current_pos])) { break; }
+    current_pos += 1;
+  }
 
-//     // Finding the index for the new left wall
-//     F32 accumulated_text_width = 0.0f;
-//     for (U64 test_left_wall_index = wall_index_right - 1;;)
-//     {
-//       // Since we know that the right side has no extra visible space, we just accumulate untill we can
-//       Str8 test_char_str = str8_substring(text_buffer_as_str, test_left_wall_index, test_left_wall_index + 1);
-//       V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
-//       accumulated_text_width += dims.x;
-//       if (accumulated_text_width > edit_box_style->width_in_px)
-//       {
-//         wall_index_left = test_left_wall_index + 1; // We over reached, so + 1
-//         accumulated_text_width -= dims.x;
-//         break;
-//       }
-//       if (test_left_wall_index == 0) { break; }
-//       test_left_wall_index -= 1;
-//     }
+  return current_pos;
+}
 
-//     Assert(visible_extra_space_right == 0.0f); // Just for context
-//     // if (visible_extra_space_left == 0.0f && accumulated_text_width < edit_box_style->width_in_px)
-//     if (wall_index_left == 0 && accumulated_text_width < edit_box_style->width_in_px)
-//     {
-//       // Walled strings often are not the same lengh than edit_box_style->width_in_px.
-//       // They also cant be longer, that would be invalid state.
-//       // But if the left wall index is 0 and the walled part is less than the space available in the 
-//       // edit box, that means that out string is not long enough to be longer than the edit box space.
-//       // If it was we would eihter have accumulated_text_width be the same as the edit box size,
-//       // or would have some space on the left. But we dont have it, since the left wall is 0;
-//       Assert(visible_extra_space_left == 0.0f);
-//       // note: I dont use visible_extra_space_left in the condition, since when state is first passed,
-//       // all the values there are 0. Wall index left at 0 is valid. If i used visible_extra_space_left 
-//       // in the condition, if would always then trigger this code path and never set visible_extra_space_left
-//       // to a different value in the else block below.
+UI_Text_op* ui_text_op_list_push(Arena* arena, UI_Text_op_list* list, UI_Text_op_kind kind)
+{
+  // note: The idea here is this. 
+  //       We only pass in the kind in here, since it is the only part that is shared by all the permutations
+  //       of this data structure. The fat part might be present and it might not be. 
+  //       So we leave it out to be then manually filled in by the caller. 
+  //       Kind of makes perfect sense.
+  UI_Text_op* op = ArenaPush(arena, UI_Text_op);
+  op->kind = kind;
+  DllPushBack(list, op);
+  list->count += 1;
+  return op;
+}
 
-//       non_used_space_right = edit_box_style->width_in_px - accumulated_text_width;
-//     }
-//     else
-//     {
-//       visible_extra_space_left = edit_box_style->width_in_px - accumulated_text_width;
-//       non_used_space_right = 0.0f;
-//       Assert(visible_extra_space_left >= 0.0f);
-//     }
-//   }
-//   else if (cursor < wall_index_left)
-//   {
-//     wall_index_left = cursor;
-//     visible_extra_space_left = 0.0f;  
-
-//     F32 accumulated_text_width = 0.0f;
-//     for (U64 test_right_wall_index = wall_index_left;;)
-//     { 
-//       // Since we know that left side has 0 extra visible space, we just accumulate until we cant
-//       Str8 test_char_str = str8_substring(text_buffer_as_str, test_right_wall_index, test_right_wall_index + 1);
-//       V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
-//       accumulated_text_width += dims.x;
-//       if (accumulated_text_width > edit_box_style->width_in_px)
-//       {
-//         accumulated_text_width -= dims.x;
-//         wall_index_right = test_right_wall_index; // Since wall indexes work the same as cursor, they are at the next index kind of, we dont do -1 or +1 here
-//         break;
-//       }
-//       if (test_right_wall_index == text_buffer_max_size) { break; }
-//       test_right_wall_index += 1;
-//     }
-
-//     visible_extra_space_right = edit_box_style->width_in_px - accumulated_text_width;
-    
-//     // We shoud not have any non used space on the right of the text edit box, 
-//     // since if we have moved to the left of the cursor, that means that 
-//     // the text at some point was longer than the edit box size, which means 
-//     // that its not possible to have non used space when we move left
-//     non_used_space_right = edit_box_style->width_in_px - (visible_extra_space_left + accumulated_text_width + visible_extra_space_right);
-//     Assert(non_used_space_right == 0.0f);
-//   }
-//   else if (wall_index_left == 0 && wall_index_right == 0) { 
-//     // Nothing, waiting for the user to do something to the cursor 
-//     // to trigger the routine above
-//   }
-//   else 
-//   {
-//     Str8 walled_str = str8_substring(text_buffer_as_str, wall_index_left, wall_index_right);
-//     V2 walled_dims = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
-    
-//     if (walled_dims.x > walled_part_space) // Something got inserted (this did not happend at the right wall, since if it did, we would have handled it in the case where cursor > right_wall_index)
-//     {
-//       BreakPoint();
-//       Assert(wall_index_right > 0);
-
-//       // Since something got added, we know that the char that got added is not the same size as the one 
-//       // that was at the right wall boundary. If it was, then there would be no difference, since when we add
-//       // we push the right char to the right. So we for example 'r' was added and another 'r' was on the right
-//       // wall boundary, the one on the boundary would get pushed outside the boundary and the new one would be
-//       // added in the middle of the walled part. Either way to us it makes no difference in how to display it,
-//       // since nothing changed in terms of the positioning and spacing.
-
-//       if (visible_extra_space_left + walled_dims.x + visible_extra_space_right > edit_box_style->width_in_px)
-//       {
-//         // When adding a char, we relocate the right wall, that means that the right visible extra space
-//         // might also shift, so we dont care about it here, since its not stable, unlike the extra 
-//         // space on the left
-//         F32 space_to_remove = (visible_extra_space_left + walled_dims.x + visible_extra_space_right) - edit_box_style->width_in_px;
-//         space_to_remove -= visible_extra_space_right;
-//         if (space_to_remove < 0.0f) // Only some extra space shoud be removed 
-//         {
-//           BreakPoint();
-//           visible_extra_space_right = abs_f32(space_to_remove);
-//         }
-//         if (space_to_remove > 0.0f) // Now we also have to adjust the right wall
-//         {
-//           F32 total_space_removed = 0.0f;
-//           U64 test_right_index = wall_index_right - 1;
-//           for (;;)
-//           {
-//             Str8 test_char_str = str8_substring(text_buffer_as_str, test_right_index, test_right_index + 1);
-//             V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
-//             total_space_removed += dims.x;
-//             if (total_space_removed > space_to_remove)
-//             {
-//               visible_extra_space_right = total_space_removed - space_to_remove; 
-//               break;
-//             }
-//             if (test_right_index == 0) { break; } // todo: It cant really reach 0 unless it also reached the left wall, give more thought to this edge case
-//             test_right_index -= 1;
-//           }
-//           wall_index_right = test_right_index;
-//         }
-//       }
-//     }
-//     else 
-//     if (walled_dims.x < walled_part_space) // Something got deleted (this did not happend at the left wall, since if it did, we would have had the routine (cursor < left_wall_index) above handle it)
-//     {
-//       Assert(wall_index_right > 0);
-//       BreakPoint();
-      
-//       // goal: 
-//       // We want to keep the cursor at the same offset to the user if possible.
-//       // So when we are removing chars, we want the cursor to be in the same spot as it was before.
-//       // We need to know what cursor offset to the left wall was. We know the left extra space that the user sees,
-//       // now we just need to know how much till the cursor they also seen      
-      
-      
-//       // === Old code
-//       /*
-//       F32 space_to_add = walled_part_space - walled_dims.x + visible_extra_space_right;
-//       F32 total_space_added = 0.0f;
-//       U64 test_right_index = wall_index_right;
-//       for (;;)
-//       {
-//         if (test_right_index >= text_buffer_as_str.count) { break; } // This is in case if we were at the end and the last char got removed
-//         Str8 test_char_str = str8_substring(text_buffer_as_str, test_right_index, test_right_index + 1);
-//         V2 dims = ui_measure_text_ex(test_char_str, edit_box_style->font, edit_box_style->font_size);
-//         total_space_added += dims.x;
-//         if (total_space_added > space_to_add)
-//         {
-//           total_space_added -= dims.x;
-//           break;
-//         }
-//         test_right_index += 1;
-//       }
-
-//       // todo: I dont understand this
-//       visible_extra_space_right = space_to_add - total_space_added;  
-//       wall_index_right = test_right_index;
-//       */
-//     }
-//   }
-
-//   // Updating wrapped part size 
-//   {
-//     Str8 walled_str = str8_substring(text_buffer_as_str, wall_index_left, wall_index_right);
-//     V2 dims = ui_measure_text_ex(walled_str, edit_box_style->font, edit_box_style->font_size);
-//     walled_part_space = dims.x;
-//   }
+UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* event_list)
+{
+  UI_Text_op_list result_op_list = {};
   
-//   // Updating cursor_offset_from_left_wall
-//   {
-//     Str8 walled_cursor_str = str8_substring(text_buffer_as_str, wall_index_left, cursor);
-//     V2 dims = ui_measure_text_ex(walled_cursor_str, edit_box_style->font, edit_box_style->font_size);
-//     cursor_offset_from_left_wall = dims.x;
-//   }
+  for (OS_Event* ev = event_list->first; ev; ev = ev->next)
+  {
+    if (ev->kind == OS_Event_kind__key)
+    {
+      switch (ev->key_event.key)
+      {
+        case Key__left_arrow:
+        {
+          UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          if (ev->key_event.modifiers & OS_Event_modifier__shift) { move->keep_section_start_after_op = true; }
+          if (ev->key_event.modifiers & OS_Event_modifier__control) { 
+            move->move_specifier = UI_Text_op_move_specifier___move_1_word_left; 
+          } 
+          else {  
+            move->move_specifier = UI_Text_op_move_specifier___move_1_char_left;
+            move->override_move_and_move_to_section_min_if_ending_section = true;
+          } 
+        } break;
 
-//   // Just checking if the invariant has not been broken
-//   if (
-//     wall_index_right != 0 // This means that the state is not zeroed out and not yet set by the routine
-//       && 
-//     (visible_extra_space_left + walled_part_space + visible_extra_space_right + non_used_space_right != edit_box_style->width_in_px)
-//   ) {
-//     BreakPoint();
-//   }
+        case Key__right_arrow:
+        {
+          UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          if (ev->key_event.modifiers & OS_Event_modifier__shift) { move->keep_section_start_after_op = true; }
+          if (ev->key_event.modifiers & OS_Event_modifier__control) { 
+            move->move_specifier = UI_Text_op_move_specifier___move_1_word_right; 
+          } 
+          else {  
+            move->move_specifier = UI_Text_op_move_specifier___move_1_char_right;
+            move->override_move_and_move_to_section_max_if_ending_section = true;
+          } 
+        } break;
 
-//   F32 height_in_px = 0.0f;
-//   {
-//     V2 dims = ui_measure_text_ex(Str8FromC(" "), edit_box_style->font, edit_box_style->font_size);
-//     height_in_px = dims.y;
-//   }
+        case Key__home:
+        {
+          UI_Text_op* op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          op->move_specifier = UI_Text_op_move_specifier___move_to_line_start;
+          if (ev->key_event.modifiers & OS_Event_modifier__shift) { op->keep_section_start_after_op = true; }
+        } break;
 
-//   Str8 edit_box_id = Str8FromC("Edit box id");
-//   ui_set_next_size_x(ui_px(edit_box_style->width_in_px));
-//   ui_set_next_size_y(ui_px(height_in_px));
-//   UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__dont_draw_overflow);
-  
-//   F32 edit_box_clip_offset = 0.0f;
-//   {
-//     if (visible_extra_space_left != 0.0f && visible_extra_space_right == 0.0f)
-//     {
-//       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
-//       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-//       edit_box_clip_offset = dims.x - visible_extra_space_left;
-//     }
-//     else if (visible_extra_space_left == 0.0f && visible_extra_space_right != 0.0f)
-//     {
-//       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
-//       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-//       edit_box_clip_offset = dims.x;
-//     }
-//     else if (visible_extra_space_left != 0.0f && visible_extra_space_right != 0.0f)
-//     {
-//       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
-//       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-//       edit_box_clip_offset = dims.x - visible_extra_space_left;
-//     }
-//     else if (visible_extra_space_left == 0.0f && visible_extra_space_right == 0.0f)
-//     {
-//       Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
-//       V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-//       edit_box_clip_offset = dims.x;
-//     }
-//     else { InvalidCodePath(); }
-//   }
-//   edit_box->clip_offset.x = -1 * edit_box_clip_offset;
+        case Key__end:
+        {
+          UI_Text_op* op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          op->move_specifier = UI_Text_op_move_specifier___move_to_line_end;
+          if (ev->key_event.modifiers & OS_Event_modifier__shift) { op->keep_section_start_after_op = true; }
+        } break;
 
-//   /*note:
-//     The parent box. This is the box that is for the user, call it the text edit box.
-//     It has all the rest of the things needed to draw the text edit inside of it. 
-//     Other things that it need are:
-//       - Cursor. 
-//       - Section
-//     Both of these are child boxes but positioned absolutely. 
-//     Each of these boxed aplies its own clip_offset. This is easier since this way there is a single truth, the text size.
-//     All the cursors and the text will just be offset relative to the text.
-//     Then it is the job of the implementor to make sure that cursor is never outside of the screen and 
-//     looks weird or gets clipped and then its like there is no cursor to the user.   
-//   */
+        case Key__backspace:
+        {
+          // Section creation op 
+          {
+            UI_Text_op* move_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+            move_op->dont_move_if_section = true;
+            move_op->keep_section_start_after_op = true;
+            move_op->move_specifier = (ev->key_event.modifiers & OS_Event_modifier__control ? 
+                                       UI_Text_op_move_specifier___move_1_word_left : 
+                                       UI_Text_op_move_specifier___move_1_char_left); 
+          }
 
-//   UI_Parent(edit_box)
-//   {
-//     // Text
-//     ui_label(text_buffer_as_str);
-  
-//     // Cursor offset box
-//     F32 cursor_width = 2.0f;
+          // Section deletion op
+          ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+        } break;
+
+        case Key__delete:
+        {
+          // Section creation op 
+          {
+            UI_Text_op* move_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+            move_op->dont_move_if_section = true;
+            move_op->keep_section_start_after_op = true;
+            move_op->move_specifier = (ev->key_event.modifiers & OS_Event_modifier__control ? 
+                                       UI_Text_op_move_specifier___move_1_word_right : 
+                                       UI_Text_op_move_specifier___move_1_char_right);
+          }
+
+          // Section deletion op
+          ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+        } break;
+
+        default:
+        {
+          if (ev->key_event.key == Key__c && ev->key_event.modifiers & OS_Event_modifier__control) // Copy
+          {
+            UI_Text_op* copy_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__copy_section);
+            copy_op->keep_section_start_after_op = true;
+          }
+          else if (ev->key_event.key == Key__v && ev->key_event.modifiers & OS_Event_modifier__control) // Paste
+          {
+            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__paste_at_cursor);
+          }
+          else if (ev->key_event.key == Key__x && ev->key_event.modifiers & OS_Event_modifier__control) // Cut
+          {
+            UI_Text_op* copy_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__copy_section);
+            copy_op->keep_section_start_after_op = true;
+            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+          }
+          else if (ev->key_event.key == Key__a && ev->key_event.modifiers & OS_Event_modifier__control) // Select all
+          {
+            UI_Text_op* move_1 = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+            move_1->move_specifier = UI_Text_op_move_specifier___move_to_line_start;
+
+            UI_Text_op* move_2 = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+            move_2->move_specifier = UI_Text_op_move_specifier___move_to_line_end;
+            move_2->keep_section_start_after_op = true;
+          }
+          else 
+          {
+            B32 is_printable = false;
+            // todo: This shoud be a separate event in the win32 WM_CHAR and not this manual from key down shit
+            U8 ch = u8_from_key(ev->key_event.key, ev->key_event.modifiers & OS_Event_modifier__shift, &is_printable); 
+            if (is_printable && (ev->key_event.went_down || ev->key_event.repeat_down))
+            {
+              ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+              UI_Text_op* insert_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__insert_char_at_cursor);
+              insert_op->char_to_insert = ch;
+            }
+          }
+        } break;
+      }
+    }
+  }
+  return result_op_list;
+}
+
+void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start)
+{
+  for (UI_Text_op* text_op = text_op_list.first; text_op != 0; text_op = text_op->next)
+  {
+    switch (text_op->kind)
+    { 
+      default: {} break;
+
+      case UI_Text_op_kind__move_cursor:
+      {
+        if (text_op->dont_move_if_section && *section_start != *cursor_pos) { goto end_of_move_op_processing; }
+        
+        if (text_op->override_move_and_move_to_section_min_if_ending_section && *section_start != *cursor_pos && !text_op->keep_section_start_after_op) {
+          *cursor_pos = Min(*cursor_pos, *section_start);
+          goto end_of_move_op_processing;
+        }
+        if (text_op->override_move_and_move_to_section_max_if_ending_section && *section_start != *cursor_pos && !text_op->keep_section_start_after_op) {
+          *cursor_pos = Max(*cursor_pos, *section_start);
+          goto end_of_move_op_processing;
+        }
+
+        switch (text_op->move_specifier)
+        {
+          case UI_Text_op_move_specifier___move_1_char_left: { if (*cursor_pos >= 1) { *cursor_pos -= 1; } } break;
+          case UI_Text_op_move_specifier___move_1_char_right: { if (*cursor_pos < *current_text_size) { *cursor_pos += 1; } } break;
+
+          case UI_Text_op_move_specifier___move_1_word_left: { *cursor_pos = (U64)__ui_move_with_control_left(str8_manual(text_buffer, *current_text_size), *cursor_pos); } break;
+          case UI_Text_op_move_specifier___move_1_word_right: { *cursor_pos = (U64)__ui_move_with_control_right(str8_manual(text_buffer, *current_text_size), *cursor_pos); } break;
+
+          case UI_Text_op_move_specifier___move_to_line_start: { *cursor_pos = 0; } break;
+          case UI_Text_op_move_specifier___move_to_line_end: { *cursor_pos = *current_text_size; } break;
+
+          default: { InvalidCodePath(); } break;
+        }
+
+        end_of_move_op_processing: {}
+      } break;
+
+      case UI_Text_op_kind__delete_section:
+      {
+        if (*cursor_pos != *section_start)
+        {
+          Scratch scratch          = get_scratch(0, 0);
+          // Deleting a part of text
+          RangeU64 range_to_delete = range_u64_make(Min(*cursor_pos, *section_start), Max(*cursor_pos, *section_start));
+          Str8 buffer_as_str       = str8_manual(text_buffer, *current_text_size);
+          
+          Str8_list str_parts         = {};
+          Str8 str_part_before_delete = str8_substring(buffer_as_str, 0, range_to_delete.min);
+          Str8 str_part_after_delete  = str8_substring(buffer_as_str, range_to_delete.max, *current_text_size);
+          str8_list_append(scratch.arena, &str_parts, str_part_before_delete);
+          str8_list_append(scratch.arena, &str_parts, str_part_after_delete);
+          
+          Str8 new_str = str8_from_list(scratch.arena, &str_parts);
+          for EachIndex(i, new_str.count) { text_buffer[i] = new_str.data[i]; }
+          *current_text_size = new_str.count;
+          
+          // Moving the cursor
+          *cursor_pos = range_to_delete.min;
+          
+          end_scratch(&scratch);
+        }
+      } break;
+
+      case UI_Text_op_kind__copy_section:
+      {
+        BP;
+        // todo: No raylib any more, have to use clipboard from win32 now buddy
+        // Scratch scratch = get_scratch(0, 0);
+        // Str8 text_to_copy = str8_substring(str8_manuall(text_buffer, *current_text_size), Min(*cursor_pos, *section_start), Max(*cursor_pos, *section_start));
+        // Str8 text_to_copy_nt = str8_copy_alloc(scratch.arena, text_to_copy);
+        // if (text_to_copy_nt.count != 0) { SetClipboardText((char*)text_to_copy_nt.data); }
+        // end_scratch(&scratch);
+      } break;
+
+      case UI_Text_op_kind__paste_at_cursor:
+      {
+        BP;
+        // todo: No raylib any more, have to use clipboard from win32 now buddy
+
+        // Pasting 
+        // Str8 buffer_as_str = str8_manuall(text_buffer, *current_text_size);
+        // Scratch scratch = get_scratch(0, 0);
+        // Str8_list str_parts = {};
+        // Str8 str_part_before_insert = str8_substring(buffer_as_str, 0, *cursor_pos);
+        // Str8 str_part_after_insert = str8_substring(buffer_as_str, *cursor_pos, *current_text_size);
+        // Str8 str_to_insert = {};
+        // {
+        //   char* clb_text = const_cast<char*>(GetClipboardText()); // todo: Remove this cpp shit here
+        //   str_to_insert = str8_from_cstr(scratch.arena, (U8*)clb_text);
+        // }
+        // str8_list_append(scratch.arena, &str_parts, str_part_before_insert);
+        // str8_list_append(scratch.arena, &str_parts, str_to_insert);
+        // str8_list_append(scratch.arena, &str_parts, str_part_after_insert);
+        // Str8 new_str = str8_from_list(scratch.arena, &str_parts);
+        // Assert(new_str.count > *current_text_size);  
+        // for EachIndex(i, Min(new_str.count, max_text_size) ) { text_buffer[i] = new_str.data[i]; }
+        // *current_text_size = Min(new_str.count, max_text_size);
+        // end_scratch(&scratch);
+      
+        // // Moving the cursor
+        // *cursor_pos += str_to_insert.count; // todo: This will be wrong if overflow, fix this
+      } break;
+
+      case UI_Text_op_kind__insert_char_at_cursor:
+      {
+        Scratch scratch     = get_scratch(0, 0);
+        Str8 buffer_as_str  = str8_manual(text_buffer, *current_text_size);
+        
+        Str8_list str_parts = {};
+        Str8 str_part_before_insert = str8_substring(buffer_as_str, 0, *cursor_pos);
+        Str8 str_part_after_insert = str8_substring(buffer_as_str, *cursor_pos, *current_text_size);
+        Str8 str_to_insert = str8_from_cstr_len(scratch.arena, &text_op->char_to_insert, 1);
+        str8_list_append(scratch.arena, &str_parts, str_part_before_insert);
+        str8_list_append(scratch.arena, &str_parts, str_to_insert);
+        str8_list_append(scratch.arena, &str_parts, str_part_after_insert);
+        
+        Str8 new_str = str8_from_list(scratch.arena, &str_parts);
+        for EachIndex(i, Min(new_str.count, max_text_size) ) { text_buffer[i] = new_str.data[i]; }
+        *current_text_size = Min(new_str.count, max_text_size);
+        
+        // Moving the cursor
+        if (*cursor_pos < max_text_size && *cursor_pos < u64_max) { *cursor_pos += 1; }
+        
+        end_scratch(&scratch);
+      } break;
+    }
+
+    if (!text_op->keep_section_start_after_op) { *section_start = *cursor_pos; }
+
+    // Just in case
+    Assert(0 <= *cursor_pos && *cursor_pos <= *current_text_size);
+    clamp_u64_inplace(cursor_pos, 0, *current_text_size);
+  }
+}
+
+void ui_text_edit_box(V2F32 px_dims, U8* text_buffer, U64 text_buffer_size, U64 cursor_pos, U64 section_pos)
+{
+  FP_Font font = ui_get_font();
+
+  ui_set_next_size_x(ui_px(px_dims.x));
+  ui_set_next_size_y(ui_px(px_dims.y));
+  ui_set_next_b_color(blue());
+  UI_Box* wrapper_box = ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__dont_draw_overflow);
+  UI_Parent(wrapper_box)
+  {
+    // Drawing the text 
+    ui_label(str8_manual(text_buffer, text_buffer_size));
+
+    // Drawing the cursor
+    Str8 str_before_cursor = str8_substring(str8_manual(text_buffer, text_buffer_size), 0, cursor_pos);
+    V2F32 dims = fp_measure_text(str_before_cursor, font);
     
-//     ui_set_next_size_x(ui_px(edit_box_style->width_in_px)); ui_set_next_size_y(ui_px(height_in_px));
-//     ui_set_next_layout_axis(Axis2__x);
-//     ui_set_next_flags(UI_Box_flag__floating);
-//     UI_Box* cursor_offset_box = ui_box_make(Str8{}, 0);
-//     cursor_offset_box->clip_offset.x = -1 * edit_box_clip_offset;
+    F32 clip_offset = 0.0f;
+    if (dims.x > px_dims.x)
+    {
+      clip_offset = dims.x - px_dims.x - 2;
+    }
 
-//     // Getting size for the spacer that will offset the cursor relative the the edit box start pos
-//     F32 cursor_offset_spacer = 0.0f;
-//     if (visible_extra_space_right == 0 && cursor == wall_index_right)
-//     {
-//       Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, wall_index_right);
-//       V2 dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
-//       cursor_offset_spacer = dims.x - cursor_width;
-//     }
-//     else
-//     {
-//       Str8 str_till_cursor = str8_substring(text_buffer_as_str, 0, cursor);
-//       V2 dims = ui_measure_text_ex(str_till_cursor, edit_box_style->font, edit_box_style->font_size);
-//       cursor_offset_spacer = dims.x;
-//     }
+    ui_set_next_size_x(ui_px(px_dims.x));
+    ui_set_next_size_y(ui_px(px_dims.y)); 
+    ui_set_next_layout_axis(Axis2__x);
+    UI_Box* floating_box = ui_box_make(Str8{}, UI_Box_flag__floating);
+    // floating_box->clip_offset = clip_offset;
+    
+    UI_Parent(floating_box)
+    {
+      ui_spacer(ui_px(dims.x));
 
-//     UI_Parent(cursor_offset_box)
-//     {
-//       ui_spacer(ui_px(cursor_offset_spacer));
-
-//       ui_set_next_size_x(ui_px(cursor_width)); ui_set_next_size_y(ui_px(height_in_px));
-//       ui_set_next_b_color({ 255, 255, 255, 255 });
-//       UI_Box* cursor_line_box = ui_box_make(Str8{}, 0);
-//     }
-
-//     #define DRAW_DEBUG_WALLS 1
-//     #if DRAW_DEBUG_WALLS
-//     {
-//       ui_set_next_size_x(ui_px(2)); ui_set_next_size_y(ui_px(height_in_px));
-//       ui_set_next_layout_axis(Axis2__x);
-//       ui_set_next_flags(UI_Box_flag__floating);
-//       UI_Box* left_wall_offset_box = ui_box_make(Str8{}, 0);
-//       left_wall_offset_box->clip_offset.x = -1 * edit_box_clip_offset;
-      
-//       UI_Parent(left_wall_offset_box)
-//       {
-//         Str8 str_till_left_wall = str8_substring(text_buffer_as_str, 0, wall_index_left);
-//         V2 dims = ui_measure_text_ex(str_till_left_wall, edit_box_style->font, edit_box_style->font_size);
-//         F32 offset = dims.x;
-//         ui_spacer(ui_px(offset));
-
-//         ui_set_next_size_x(ui_px(2)); ui_set_next_size_y(ui_px(height_in_px));
-//         ui_set_next_b_color({ 0, 255, 255, 255 });
-//         UI_Box* left_wall = ui_box_make(Str8{}, 0);
-//       }
-//     }
-//     #endif
-//     #undef DRAW_DEBUG_WALLS
-
-//     #define DRAW_DEBUG_WALLS 1
-//     #if DRAW_DEBUG_WALLS
-//     {
-//       ui_set_next_size_x(ui_px(2)); ui_set_next_size_y(ui_px(height_in_px));
-//       ui_set_next_layout_axis(Axis2__x);
-//       ui_set_next_flags(UI_Box_flag__floating);
-//       UI_Box* left_wall_offset_box = ui_box_make(Str8{}, 0);
-//       left_wall_offset_box->clip_offset.x = -1 * edit_box_clip_offset;
-      
-//       UI_Parent(left_wall_offset_box)
-//       {
-//         Str8 str_till_right_wall = str8_substring(text_buffer_as_str, 0, wall_index_right);
-//         V2 dims = ui_measure_text_ex(str_till_right_wall, edit_box_style->font, edit_box_style->font_size);
-//         ui_spacer(ui_px(dims.x - 1));
-
-//         ui_set_next_size_x(ui_px(2)); ui_set_next_size_y(ui_px(height_in_px));
-//         ui_set_next_b_color({ 255, 0, 255, 255 });
-//         UI_Box* right_wall = ui_box_make(Str8{}, 0);
-//       }
-
-//     }
-//     #endif
-//     #undef DRAW_DEBUG_WALLS
-//   }
-// }
-
+      ui_set_next_size_x(ui_px(2));
+      ui_set_next_size_y(ui_px(px_dims.y));
+      ui_set_next_b_color(red());
+      UI_Box* cursor_box = ui_box_make(Str8{}, UI_Box_flag__has_background);
+    }
+  }
+}
 
 
 #endif

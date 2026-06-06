@@ -22,7 +22,7 @@ Data_buffer data_buffer_make(Arena* arena, U64 count)
 ///////////////////////////////////////////////////////////
 // - makers 
 // 
-Str8 str8_manuall(U8* buffer, U64 count)
+Str8 str8_manual(U8* buffer, U64 count)
 {
   Str8 str = {};
   str.data = buffer;
@@ -51,7 +51,7 @@ Str8 str8_from_cstr(Arena* arena, U8* str)
 
 Str8 str8_from_cstr_copy(U8* str)
 {
-  return str8_manuall(str, strlen((char*)str));
+  return str8_manual(str, strlen((char*)str));
 }
 
 Str8 str8_copy_alloc(Arena* arena, Str8 str)
@@ -68,7 +68,7 @@ Str8 str8_from_list(Arena* arena, Str8_list* list)
 
 Str8 str8_from_list_ex(Arena* arena, const Str8_list list, Str8 str_to_put_before, Str8 str_to_put_between, Str8 str_to_put_after)
 {
-  Str8 str = str8_manuall(ArenaCurrentAddressP(arena, U8), 0);
+  Str8 str = str8_manual(ArenaCurrentAddressP(arena, U8), 0);
   U64 node_index = 0;
 
   if (str_to_put_before.count > 0)

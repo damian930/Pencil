@@ -155,7 +155,6 @@ enum OS_Event_kind : U32 {
 
 struct OS_Event {
   OS_Event_kind kind;
-  B32 is_consumed;
 
   union {
     struct {
@@ -167,6 +166,7 @@ struct OS_Event {
     } mouse_event;
   
     struct {
+      OS_Event_modifiers modifiers;
       Key key;
       B32 went_down;
       B32 went_up;
@@ -174,9 +174,19 @@ struct OS_Event {
     } key_event;
   
     struct {
+      OS_Event_modifiers modifiers;
       F32 scroll_data;
     } wheel_event;
   };
+
+  OS_Event* next;
+  OS_Event* prev;
+};
+
+struct OS_Event_list {
+  OS_Event* first;
+  OS_Event* last;
+  U64 count;
 };
 
 struct OS_Key_state {
@@ -230,9 +240,17 @@ Str8 os_get_current_dir_path(Arena* arena);
 #define OS_FileOpenClose(file_var_name, file_path, access_flags) DeferInitReleaseLoop(OS_File file_var_name = os_file_open(file_path, access_flags), os_file_close(&file_var_name))
 
 // - Frame
+
+// note/todo: I dont really like this list api for events, i would rather it just be whatever and the caller just gets them and consumed them based
+//            on som api not like we have now. Maybe it would make sense to just have different calls like:
+//            os_get_mouse_event() or os_get_keyboard_event() or os_get_system_event() and they are the same struct but we then
+//            in those calls specify the event details that we want to get. I dont really like a fat struct approach here that much, or i dont get it.
+//            Imma leave it like this for now, cause i am not sure.
 void os_frame_begin();
 void os_frame_end();
 F32 os_get_time_since_last_frame();
+OS_Event_list* os_get_frame_event_list();
+void os_consume_frame_event(OS_Event* event);
 
 // - Windowing
 V2F32 os_get_window_dims();

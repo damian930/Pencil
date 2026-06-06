@@ -25,7 +25,7 @@ void ui_label_f(const char* fmt, ...)
   else if (err >= buffer_count) { Assert(0); }
   else if (err < buffer_count) { /* All good */ }
   va_end(argptr);
-  Str8 str = str8_manuall(buffer, (U64)err);
+  Str8 str = str8_manual(buffer, (U64)err);
   ui_label(str);
   end_scratch(&scratch);
 }

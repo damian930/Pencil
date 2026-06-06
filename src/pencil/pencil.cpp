@@ -208,7 +208,7 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     Shortcut_chord chord = P->chords[i];
     if (key_states[key_from_os_event_mod(chord.mod)].is_down && (key_states[chord.key].went_down))
     {
-      run_command_from_name(P, str8_manuall(chord.command_name_buffer, chord.command_name_buffer_count));
+      run_command_from_name(P, str8_manual(chord.command_name_buffer, chord.command_name_buffer_count));
     }
   }
 
@@ -987,7 +987,7 @@ void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_
   for (U64 i = 0; i < P->chord_count; i += 1)
   {
     Shortcut_chord* test_chord = P->chords + i;
-    if (   str8_match(str8_manuall(test_chord->command_name_buffer, test_chord->command_name_buffer_count), command_name, 0) 
+    if (   str8_match(str8_manual(test_chord->command_name_buffer, test_chord->command_name_buffer_count), command_name, 0) 
         || (test_chord->mod == mod && test_chord->key == key)
     ) { 
       chord = test_chord;

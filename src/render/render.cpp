@@ -104,11 +104,12 @@ void r_init()
     desc.FillMode        = d3d_fill_mode;
     desc.CullMode        = D3D11_CULL_NONE;
     desc.DepthClipEnable = true;
+    desc.ScissorEnable   = true;
     hr = d3d->device->CreateRasterizerState(&desc, raster_state);
     HR(hr);
   }
 
-  // Blending states
+  // Blending states (Here is a link to some blending modes and their formulas: https://developer.android.com/reference/kotlin/android/graphics/PorterDuff.Mode)
   {
     // Alpha blend
     {
@@ -454,10 +455,16 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
   for (D_Command_batch* batch = command_batch_list->first; batch; batch = batch->next_batch)
   {
     d3d->context->OMSetRenderTargets(1, &batch->target.texture_rtv, Null);
-    d3d->context->RSSetScissorRects(0, 0); // TODO: SCISSOR IS PRESENT, BUT DONT WORK YET
     d3d->context->RSSetState(d3d->rasterizer_states[batch->fill_mode]);
-
     d3d->context->OMSetBlendState(d3d->blend_states[batch->blend_kind], Null, ~0U);
+    {
+      D3D11_RECT scissor_rect = {};
+      scissor_rect.left   = (S32)batch->scissor_rect.x;
+      scissor_rect.top    = (S32)batch->scissor_rect.y;
+      scissor_rect.right  = (S32)batch->scissor_rect.x + (S32)batch->scissor_rect.width;
+      scissor_rect.bottom = (S32)batch->scissor_rect.y + (S32)batch->scissor_rect.height;
+      d3d->context->RSSetScissorRects(1, &scissor_rect); 
+    }
 
     if (batch->command_type == D_Command_type__Rect)
     {

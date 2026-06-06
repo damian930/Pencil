@@ -171,10 +171,19 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
     box->text_style.font = font;
   }
 
-  // UI_Box* this_box_prev_frame = ui_get_box_prev_frame(id_and_text);
-  // if (!ui_box_is_zero(this_box_prev_frame)) 
+  // for EachEnumRange(axis, Axis2, Axis2__x, Axis2__COUNT)
   // {
-  //   // box->clip_offset = this_box_prev_frame->clip_offset;
+  //   if (flags & UI_Box_flag__clip_x<<axis)
+  //   {
+  //     // 
+
+  //     ui_intersect_rects_on_axis(ui_get_parent() != 0 ? , rect, rect, axis);
+
+  //   }
+  // }
+
+  // {
+    // box->clip_data.clip_value = latest_clip_rect; // todo: This shoud be the rect for this box with the clip axis limited to the boxes rect
   // }
 
   DllPushBack_Name(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling);
@@ -510,11 +519,11 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
   }
 }
 
-void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis)
+void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, Rect parent_clip_rect)
 {
-  static F32 total_offset[Axis2__COUNT];
+  static F32 total_offset[Axis2__COUNT]  = {};
 
-
+  // Positioning boxes regardless of clip
   if (axis == Axis2__x)
   {
     root->final_on_screen_rect.x = total_offset[axis] + root->final_parent_offset.v[axis];
@@ -525,27 +534,53 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis)
     root->final_on_screen_rect.y = total_offset[axis] + root->final_parent_offset.v[axis];
     root->final_on_screen_rect.height = root->final_on_screen_size.v[axis];
   }
+  
+  // Taking care of possible parent clip
+  {
+    F32 clip_value = 0.0f;
+    UI_Box* parent = root->parent;
+    if (!ui_box_is_zero(parent))
+    {
+      if (parent->flags & UI_Box_flag__clip_x<<axis)
+      {
+        clip_value = parent->clip_data.clip_value[axis];
+      }
+    }
+
+    if (axis == Axis2__x) { root->final_on_screen_rect.x += clip_value; }
+    if (axis == Axis2__y) { root->final_on_screen_rect.y += clip_value; }
+  }
+  
+  // Dealing with clip rects 
+  Rect new_clip_rect = parent_clip_rect;
+  {
+    for EachEnumRange(i_axis, Axis2, Axis2__x, Axis2__COUNT) {
+      if (root->flags & UI_Box_flag__clip_x<<i_axis) { 
+        new_clip_rect = intersect_rects_on_axis(parent_clip_rect, root->final_on_screen_rect, i_axis);
+      }
+    }
+    root->clip_data.latest_clip_rect = new_clip_rect;
+  }
+
+  // Doing children
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
     F32 prev_total_offset = total_offset[axis]; 
     total_offset[axis] = (axis == Axis2__x ? root->final_on_screen_rect.x : root->final_on_screen_rect.y);
-    ui_do_final_rect_for_box(child, axis);
+    ui_do_final_rect_for_box(child, axis, new_clip_rect);
     total_offset[axis] = prev_total_offset;
   }
 }
 
 void ui_layout_box(UI_Box* root, Axis2 axis)
 { 
-  ui_do_sizing_for_fixed_sized_box(root, axis);
-  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
-  ui_do_sizing_for_parent_dependant_box(root, axis);
-  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
-  ui_do_sizing_for_child_dependant_box(root, axis);
-  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_fixed_sized_box(root, axis);      /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_parent_dependant_box(root, axis); /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_child_dependant_box(root, axis);  /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
   ui_do_layout_fixing(root, axis);
 
   ui_do_relative_parent_offsets_for_box(root, axis);
-  ui_do_final_rect_for_box(root, axis);
+  ui_do_final_rect_for_box(root, axis, rect_make(f32_neg_inf(), f32_neg_inf(), f32_inf(), f32_inf()));
 }
 
 // note: There might be weird thing going on with ids and text, dont forget about ##
@@ -664,49 +699,92 @@ B32 ui_has_active()
 //   ui_get_context()->currently_active_box_id = Str8{};
 // }
 
-// todo: This seems like it could be done at the start of the build since there is no dinamic data used here 
+/* IDEAS ABOUT ACTIONS FOR POSSIBLE LATER:
+  - Right now hover and active work very simply. The caller just asks for the events,
+    the call then checks the boxe's rect and does hover and if mosue is down the active logic.
+    This is not the best way to do this. 
+    Here are some cases when this fais:
+      A box with another box that has id and when we press inner box we would like the outer box to be active.
+      This cant be done, since the inner box will get active and we dont have a way to bubble or propogate.
+      ---
+      A box with inner box and we do hover effect and we dont want to do if any child is hoverd, then we cant know it,
+      since the hover for the outer box will be done first and it will hover and then the child and it will hover, 
+      there is no way to opt in our out of thi.
+      ---
+    This might be solved by having the default way of inputs, either the deepest child that has id or interactable 
+    or what we do right now, just by the rect. But then we would have to have some modifiers that would change the logic.
+    One way to do this would be to have a flag that makes the box hot if any immediate child is hot.
+    Another is if any inner child is hot. 
+
+    I am not sure where i need this yet and how example, so will just leave this here for now like this,
+    but i am writing this here for reasons to remind me of this all if i ever need a more specific logic
+    for hover and active.
+*/
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
   UI_Actions* result_actions = &this_frames_box->actions;
   if (this_frames_box->has_been_updated_this_build) { return *result_actions; }
+  
   this_frames_box->has_been_updated_this_build = true;
   result_actions->box = this_frames_box;
-  if (this_frames_box->id.count == 0) { return *result_actions; }
-
+  
+  if (this_frames_box->id.count == 0) { return *result_actions; } // We dont update a box that doesnt have id on it
+  
   UI_Context* ctx = ui_get_context();
-
+  
+  // todo: You have to use a scissor rect here and then to recursive intersections if any parent in the tree for the box has clip flags set
   UI_Box* prev_frame_box = ui_get_box_prev_frame(this_frames_box->id);
-  if (ui_box_is_zero(prev_frame_box)) { return {}; }
+  if (ui_box_is_zero(prev_frame_box)) { return {}; } // We dont update boxes that are created this frame and were not present last frame
 
   // Data to get
-  B32 is_hovered = false;
-  B32 is_down    = false;
-  B32 was_down   = false;
+  B32 is_hovered              = false;
+  B32 is_down                 = false;
+  B32 was_down                = false;
   B32 left_box_while_was_down = false;
-  F32 mouse_wheel_move = 0.0f;
+  F32 mouse_wheel_move        = 0.0f;
 
   B32 some_other_box_is_being_interacted_with = false;
   if (ctx->currently_interacted_with_box_id.count != 0 && !str8_match(ctx->currently_interacted_with_box_id, prev_frame_box->id, 0))
   {
     some_other_box_is_being_interacted_with = true;
   }
-  
-  if (is_point_inside_rect(ctx->mouse_x, ctx->mouse_y, prev_frame_box->final_on_screen_rect)) {
+
+  Rect interaction_rect = intersect_rects(prev_frame_box->final_on_screen_rect, prev_frame_box->clip_data.latest_clip_rect);
+  if (is_point_inside_rect(ctx->mouse_x, ctx->mouse_y, interaction_rect)) {
     is_hovered = true;
   }
 
+  // note:
   // Either there is no active box or we are the active box
-  // note: Since active box is retained, we just load the retained state of actions,
-  //       no need to load hover, we get it each frame just from the box rect.
+  // Since active box is retained, we just load the retained state of actions,
+  // no need to load hover, we get it each frame just from the box rect.
   if (!some_other_box_is_being_interacted_with)
   {
     was_down                = ctx->currently_interacted_with_box__is_down;
     left_box_while_was_down = ctx->currently_interacted_with_box__left_box_while_was_down;
-    // note: is donw is not set, it is calculated next
+    // note: is_down is not set, it is calculated next
 
     if (is_hovered && !was_down)
     {
-      if (os_mouse_button_went_down(Mouse_button__left)) // todo: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
+      // todo: Have to get the event here from the os and comsume it
+
+      // note: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
+      // todo: The events api sucks right now, but if it works, i will make a better one
+      B32 mouse_left_went_down = false;
+      {
+        OS_Event_list* events = os_get_frame_event_list();
+        for (OS_Event* ev = events->first; ev; ev = ev->next)
+        {
+          if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.button == Mouse_button__left && ev->mouse_event.went_down)
+          {
+            mouse_left_went_down = true;
+            os_consume_frame_event(ev);
+            break;
+          }
+        }
+      }
+
+      if (mouse_left_went_down)  
       {
         // New box is interacted, so setting the state for it
         Assert(!was_down);
@@ -727,8 +805,23 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         left_box_while_was_down = true; 
         ctx->currently_interacted_with_box__left_box_while_was_down = true;
       }
-  
-      if (os_mouse_button_went_up(Mouse_button__left))
+
+      // todo: The events api sucks right now, but if it works, i will make a better one
+      B32 mouse_left_went_up = false;
+      {
+        OS_Event_list* events = os_get_frame_event_list();
+        for (OS_Event* ev = events->first; ev; ev = ev->next)
+        {
+          if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.button == Mouse_button__left && ev->mouse_event.went_up)
+          {
+            mouse_left_went_up = true;
+            os_consume_frame_event(ev);
+            break;
+          }
+        }
+      }
+
+      if (mouse_left_went_up)
       {
         Assert(ctx->currently_interacted_with_box_id.count != 0);
         is_down = false;
@@ -875,7 +968,7 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   #if DEBUG_MODE
   // if (str8_match(root->id, Str8FromC("test id"), 0)) { BP; }
   #endif
-  
+
   // todo: I dont fully like this if here, but for now its like this 
   if (root->custom_draw_func != 0) 
   {
@@ -888,6 +981,13 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
   }
   else 
   {
+    // In terms of rendering UI_Box_flag__clip_x and UI_Box_flag__dont_draw_overflow_x are kind of the same,
+    // they just turn on recursive scissoring for the ui box tree. The difference that the UI_Box_flag__clip_x
+    // provides is in the logic for the ui when building. So here i will just use the same codepath for rendering 
+    // for UI_Box_flag__clip_x as for UI_Box_flag__dont_draw_overflow_x
+    if (root->flags & UI_Box_flag__clip_x) { root->flags |= UI_Box_flag__dont_draw_overflow_x; };
+    if (root->flags & UI_Box_flag__clip_y) { root->flags |= UI_Box_flag__dont_draw_overflow_y; };
+
     Rect rect = root->final_on_screen_rect;
   
     if (root->flags & UI_Box_flag__has_background)
@@ -908,87 +1008,28 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
-    Rect scissor_rect = parent_scissor_rect;
-    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-    {
-      NotImplemented(); // todo: Fix the innitial rect for this that you pass to the root box that gets drawn
-      RangeV2F32 default_scissor_box = {};
-      default_scissor_box.min = v2f32((F32)s16_min, (F32)s16_min);
-      default_scissor_box.max = v2f32((F32)s16_max, (F32)s16_max);
-      
-      RangeV2F32 rect_bbox        = range_v2f32_from_rect(rect);
-      RangeV2F32 new_scissor_bbox = default_scissor_box;
-      
-      // Have to make sure that the child scissor is contained within the parent scissor on ax axis, 
-      // so a child cant make a scissor larger than the parent and then have its children
-      // drawn, though the parent has no overflow flag spcefied.
-      // This works per axis. So if no overflow is aplied only for 1 axis, then the other axis shoud be
-      // drawn as ussual, with oveflow. This is achieved by having default_scissor_box that extends way pass
-      // the ui coordinate limits.  
-      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y)
-      {
-        RangeV2F32 parent_scissor_bbox = range_v2f32_from_rect(parent_scissor_rect);
-  
-        // Clmaping based to the space that the parent have already limited its children to
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->parent->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            F32 min = rect_bbox.min.v[axis];
-            F32 max = rect_bbox.max.v[axis];
-    
-            if (min < parent_scissor_bbox.min.v[axis]) { min = parent_scissor_bbox.min.v[axis]; }
-            if (max > parent_scissor_bbox.max.v[axis]) { max = parent_scissor_bbox.max.v[axis]; }
-    
-            new_scissor_bbox.min.v[axis] = min; 
-            new_scissor_bbox.max.v[axis] = max; 
-          }
-        }
-  
-        // The child might have a different axis specified for no overflow, so have to clamp again
-        // but this time for the child (root) and not the parent (root->parent)
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            if (new_scissor_bbox.min.v[axis] < rect_bbox.min.v[axis]) { new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; }
-            if (new_scissor_bbox.max.v[axis] > rect_bbox.max.v[axis]) { new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; }
-          }
-        }
+    Rect new_scissor_rect = parent_scissor_rect;
+    for EachEnumRange(axis, Axis2, Axis2__x, Axis2__COUNT) { 
+      if (root->flags & UI_Box_flag__dont_draw_overflow_x<<axis) {
+        new_scissor_rect = intersect_rects_on_axis(rect, new_scissor_rect, axis);
       }
-      else {
-        // Simple case, we dont have parent enforce scissoring at all, so we just do it, there are 
-        // no additional adjustments we have to do to not mess up what the parent have enforces before us.
-        for (U64 _axis = (U64)Axis2__x; _axis < (U64)Axis2__COUNT; _axis += 1)
-        {
-          Axis2 axis = (Axis2)_axis;
-          if (root->flags & (UI_Box_flag__dont_draw_overflow_x<<axis))
-          {
-            new_scissor_bbox.min.v[axis] = rect_bbox.min.v[axis]; 
-            new_scissor_bbox.max.v[axis] = rect_bbox.max.v[axis]; 
-          }
-        }
-      }
-  
-      scissor_rect = rect_from_range_v2f32(new_scissor_bbox);
-      d_push_scissor_rect(scissor_rect);
+    }
+    if (!rect_match(new_scissor_rect, parent_scissor_rect)) {
+      d_push_scissor_rect(new_scissor_rect);
     }
 
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      ui_draw_box(child, scissor_rect);
+      ui_draw_box(child, new_scissor_rect);
     }
   
     // No longer scissoring
-    if (root->flags & UI_Box_flag__dont_draw_overflow_x || root->flags & UI_Box_flag__dont_draw_overflow_y)
-    {
-      NotImplemented();
-      if (root->parent->flags & UI_Box_flag__dont_draw_overflow_x || root->parent->flags & UI_Box_flag__dont_draw_overflow_y) {
-        d_pop_scissor_rect();
-      }
+    if (!rect_match(new_scissor_rect, parent_scissor_rect)) {
+      d_pop_scissor_rect();
     }
+
+    if (root->flags & UI_Box_flag__clip_x) { root->flags &= ~UI_Box_flag__dont_draw_overflow_x; };
+    if (root->flags & UI_Box_flag__clip_y) { root->flags &= ~UI_Box_flag__dont_draw_overflow_y; };
   }
 }
 
@@ -996,7 +1037,7 @@ void ui_draw()
 {
   // todo: Dont pass Rect here like this 
   UI_Context* ctx = ui_get_context();
-  ui_draw_box(ctx->root_box, Rect{});
+  ui_draw_box(ctx->root_box, ctx->root_box->final_on_screen_rect);
 }
 
 #endif

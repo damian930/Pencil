@@ -30,8 +30,9 @@ struct OS_State {
   OS_Window window;
 
   // Frame data
-  OS_Event frame_events[64];
-  U64 frame_event_count;
+  Arena* frame_arena;
+  //
+  OS_Event_list frame_event_list;
   //
   V2F32 this_frame_mouse_pos; // Relative to the client area of the window
   V2F32 prev_frame_mouse_pos; // Relative to the client area of the window
@@ -64,6 +65,8 @@ void os_init()
     Str8 str = str8_from_wstr(__os_g_state->state_arena, wstr);
     __os_g_state->path_to_system_fonts = str;
   }
+
+  __os_g_state->frame_arena = arena_alloc(Megabytes(64));
 }
 
 void os_release()
@@ -289,11 +292,10 @@ void os_frame_begin()
   
   // Resetting data from the prev frame
   {
-    for (U64 i = 0; i < os_state->frame_event_count; i += 1) { os_state->frame_events[i] = OS_Event{}; }
-    os_state->frame_event_count = 0;
-
+    os_state->frame_event_list     = OS_Event_list{};
     os_state->prev_frame_mouse_pos = os_state->this_frame_mouse_pos;
     os_state->this_frame_mouse_pos = v2f32(f32_neg_inf(), f32_neg_inf());
+    arena_clear(os_state->frame_arena);
   }
 
   // Creating frame events though the winproc
@@ -307,11 +309,10 @@ void os_frame_begin()
   {
     static B32 mouse_button_is_down_states[Mouse_button__COUNT] = {};
 
-    for (U64 i = 0; i < os_state->frame_event_count; i += 1)
+    for (OS_Event* ev = os_state->frame_event_list.first; ev; ev = ev->next)
     {
-      OS_Event event = os_state->frame_events[i];
-      if (event.kind == OS_Event_kind__mouse && event.mouse_event.went_down) { mouse_button_is_down_states[event.mouse_event.button] = true; }
-      if (event.kind == OS_Event_kind__mouse && event.mouse_event.went_up) { mouse_button_is_down_states[event.mouse_event.button] = false; }
+      if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.went_down) { mouse_button_is_down_states[ev->mouse_event.button] = true; }
+      if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.went_up) { mouse_button_is_down_states[ev->mouse_event.button] = false; }
     }
 
     B32 some_button_is_down = false;
@@ -371,6 +372,28 @@ F32 os_get_time_since_last_frame()
   OS_State* os_state = os_get_state();
   F32 diff = os_state->start_time_for_this_frame - os_state->start_time_for_prev_frame;
   return diff;
+}
+
+OS_Event_list* os_get_frame_event_list()
+{
+  return &os_get_state()->frame_event_list;
+}
+
+void os_consume_frame_event(OS_Event* event)
+{
+  // todo: I dont like that the event here might not even be a part of the event, bad api i think
+  B32 found = false;
+  for (OS_Event* test_event = os_get_state()->frame_event_list.first; test_event; test_event = test_event->next)
+  {
+    if (test_event == event) { found = true; break; }
+  }
+  
+  DllPop(&os_get_state()->frame_event_list, event);
+  if (found) {
+    os_get_state()->frame_event_list.count -= 1;
+  } else {
+    InvalidCodePath("What a bad api for real");
+  }
 }
 
 ///////////////////////////////////////////////////////////
@@ -758,6 +781,15 @@ LRESULT win32_proc(
   {
     default: { result = DefWindowProc(window_handle, message, w_param, l_param); } break;
     
+    case WM_SYSKEYDOWN: 
+    case WM_SYSKEYUP: 
+    {
+      // note: Just dont have a clear thing i need for this yet, but i know that i might need this at some point, 
+      //       so leaving this in here with a BP to know when i need this.
+      BP; 
+      result = DefWindowProc(window_handle, message, w_param, l_param);
+    } break;
+
     case WM_KEYDOWN: 
     case WM_KEYUP: 
     {
@@ -771,10 +803,15 @@ LRESULT win32_proc(
         switch (w_param)
         {
           default:         { InvalidCodePath();  } break;
-          case VK_SHIFT:   { key = Key__shift;   } break;
-          case VK_CONTROL: { key = Key__control; } break;
-          case VK_DELETE:  { key = Key__delete;  } break;
-          case VK_TAB:     { key = Key__tab;     } break;
+          case VK_SHIFT:   { key = Key__shift;       } break;
+          case VK_CONTROL: { key = Key__control;     } break;
+          case VK_DELETE:  { key = Key__delete;      } break;
+          case VK_TAB:     { key = Key__tab;         } break;
+          case VK_LEFT:    { key = Key__left_arrow;  } break;
+          case VK_UP:      { key = Key__up_arrow;    } break;
+          case VK_RIGHT:   { key = Key__right_arrow; } break;
+          case VK_DOWN:    { key = Key__down_arrow;  } break;
+          case VK_SPACE:   { key = Key__space;       } break;
         }
       }
 
@@ -799,18 +836,26 @@ LRESULT win32_proc(
         if (!got_up) { Assert(XOR(went_down, repeat_down)); }
       }
 
+      // VK_SHIFT, VK_CONTROL, and VK_MENU
+      OS_Event_modifiers modifiers = {}; 
+      if (GetKeyState(VK_SHIFT) & 0x8000) { modifiers |= OS_Event_modifier__shift; }
+      if (GetKeyState(VK_CONTROL) & 0x8000) { modifiers |= OS_Event_modifier__control; }
+
       if (key != Key__NONE)
       {
         is_event_made = true;
         event.kind = OS_Event_kind__key;
+        event.key_event.modifiers   = modifiers;
         event.key_event.key         = key;
         event.key_event.went_down   = went_down;
-        event.key_event.went_up      = got_up;
+        event.key_event.went_up     = got_up;
         event.key_event.repeat_down = repeat_down;
 
         is_event_made = true;
       }
     } break;
+
+    // todo: look into WM_CHAR (https://learn.microsoft.com/en-us/windows/win32/learnwin32/keyboard-input)
 
     case WM_LBUTTONDOWN: case WM_LBUTTONUP: 
     case WM_RBUTTONDOWN: case WM_RBUTTONUP:
@@ -861,7 +906,13 @@ LRESULT win32_proc(
       F32 wheel_delta = (F32)(GET_WHEEL_DELTA_WPARAM(w_param) / WHEEL_DELTA);
       V2F32 mous_pos = v2f32((F32)GET_X_LPARAM(l_param), (F32)GET_Y_LPARAM(l_param));
       
+      OS_Event_modifiers modifiers = {};
+
+      if (GetKeyState(VK_SHIFT) & 0x8000) { modifiers |= OS_Event_modifier__shift; }
+      if (GetKeyState(VK_CONTROL) & 0x8000) { modifiers |= OS_Event_modifier__control; }
+
       event.kind                    = OS_Event_kind__wheel;
+      event.wheel_event.modifiers   = modifiers;
       event.wheel_event.scroll_data = wheel_delta;
 
       is_event_made = true;
@@ -911,11 +962,10 @@ LRESULT win32_proc(
 
   if (is_event_made)
   {
-    if (win32_state->frame_event_count < ArrayCount(win32_state->frame_events)) 
-    {
-      win32_state->frame_events[win32_state->frame_event_count++] = event;
-    } 
-    else { BreakPoint(); }
+    OS_Event* new_event = ArenaPush(win32_state->frame_arena, OS_Event);
+    *new_event = event;
+    DllPushBack(&win32_state->frame_event_list, new_event);
+    win32_state->frame_event_list.count += 1;
   } 
 
   return result;

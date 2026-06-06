@@ -268,6 +268,30 @@ B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end)
 	return is_inside;
 }
 
+Rect intersect_rects_on_axis(Rect rect, Rect other, Axis2 axis)
+{
+	RangeV2F32 rect_bbox = range_v2f32_from_rect(rect);
+	RangeV2F32 other_bbox = range_v2f32_from_rect(other);
+
+	F32 min = rect_bbox.min.v[axis];
+	F32 max = rect_bbox.max.v[axis];
+
+	if (min < other_bbox.min.v[axis]) { min = other_bbox.min.v[axis]; }
+	if (max > other_bbox.max.v[axis]) { max = other_bbox.max.v[axis]; }
+
+	rect_bbox.min.v[axis] = min; 
+	rect_bbox.max.v[axis] = max; 
+
+	return rect_from_range_v2f32(rect_bbox);
+}
+
+Rect intersect_rects(Rect rect, Rect other)
+{
+	Rect result = intersect_rects_on_axis(rect, other, Axis2__x);
+	result = intersect_rects_on_axis(result, other, Axis2__y);
+	return result;
+}
+
 
 #endif
 

@@ -35,14 +35,14 @@ abstract.
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
 
-// #include "ui/ui_core.h"
-// #include "ui/ui_core.cpp"
+#include "ui/ui_core.h"
+#include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
-#include "pencil/pencil.h"
-#include "pencil/pencil.cpp"
+// #include "pencil/pencil.h"
+// #include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -60,7 +60,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   r_init(); 
   d_init();
   fp_init();
-  // ui_init();
+  ui_init();
 
   { // Making sure that the app is not being run more than once
     HANDLE mutex_h = CreateMutexA(Null, false, APP_MUTEX_NAME_WIN32);
@@ -149,12 +149,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  Pencil_state P = {}; 
-  P.current_mode = Pencil_mode__draw;
-  pencil_init(&P);
+  // Pencil_state P = {}; 
+  // P.current_mode = Pencil_mode__draw;
+  // pencil_init(&P);
   
   // Testing and working on font provider
   FP_Font font = {};
+  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
   // {
   //   Scratch scratch = get_scratch(0, 0);
   //   Str8 path_to_fonts = os_get_path_to_system_fonts();
@@ -168,7 +169,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //   font = fp_load_font(path_to_font, 128, range_u64_make(0, (U64)u8_max + 1));
   //   end_scratch(&scratch);
   // }
-  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 18, range_u64_make(0, (U64)u8_max + 1));
 
   // R_Target pen_texture = r_load_texture_from_file(Str8FromC("../data/pen.png"));
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
@@ -176,7 +176,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
   {
-    if (P.terminate_app) { break; }
+    // if (P.terminate_app) { break; }
 
     F64 frame_start_time_sec = os_get_time_for_timing_sec();
     // OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
@@ -194,13 +194,90 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     { // UI and Application update 
       // pencil_do_ui(&P, font);
-      pencil_update(&P, false);
+      // pencil_update(&P, false);
       // pencil_update(&P, !ui_has_active(), false);
     }
 
+    { // Testing the ui for text input 
+      d_fill_with_color(black());
+      DeferLoop(ui_begin_build(os_get_window_dims(), os_get_mouse_pos()), ui_end_build())
+      {
+        ui_push_font(font);
+
+        UI_PaddedBox(ui_px(100), Axis2__y)
+        {
+          ui_set_next_size_x(ui_px(200));
+          ui_set_next_size_y(ui_px(100));
+          ui_set_next_layout_axis(Axis2__x);
+          ui_set_next_b_color(blue());
+          UI_Box* wrapper = ui_box_make(Str8FromC("Wrapper id"), UI_Box_flag__has_background|UI_Box_flag__clip_x);
+          
+          wrapper->clip_data.clip_value[Axis2__x] = -50;
+
+          // if (ui_actions_from_box(wrapper).is_down)
+          // {
+          //   BP;
+          // }
+
+          // todo: Understand how you do inputs and actions right now for the boxes
+          // todo: Define how clip logic with inputs shoud work
+          // todo: Implement the logic there. Also right now is a good time to just fix
+          //       the hard looking code for actions to just have it be easily used later,
+          //       not that we are doing ui again.
+
+          UI_Parent(wrapper)
+          {
+            // todo: Have this element be clipped
+            // [ ] - Childre that are outside are to not be visible
+            // [ ] - Children that are outside should not be able to get inputs 
+            // [ ] - Dont_draw flag should just clip on rendering side not the ligic ui side
+            // [ ] - Clip shoud clip on the logic side for inputs and the render side 
+            const U64 count = 4;
+            V4F32 colors[count] = { red(), green(), orange(), magenta() };
+            Str8 ids[count] = { Str8FromC("1"), Str8FromC("2"), Str8FromC("3"), Str8FromC("4") };
+            for EachIndex(i, count)
+            {
+              ui_spacer(ui_px(15));              
+              ui_set_next_size_x(ui_px(50));
+              ui_set_next_size_y(ui_px(80));
+              ui_set_next_b_color(colors[i]);
+              UI_Box* box = ui_box_make(ids[i], UI_Box_flag__has_background);
+            }
+
+            if (ui_actions_from_id(ids[0]).is_hovered)
+            {
+              d_fill_with_color(green());
+            }
+
+            ui_spacer(ui_px(15));              
+          }
+
+          // { // Edit box
+          //   static U8 buffer[64]    = {};
+          //   static U64 buffer_count = 0;
+          //   static U64 cursor_pos   = 0;
+          //   static U64 section_pos  = 0;
+
+          //   Scratch scratch = get_scratch(0, 0);
+          //   {
+          //     UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+          //     ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
+          //   }
+          //   end_scratch(&scratch);
+
+          //   ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
+          // }
+        }
+      }
+      
+      // d_fill_with_color(black());
+      // r_clear_target(window_frame_buffer_target, red());
+      ui_draw();
+    }
+
     { // Rendering
-      r_clear_target(window_frame_buffer_target, transparent());
-      pencil_render(&P);
+      // r_clear_target(window_frame_buffer_target, transparent());
+      // pencil_render(&P);
       // if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
     }
 

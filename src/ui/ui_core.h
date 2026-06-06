@@ -2,7 +2,6 @@
 #define __UI_H
 
 #include "core/core_include.h"
-
 #include "font_provider/font_provider.h"
 
 /* todos:
@@ -33,8 +32,8 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__floating_x = (1 << 5), 
   UI_Box_flag__floating_y = (1 << 6), 
 
-  // UI_Box_flag__clip_x = (1 << 7), 
-  // UI_Box_flag__clip_y = (1 << 8), 
+  UI_Box_flag__clip_x = (1 << 7), 
+  UI_Box_flag__clip_y = (1 << 8), 
 
   UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
   UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
@@ -120,10 +119,18 @@ struct UI_Box {
   B32 has_been_updated_this_build;
   UI_Actions actions;
 
-  // Final build data
-  V2F32 final_on_screen_size; // Result of the sizing pass
-  V2F32 final_parent_offset;  // Result of the relative to parent pass
-  Rect final_on_screen_rect;  // These are the result of the finals layout pass 
+  // TODO: This is test code for now
+  struct {
+    F32 clip_value[Axis2__COUNT];      // Offset per axis
+    Rect latest_clip_rect;
+  } clip_data;  
+
+  // Intermediate data for ui building (More low level)
+  V2F32 final_on_screen_size; 
+  V2F32 final_parent_offset;  
+
+  // Final ui build data (This accounts for everything: float, clip, ...)
+  Rect final_on_screen_rect;   
   
   // Per build box tree
   UI_Box* first_child;
@@ -154,6 +161,7 @@ struct UI_Context {
   F32 mouse_x;
   F32 mouse_y;
   //
+  // This is like "active" in Casey Muratory terms
   Str8 currently_interacted_with_box_id;
   B32 currently_interacted_with_box__is_down;
   B32 currently_interacted_with_box__left_box_while_was_down;
@@ -244,7 +252,7 @@ void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis);
 void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis);
 void ui_do_layout_fixing(UI_Box* root, Axis2 axis);
 void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis);
-void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
+// void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
 void ui_layout_box(UI_Box* root, Axis2 axis);
 
 // - Active box stuff
@@ -265,8 +273,6 @@ UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
 UI_Box* ui_get_box_prev_frame(Str8 id);
 UI_Box_data ui_get_box_data_prev_frame_from_box(UI_Box* box);
 UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id);
-
-// UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id);
 
 // - Actions
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box);

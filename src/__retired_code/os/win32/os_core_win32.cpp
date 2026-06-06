@@ -764,7 +764,7 @@ Str8_list os_test_list_directory(Arena* arena, Str8 dir_path)
           && 
           !(sub_file_name_len == 2 && sub_file_name[0] == '.' && sub_file_name[1] == '.')
       ) { 
-        Str8 str_to_store = str8_manuall(sub_file_name, sub_file_name_len);
+        Str8 str_to_store = str8_manual(sub_file_name, sub_file_name_len);
         str8_list_append_copy(arena, &result_list, str_to_store);
       }
 
