@@ -8,6 +8,7 @@
 - Current feature working progress:
 [ ] - for UI_Box_flag__clip_x draw it with scissoring based on the clip rect and recursive intersection
 [ ] - for UI_Box_flag__clip_x get recursive intersection rect to do inputs against
+[ ] - Move ui core to bboxes from rects, those are better for axis independant stuff
 
 [ ] - Have the window be full screen. 
 [ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.

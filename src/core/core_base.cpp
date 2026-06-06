@@ -268,28 +268,49 @@ B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end)
 	return is_inside;
 }
 
-Rect intersect_rects_on_axis(Rect rect, Rect other, Axis2 axis)
+RangeV2F32 intersect_range_v2f32_on_axis(RangeV2F32 range, RangeV2F32 other, Axis2 axis)
 {
-	RangeV2F32 rect_bbox = range_v2f32_from_rect(rect);
-	RangeV2F32 other_bbox = range_v2f32_from_rect(other);
-
-	F32 min = rect_bbox.min.v[axis];
-	F32 max = rect_bbox.max.v[axis];
-
-	if (min < other_bbox.min.v[axis]) { min = other_bbox.min.v[axis]; }
-	if (max > other_bbox.max.v[axis]) { max = other_bbox.max.v[axis]; }
-
-	rect_bbox.min.v[axis] = min; 
-	rect_bbox.max.v[axis] = max; 
-
-	return rect_from_range_v2f32(rect_bbox);
+	range.min.v[axis] = Max(range.min.v[axis], other.min.v[axis]); 
+	range.max.v[axis] = Min(range.max.v[axis], other.max.v[axis]); 
+	return range; 
 }
 
-Rect intersect_rects(Rect rect, Rect other)
+RangeV2F32 intersect_range_v2f32(RangeV2F32 range, RangeV2F32 other)
 {
-	Rect result = intersect_rects_on_axis(rect, other, Axis2__x);
-	result = intersect_rects_on_axis(result, other, Axis2__y);
+	RangeV2F32 intermediate = intersect_range_v2f32_on_axis(range, other, Axis2__x);
+	RangeV2F32 result = intersect_range_v2f32_on_axis(intermediate, other, Axis2__y);
 	return result;
+}
+
+RangeV2F32 range_v2f32_as_bb(V2F32 p1, V2F32 p2)
+{
+	V2F32 min = {};
+	min.x = Min(p1.x, p2.x);
+	min.y = Min(p1.y, p2.y);
+
+	V2F32 max = {};
+	max.x = Max(p1.x, p2.x);
+	max.y = Max(p1.y, p2.y);
+
+	return range_v2f32(min, max);
+}
+
+RangeV2F32 range_v2f32_from_rect(Rect rect)
+{
+	RangeV2F32 range = {};
+	range.min = v2f32(rect.x, rect.y);
+	range.max = v2f32(rect.x + rect.width, rect.y + rect.height);
+	return range;
+}
+
+Rect rect_from_range_v2f32(RangeV2F32 range)
+{
+	Rect rect = {};
+	rect.x      = range.min.x;
+	rect.y      = range.min.y;
+	rect.width  = range.max.x - range.min.x;
+	rect.height = range.max.y - range.min.y;
+	return rect;
 }
 
 

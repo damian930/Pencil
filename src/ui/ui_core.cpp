@@ -204,6 +204,18 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   return box;
 }
 
+UI_Box* ui_box_make_f(const char* fmt, UI_Box_flags flags, ...)
+{
+  Scratch scratch = get_scratch(0, 0);
+  va_list args;
+  va_start(args, flags);
+  Str8 str = str8_valist(scratch.arena, fmt, args);
+  UI_Box* box = ui_box_make(str, flags);
+  va_end(args);
+  end_scratch(&scratch);
+  return box;
+}
+
 void ui_box_set_custom_draw(UI_Box* box, void (*draw_func) (UI_Box*), void* data)
 {
   box->custom_draw_func = draw_func; 
@@ -519,55 +531,37 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
   }
 }
 
-void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, Rect parent_clip_rect)
+void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip_bbox)
 {
   static F32 total_offset[Axis2__COUNT]  = {};
 
-  // Positioning boxes regardless of clip
-  if (axis == Axis2__x)
-  {
-    root->final_on_screen_rect.x = total_offset[axis] + root->final_parent_offset.v[axis];
-    root->final_on_screen_rect.width = root->final_on_screen_size.v[axis];
-  }
-  else if (axis == Axis2__y)
-  {
-    root->final_on_screen_rect.y = total_offset[axis] + root->final_parent_offset.v[axis];
-    root->final_on_screen_rect.height = root->final_on_screen_size.v[axis];
-  }
-  
-  // Taking care of possible parent clip
-  {
-    F32 clip_value = 0.0f;
-    UI_Box* parent = root->parent;
-    if (!ui_box_is_zero(parent))
-    {
-      if (parent->flags & UI_Box_flag__clip_x<<axis)
-      {
-        clip_value = parent->clip_data.clip_value[axis];
-      }
-    }
+  // if (str8_match(root->id, Str8FromC("Test id"), 0)) { BP; }
 
-    if (axis == Axis2__x) { root->final_on_screen_rect.x += clip_value; }
-    if (axis == Axis2__y) { root->final_on_screen_rect.y += clip_value; }
-  }
-  
-  // Dealing with clip rects 
-  Rect new_clip_rect = parent_clip_rect;
+  // Positioning boxes regardless of clip
+  root->final_on_screen_bbox.min.v[axis] = total_offset[axis] + root->final_parent_offset.v[axis];;
+  root->final_on_screen_bbox.max.v[axis] = root->final_on_screen_bbox.min.v[axis] + root->final_on_screen_size.v[axis];
+
+  // Adjesting with clip
+  root->final_on_screen_bbox.min.v[axis] += (root->parent != 0 ? root->parent->clip_data.clip_value[axis] : 0.0f);
+  root->final_on_screen_bbox.max.v[axis] += (root->parent != 0 ? root->parent->clip_data.clip_value[axis] : 0.0f);
+
+  // Dealing with clip rects
+  root->clip_data.clip_bbox.min.v[axis] = parent_clip_bbox.min.v[axis]; 
+  root->clip_data.clip_bbox.max.v[axis] = parent_clip_bbox.max.v[axis]; 
+  //
+  RangeV2F32 new_clip_bbox = parent_clip_bbox;
   {
-    for EachEnumRange(i_axis, Axis2, Axis2__x, Axis2__COUNT) {
-      if (root->flags & UI_Box_flag__clip_x<<i_axis) { 
-        new_clip_rect = intersect_rects_on_axis(parent_clip_rect, root->final_on_screen_rect, i_axis);
-      }
+    if (root->flags & UI_Box_flag__clip_x<<axis) {
+      new_clip_bbox = intersect_range_v2f32_on_axis(parent_clip_bbox, root->final_on_screen_bbox, axis);
     }
-    root->clip_data.latest_clip_rect = new_clip_rect;
   }
 
   // Doing children
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
     F32 prev_total_offset = total_offset[axis]; 
-    total_offset[axis] = (axis == Axis2__x ? root->final_on_screen_rect.x : root->final_on_screen_rect.y);
-    ui_do_final_rect_for_box(child, axis, new_clip_rect);
+    total_offset[axis] = root->final_on_screen_bbox.min.v[axis];
+    ui_do_final_rect_for_box(child, axis, new_clip_bbox);
     total_offset[axis] = prev_total_offset;
   }
 }
@@ -580,7 +574,11 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
   ui_do_layout_fixing(root, axis);
 
   ui_do_relative_parent_offsets_for_box(root, axis);
-  ui_do_final_rect_for_box(root, axis, rect_make(f32_neg_inf(), f32_neg_inf(), f32_inf(), f32_inf()));
+
+  // todo: After moving to ranges i can have clear bound be the same for everything
+  //       For now using these values
+  RangeV2F32 parent_clip_bbox = range_v2f32(v2f32(-1000.0f, -1000.0f), v2f32(1000.0f, 1000.0f));
+  ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
 }
 
 // note: There might be weird thing going on with ids and text, dont forget about ##
@@ -623,7 +621,7 @@ UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id)
   UI_Box* box = ui_get_box_prev_frame(id);
   if (!ui_box_is_zero(box)) 
   { 
-    box_data.on_screen_rect = box->final_on_screen_rect; 
+    box_data.on_screen_bbox = box->final_on_screen_bbox; 
     box_data.found = true; 
   }
   return box_data;
@@ -749,8 +747,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     some_other_box_is_being_interacted_with = true;
   }
 
-  Rect interaction_rect = intersect_rects(prev_frame_box->final_on_screen_rect, prev_frame_box->clip_data.latest_clip_rect);
-  if (is_point_inside_rect(ctx->mouse_x, ctx->mouse_y, interaction_rect)) {
+  RangeV2F32 interaction_bbox = intersect_range_v2f32(prev_frame_box->final_on_screen_bbox, prev_frame_box->clip_data.clip_bbox);
+  if (is_v2f32_inside_range_v2f32(interaction_bbox, ui_get_mouse_pos())) {
     is_hovered = true;
   }
 
@@ -963,7 +961,7 @@ void ui_pop_single_usage_font()  { UI_Context* ctx = ui_get_context(); _U_StyleS
 FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node, font) }
 
 // - UI Draw
-void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
+void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
 {
   #if DEBUG_MODE
   // if (str8_match(root->id, Str8FromC("test id"), 0)) { BP; }
@@ -976,7 +974,8 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
 
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      ui_draw_box(child, parent_scissor_rect);
+      BP;
+      // ui_draw_box(child, parent_scissor_bbox);
     }
   }
   else 
@@ -988,8 +987,9 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     if (root->flags & UI_Box_flag__clip_x) { root->flags |= UI_Box_flag__dont_draw_overflow_x; };
     if (root->flags & UI_Box_flag__clip_y) { root->flags |= UI_Box_flag__dont_draw_overflow_y; };
 
-    Rect rect = root->final_on_screen_rect;
-  
+    Rect rect       = rect_from_range_v2f32(root->final_on_screen_bbox);
+    RangeV2F32 bbox = root->final_on_screen_bbox;
+
     if (root->flags & UI_Box_flag__has_background)
     {
       d_draw_rect_pro(rect, root->shape_style.vertex_colors[UV__00], root->shape_style.vertex_colors[UV__01], root->shape_style.vertex_colors[UV__10], root->shape_style.vertex_colors[UV__11], root->shape_style.corner_radii, root->shape_style.softness); 
@@ -1008,23 +1008,23 @@ void ui_draw_box(UI_Box* root, Rect parent_scissor_rect)
     }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)
-    Rect new_scissor_rect = parent_scissor_rect;
+    RangeV2F32 new_scissor_bbox = parent_scissor_bbox;
     for EachEnumRange(axis, Axis2, Axis2__x, Axis2__COUNT) { 
       if (root->flags & UI_Box_flag__dont_draw_overflow_x<<axis) {
-        new_scissor_rect = intersect_rects_on_axis(rect, new_scissor_rect, axis);
+        new_scissor_bbox = intersect_range_v2f32_on_axis(bbox, new_scissor_bbox, axis);
       }
     }
-    if (!rect_match(new_scissor_rect, parent_scissor_rect)) {
-      d_push_scissor_rect(new_scissor_rect);
+    if (!range_v2f3_match(new_scissor_bbox, parent_scissor_bbox)) {
+      d_push_scissor_rect(rect_from_range_v2f32(new_scissor_bbox));
     }
 
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      ui_draw_box(child, new_scissor_rect);
+      ui_draw_box(child, new_scissor_bbox);
     }
   
     // No longer scissoring
-    if (!rect_match(new_scissor_rect, parent_scissor_rect)) {
+    if (!range_v2f3_match(new_scissor_bbox, parent_scissor_bbox)) {
       d_pop_scissor_rect();
     }
 
@@ -1037,7 +1037,7 @@ void ui_draw()
 {
   // todo: Dont pass Rect here like this 
   UI_Context* ctx = ui_get_context();
-  ui_draw_box(ctx->root_box, ctx->root_box->final_on_screen_rect);
+  ui_draw_box(ctx->root_box, ctx->root_box->final_on_screen_bbox);
 }
 
 #endif

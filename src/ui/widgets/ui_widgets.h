@@ -37,11 +37,11 @@ void ui_wrapper_end();
 #define UI_Wrapper(axis) DeferLoop(ui_wrapper_begin(axis), ui_wrapper_end())
 
 // - Color pickers
-void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);
-void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv);
+// void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);
+// void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv);
 
-void __ui_color_picker_sv_square_draw_func(UI_Box* box);
-void __ui_color_picker_h_draw_func(UI_Box* box);
+// void __ui_color_picker_sv_square_draw_func(UI_Box* box);
+// void __ui_color_picker_h_draw_func(UI_Box* box);
 
 // - Image
 void ui_image(R_Target texture); // note: This gets the size from the ouside: ui_set_next_size_x/y
@@ -59,6 +59,7 @@ struct UI_Slider_style {
   // V4 text_color;
   // F32 font_size;
 };
+/*
 B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_value, F32 min, F32 max, F32* out_opt_new_value)
 {
   UI_Actions slider_actions = ui_actions_from_id(slider_id);
@@ -68,7 +69,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 
   F32 corner_r_in_norm = 0.0f;
   if (slider_box_data.found) {
-    corner_r_in_norm = corner_r_in_px / (Min(slider_box_data.on_screen_rect.width, slider_box_data.on_screen_rect.height) / 2);
+    corner_r_in_norm = corner_r_in_px / (Min(slider_box_data.on_screen_bbox.width, slider_box_data.on_screen_bbox.height) / 2);
   }
 
   if (slider_actions.is_hovered) { ui_set_next_b_color(slider_style->hover_color);} 
@@ -84,7 +85,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
   B32 moved_slider = false;
   if (slider_box_data.found)
   {
-    F32 thumb_container_width = slider_box_data.on_screen_rect.width;
+    F32 thumb_container_width = slider_box_data.on_screen_bbox.width;
     F32 max_thumb_offset      = thumb_container_width;
     F32 value_ratio           = (current_value - min) / (max - min);
     clamp_f32_inplace(&value_ratio, 0.0f, 1.0f);
@@ -93,9 +94,9 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     UI_Parent(slider_box)
     {
       ui_set_next_size_x(ui_px(thumb_offset));
-      ui_set_next_size_y(ui_px(slider_box_data.on_screen_rect.height));
+      ui_set_next_size_y(ui_px(slider_box_data.on_screen_bbox.height));
       ui_set_next_b_color(slider_style->slided_part_color);
-      ui_set_next_corner_r(v4f32_all(corner_r_in_px / (Min(thumb_offset, slider_box_data.on_screen_rect.height) / 2)));
+      ui_set_next_corner_r(v4f32_all(corner_r_in_px / (Min(thumb_offset, slider_box_data.on_screen_bbox.height) / 2)));
       UI_Box* thumb_box = ui_box_make(Str8FromC("Thumb test"), UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
     }
   
@@ -119,7 +120,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
     {
       // ui_set_active_box(slider_box);
       V2F32 mouse_pos = ui_get_mouse_pos();
-      thumb_offset = mouse_pos.x - slider_box_data.on_screen_rect.x;
+      thumb_offset = mouse_pos.x - slider_box_data.on_screen_bbox.x;
       moved_slider = true;
     }
     else 
@@ -139,6 +140,7 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 
   return moved_slider;
 }
+*/
 
 ///////////////////////////////////////////////////////////
 // ---- WORK IN PROGRESS FOR A TEXT INPUT FIELD

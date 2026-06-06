@@ -39,6 +39,7 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
 
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
+  UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
   UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
 };
 typedef U32 UI_Box_flags;
@@ -122,7 +123,7 @@ struct UI_Box {
   // TODO: This is test code for now
   struct {
     F32 clip_value[Axis2__COUNT];      // Offset per axis
-    Rect latest_clip_rect;
+    RangeV2F32 clip_bbox;
   } clip_data;  
 
   // Intermediate data for ui building (More low level)
@@ -130,7 +131,7 @@ struct UI_Box {
   V2F32 final_parent_offset;  
 
   // Final ui build data (This accounts for everything: float, clip, ...)
-  Rect final_on_screen_rect;   
+  RangeV2F32 final_on_screen_bbox;   
   
   // Per build box tree
   UI_Box* first_child;
@@ -143,7 +144,7 @@ struct UI_Box {
 
 struct UI_Box_data {
   B32 found;
-  Rect on_screen_rect;
+  RangeV2F32 on_screen_bbox;
 };
 
 struct UI_Context {
@@ -236,6 +237,7 @@ Str8 ui_get_text_part_from_str8(Str8 id_and_text);
 // - Box stuff
 B32 ui_box_is_zero(UI_Box* box);
 UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags);
+UI_Box* ui_box_make_f(const char* fmt, UI_Box_flags flags, ...);
 void ui_box_set_custom_draw(UI_Box* box, void (*draw_func) (UI_Box*), void* data);
 void ui_push_parent(UI_Box* box);
 void ui_pop_parent();

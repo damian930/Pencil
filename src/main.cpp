@@ -206,50 +206,46 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
         UI_PaddedBox(ui_px(100), Axis2__y)
         {
-          ui_set_next_size_x(ui_px(200));
-          ui_set_next_size_y(ui_px(100));
-          ui_set_next_layout_axis(Axis2__x);
-          ui_set_next_b_color(blue());
-          UI_Box* wrapper = ui_box_make(Str8FromC("Wrapper id"), UI_Box_flag__has_background|UI_Box_flag__clip_x);
-          
-          wrapper->clip_data.clip_value[Axis2__x] = -50;
+          // todo: Slider that would make the clip larger for a box and basically scroll it and then 
+          //       the box will have boxes inside with color and when hovered will blit the screen with that color
+          V4F32 colors[] = { red(), green(), blue(), yellow(), pink(), teal(), orange(), taupe(), magenta() };
+          static F32 clip_value = -50.0f;
 
-          // if (ui_actions_from_box(wrapper).is_down)
-          // {
-          //   BP;
-          // }
-
-          // todo: Understand how you do inputs and actions right now for the boxes
-          // todo: Define how clip logic with inputs shoud work
-          // todo: Implement the logic there. Also right now is a good time to just fix
-          //       the hard looking code for actions to just have it be easily used later,
-          //       not that we are doing ui again.
-
-          UI_Parent(wrapper)
+          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
           {
-            // todo: Have this element be clipped
-            // [ ] - Childre that are outside are to not be visible
-            // [ ] - Children that are outside should not be able to get inputs 
-            // [ ] - Dont_draw flag should just clip on rendering side not the ligic ui side
-            // [ ] - Clip shoud clip on the logic side for inputs and the render side 
-            const U64 count = 4;
-            V4F32 colors[count] = { red(), green(), orange(), magenta() };
-            Str8 ids[count] = { Str8FromC("1"), Str8FromC("2"), Str8FromC("3"), Str8FromC("4") };
-            for EachIndex(i, count)
+            if (ev->kind == OS_Event_kind__wheel)
             {
-              ui_spacer(ui_px(15));              
-              ui_set_next_size_x(ui_px(50));
-              ui_set_next_size_y(ui_px(80));
-              ui_set_next_b_color(colors[i]);
-              UI_Box* box = ui_box_make(ids[i], UI_Box_flag__has_background);
+              clip_value += ev->wheel_event.scroll_data * 10;
             }
+          }
 
-            if (ui_actions_from_id(ids[0]).is_hovered)
+          UI_PaddedBox(ui_px(100), Axis2__x)
+          {
+            ui_set_next_size_x(ui_px(300));
+            ui_set_next_size_y(ui_px(200));
+            ui_set_next_b_color(white());
+            ui_set_next_layout_axis(Axis2__x);
+            UI_Box* wrapper = ui_box_make(Str8FromC("Test id"), UI_Box_flag__has_background|UI_Box_flag__clip);
+            wrapper->clip_data.clip_value[Axis2__x] = clip_value;
+
+            UI_Parent(wrapper)
             {
-              d_fill_with_color(green());
-            }
+              for EachIndex(i, ArrayCount(colors))
+              {
+                ui_spacer(ui_px(25));
 
-            ui_spacer(ui_px(15));              
+                ui_set_next_size_x(ui_px(50));
+                ui_set_next_size_y(ui_px(50));
+                ui_set_next_b_color(colors[i]);
+                UI_Box* color_box = ui_box_make_f("%lld color_box", UI_Box_flag__has_background, i);
+                UI_Actions actions = ui_actions_from_box(color_box);
+                if (actions.is_hovered)
+                {
+                  d_fill_with_color(colors[i]);                  
+                }
+              }
+              ui_spacer(ui_px(25));
+            }
           }
 
           // { // Edit box

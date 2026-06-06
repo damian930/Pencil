@@ -7,6 +7,7 @@
 #include "stdarg.h" // For va_args
 #include "string.h" // For memset
 #include "math.h"   // For math
+#include "float.h"  // For FLT_MAX and such
 
 /* todo:
 	[ ] - Remove todos
@@ -448,9 +449,10 @@ tu_specific Axis2 axis2_other(Axis2 axis) { return (axis == Axis2__x ? Axis2__y 
 #pragma warning(disable: 4309)
 
 // - F32 constatns
-global const U32 f32_sign     = 0x80000000;
-global const U32 f32_exponent = 0x7f800000;
-global const U32 f32_mantisa  = 0x007fffff;
+global const U32 f32_sign        = 0x80000000;
+global const U32 f32_exponent    = 0x7f800000;
+global const U32 f32_mantisa     = 0x007fffff;
+global const F32 f32_max_decimal = FLT_MAX;
 tu_specific F32 f32_inf();
 tu_specific F32 f32_neg_inf();
 tu_specific F32 f32_nan();
@@ -676,35 +678,33 @@ tu_specific RangeV2F32 range_v2f32(V2F32 min, V2F32 max)
 	return range;
 }
 
-tu_specific RangeV2F32 range_v2f32_as_bb(V2F32 p1, V2F32 p2)
+tu_specific RangeV2F32 range_v2f32_as_bb(V2F32 p1, V2F32 p2);
+tu_specific RangeV2F32 range_v2f32_from_rect(Rect rect);
+tu_specific Rect rect_from_range_v2f32(RangeV2F32 range);
+
+tu_specific RangeV2F32 intersect_range_v2f32_on_axis(RangeV2F32 range, RangeV2F32 other, Axis2 axis);
+tu_specific RangeV2F32 intersect_range_v2f32(RangeV2F32 range, RangeV2F32 other);
+
+tu_specific V2F32 range_v2f32_dims(RangeV2F32 range)
 {
-	V2F32 min = {};
-	min.x = Min(p1.x, p2.x);
-	min.y = Min(p1.y, p2.y);
-
-	V2F32 max = {};
-	max.x = Max(p1.x, p2.x);
-	max.y = Max(p1.y, p2.y);
-
-	return range_v2f32(min, max);
+	V2F32 dims = {};
+	dims.x = range.max.x - range.min.x;
+	dims.y = range.max.y - range.min.y;
+	return dims;
 }
 
-tu_specific RangeV2F32 range_v2f32_from_rect(Rect rect)
+tu_specific B32 range_v2f3_match(RangeV2F32 range, RangeV2F32 other)
 {
-	RangeV2F32 range = {};
-	range.min = v2f32(rect.x, rect.y);
-	range.max = v2f32(rect.x + rect.width, rect.y + rect.height);
-	return range;
+	return (v2f32_match(range.min, other.min) && v2f32_match(range.max, other.max));
 }
 
-tu_specific Rect rect_from_range_v2f32(RangeV2F32 range)
+tu_specific B32 is_v2f32_inside_range_v2f32(RangeV2F32 range, V2F32 vec)
 {
-	Rect rect = {};
-	rect.x      = range.min.x;
-	rect.y      = range.min.y;
-	rect.width  = range.max.x - range.min.x;
-	rect.height = range.max.y - range.min.y;
-	return rect;
+	return (
+		range.min.x <= vec.x && vec.x < range.max.x
+		&&
+		range.min.y <= vec.y && vec.y < range.max.y
+	);
 }
 
 // note: this is static inline just cause i didnt care to move it to cpp file

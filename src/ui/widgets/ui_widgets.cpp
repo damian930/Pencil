@@ -125,6 +125,7 @@ struct _UI_Color_picker_h_data {
   Axis2 axis;
 };
 
+/*
 void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32* out_opt_new_sat, F32* out_opt_new_val)
 {
   // note:
@@ -172,8 +173,8 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
     clamp_f32_inplace(&x_t, 0.0f, 1.0f);
     clamp_f32_inplace(&y_t, 0.0f, 1.0f);
 
-    circle_x_offset = (box_data.on_screen_rect.width * x_t) - (circle_diameter / 2.0f);
-    circle_y_offset = (box_data.on_screen_rect.height * (1.0f - y_t)) - (circle_diameter / 2.0f);
+    circle_x_offset = (range_v2f32_dims(box_data.on_screen_bbox).x * x_t) - (circle_diameter / 2.0f);
+    circle_y_offset = (range_v2f32_dims(box_data.on_screen_bbox).y * (1.0f - y_t)) - (circle_diameter / 2.0f);
   }
 
   // Color picker tree
@@ -204,8 +205,8 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   {
     if (box_data.found)
     {
-      F32 picker_relative_x = (mouse.x - box_data.on_screen_rect.x) / (box_data.on_screen_rect.width);
-      F32 picker_relative_y = 1.0f - ((mouse.y - box_data.on_screen_rect.y) / (box_data.on_screen_rect.height)); // Flipping the Y since color picker is bottom_left->up and the screen is top_left->down
+      F32 picker_relative_x = (mouse.x - box_data.on_screen_bbox.min.x) / (range_v2f32_dims(box_data.on_screen_bbox).x);
+      F32 picker_relative_y = 1.0f - ((mouse.y - box_data.on_screen_bbox.min.y) / (range_v2f32_dims(box_data.on_screen_bbox).y)); // Flipping the Y since color picker is bottom_left->up and the screen is top_left->down
       clamp_f32_inplace(&picker_relative_x, 0.0f, 1.0f);
       clamp_f32_inplace(&picker_relative_y, 0.0f, 1.0f);
 
@@ -217,7 +218,9 @@ void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsva, F32
   if (out_opt_new_sat) { *out_opt_new_sat = new_sat; }
   if (out_opt_new_val) { *out_opt_new_val = new_val; }
 }
+*/
 
+/*
 void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction, F32 hue, F32* out_opt_new_color_hsv)
 {
   ui_set_next_size_x(size_x);
@@ -229,8 +232,8 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
   ui_box_set_custom_draw(color_picker_box, __ui_color_picker_h_draw_func, draw_data);
 
   UI_Box_data box_data = ui_get_box_data_prev_frame_from_box(color_picker_box);
-  V2F32 box_origin     = rect_get_origin(box_data.on_screen_rect);
-  V2F32 box_dims       = rect_get_dims(box_data.on_screen_rect);
+  V2F32 box_origin     = rect_get_origin(box_data.on_screen_bbox);
+  V2F32 box_dims       = rect_get_dims(box_data.on_screen_bbox);
 
   F32 thumb_width  = 10.0f;
   F32 thumb_offset = 0.0f;
@@ -272,9 +275,11 @@ void ui_color_picker_h(Str8 id, UI_Size size_x, UI_Size size_y, Axis2 direction,
 void __ui_color_picker_sv_square_draw_func(UI_Box* box)
 {
   _UI_Color_picker_sv_data* data = (_UI_Color_picker_sv_data*)box->custom_draw_data;
-  d_draw_rect_pro(box->final_on_screen_rect, data->colors[UV__00], data->colors[UV__10], data->colors[UV__01], data->colors[UV__11], V4F32{}, 0.0f);
+  d_draw_rect_pro(box->final_on_screen_bbox, data->colors[UV__00], data->colors[UV__10], data->colors[UV__01], data->colors[UV__11], V4F32{}, 0.0f);
 }
+*/
 
+/*
 void __ui_color_picker_h_draw_func(UI_Box* box)
 {
   _UI_Color_picker_h_data* data = (_UI_Color_picker_h_data*)box->custom_draw_data;
@@ -309,8 +314,8 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
 
     Rect rect = {};
     {
-      V2F32 box_p    = rect_get_origin(box->final_on_screen_rect);
-      V2F32 box_dims = rect_get_dims(box->final_on_screen_rect);
+      V2F32 box_p    = rect_get_origin(box->final_on_screen_bbox);
+      V2F32 box_dims = rect_get_dims(box->final_on_screen_bbox);
   
       V2F32 rect_p = {};
       rect_p.v[data->axis]              = hue_section_start * box_dims.v[data->axis] + box_p.v[data->axis]; 
@@ -328,29 +333,30 @@ void __ui_color_picker_h_draw_func(UI_Box* box)
     hue_section_start += hue_section_length;
   }
 }
+*/
 
 ///////////////////////////////////////////////////////////
 // - Image
 //
-struct _UI_Image_data {
-  R_Target texture;
-};
+// struct _UI_Image_data {
+//   R_Target texture;
+// };
 
-void __ui_image_draw_func(UI_Box* box)
-{
-  _UI_Image_data* data = (_UI_Image_data*)box->custom_draw_data;
-  Rect dest_rect = box->final_on_screen_rect;
-  Rect source_rect = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(data->texture)); 
-  d_draw_texture_pro(data->texture, dest_rect, source_rect, white());
-}
+// void __ui_image_draw_func(UI_Box* box)
+// {
+//   _UI_Image_data* data = (_UI_Image_data*)box->custom_draw_data;
+//   Rect dest_rect = box->final_on_screen_bbox;
+//   Rect source_rect = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(data->texture)); 
+//   d_draw_texture_pro(data->texture, dest_rect, source_rect, white());
+// }
 
-void ui_image(R_Target texture)
-{
-  UI_Box* image_box = ui_box_make(Str8{}, 0);
-  _UI_Image_data* data = ArenaPush(ui_get_build_arena(), _UI_Image_data);
-  data->texture = texture;
-  ui_box_set_custom_draw(image_box, __ui_image_draw_func, data);
-}
+// void ui_image(R_Target texture)
+// {
+//   UI_Box* image_box = ui_box_make(Str8{}, 0);
+//   _UI_Image_data* data = ArenaPush(ui_get_build_arena(), _UI_Image_data);
+//   data->texture = texture;
+//   ui_box_set_custom_draw(image_box, __ui_image_draw_func, data);
+// }
 
 // ///////////////////////////////////////////////////////////
 // // - Text input field
