@@ -647,14 +647,14 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
 //   return result_data;
 // } 
 
-B32 ui_is_active_id(Str8 box_id)
+B32 ui_is_id_active(Str8 box_id)
 {
   return str8_match(ui_get_context()->currently_interacted_with_box_id, box_id, 0); 
 }
 
 B32 ui_is_box_active(UI_Box* box)
 {
-  return ui_is_active_id(box->id);
+  return ui_is_id_active(box->id);
 }
 
 // void ui_set_active_id(Str8 box_id)
@@ -675,7 +675,7 @@ void ui_reset_active_id_match(Str8 box_id)
 
 B32 ui_is_active_box(UI_Box* box)
 {
-  return ui_is_active_id(box->id);
+  return ui_is_id_active(box->id);
 }
 
 // void ui_set_active_box(UI_Box* box)

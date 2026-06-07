@@ -916,13 +916,58 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
           ui_set_next_border(1, border_grey);
           UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_borders))
           {
-            UI_PaddedBox(ui_px(2), Axis2__x)
+            UI_PaddedBox(ui_px(2), Axis2__y)
             {
-              B32 text_done = ui_text_edit_box(Str8FromC("Text edit box for commnads"), edit_box_width, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
-              if (text_done)
+              Str8 edit_box_id = Str8FromC("Text edit box for commnads");
+              ui_text_edit_box(edit_box_id, edit_box_width, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
+              
+              if (ui_is_id_active(edit_box_id))
               {
-                run_command_from_name(P, str8_manual(buffer, buffer_count));
-              }
+                Str8 edit_box_str = str8_manual(buffer, buffer_count);
+                DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
+                {
+                  ui_spacer(ui_px(2));
+                
+                  ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
+                  ui_set_next_size_y(ui_px(2));
+                  ui_set_next_b_color(border_grey);
+                  ui_box_make(Str8{}, UI_Box_flag__has_background);
+  
+                  ui_spacer(ui_px(2));
+  
+                  Str8_list filtered_commands = {};
+                  for EachIndex(command_name_index, Command_id__COUNT)
+                  {
+                    Str8 command_name = command_names[command_name_index];
+                    if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
+                    {
+                      str8_list_append(scratch.arena, &filtered_commands, command_name);
+                    }
+                  }
+  
+                  for (Str8_node* node = filtered_commands.first; node; node = node->next)
+                  {
+                    ui_spacer(ui_px(5));
+                    ui_label(node->str);
+                  }
+                  ui_spacer(ui_px(5));
+
+
+                  // Doing some stuff with events
+                  for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+                  {
+                    if (ev->kind == OS_Event_kind__key)
+                    {
+                      if (ev->key_event.key == Key__escape) { ui_reset_active_id_match(edit_box_id); }
+                      if (ev->key_event.key == Key__enter) {
+                        run_command_from_name(P, filtered_commands.first->str);
+                      }
+                    }
+                  }
+
+                }
+
+              }              
             }
           }
         }
@@ -1089,11 +1134,11 @@ void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_
 void run_command_from_name(Pencil_state* P, Str8 command_name)
 {
   if (0) {}
-  else if (str8_match(command_name, COMMAND_NAME_TERMINATE_APP, Str8_match__ignore_case)) { command_terminate_app(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_RULER, Str8_match__ignore_case)) { command_swap_to_ruller(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_DRAW,  Str8_match__ignore_case)) { command_swap_to_draw(P); }
-  else if (str8_match(command_name, COMMAND_NAME_TOGGLE_LINE_FADE, Str8_match__ignore_case)) { command_toggle_line_fade(P); }
-  else if (str8_match(command_name, COMMAND_NAME_SWAP_TO_ERASER, Str8_match__ignore_case)) { command_swap_to_eraser(P); }
+  else if (str8_match(command_name, command_names[Command_id__terminate_app], Str8_match__ignore_case)) { command_terminate_app(P); }
+  else if (str8_match(command_name, command_names[Command_id__swap_to_ruler], Str8_match__ignore_case)) { command_swap_to_ruller(P); }
+  else if (str8_match(command_name, command_names[Command_id__swap_to_draw],  Str8_match__ignore_case)) { command_swap_to_draw(P); }
+  else if (str8_match(command_name, command_names[Command_id__toggle_line_fade], Str8_match__ignore_case)) { command_toggle_line_fade(P); }
+  else if (str8_match(command_name, command_names[Command_id__swap_to_eraser], Str8_match__ignore_case)) { command_swap_to_eraser(P); }
   else {
     InvalidCodePath();
   }

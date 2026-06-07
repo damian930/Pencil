@@ -39,11 +39,27 @@ struct Draw_record_registration_result {
   Draw_record* record;  
 };
 
-#define COMMAND_NAME_TERMINATE_APP     Str8FromC("Terminate app")
-#define COMMAND_NAME_SWAP_TO_RULER     Str8FromC("Swap to ruller")
-#define COMMAND_NAME_SWAP_TO_DRAW      Str8FromC("Swap to draw")
-#define COMMAND_NAME_TOGGLE_LINE_FADE  Str8FromC("Toggle line fade")
-#define COMMAND_NAME_SWAP_TO_ERASER    Str8FromC("Swap to eraser")
+// note: These are to be sorted
+#define COMMAND_DATA_X_LIST                           \
+  X(swap_to_draw,     Str8FromC("Swap to draw")     ) \
+  X(swap_to_eraser,   Str8FromC("Swap to eraser")   ) \
+  X(swap_to_ruler,    Str8FromC("Swap to ruller")   ) \
+  X(terminate_app,    Str8FromC("Terminate app")    ) \
+  X(toggle_line_fade, Str8FromC("Toggle line fade") ) \
+
+enum Command_id : U32 {
+  // Command_id__NONE,
+  #define X(id, str_name) Command_id__##id,
+    COMMAND_DATA_X_LIST
+  #undef X
+  Command_id__COUNT,
+};
+
+Str8 command_names[Command_id__COUNT] = {
+  #define X(id, str_name) str_name,
+    COMMAND_DATA_X_LIST
+  #undef X
+};
 
 struct Shortcut_chord {
   OS_Event_modifier mod;

@@ -262,7 +262,7 @@ void ui_layout_box(UI_Box* root, Axis2 axis);
 
 // - Active box stuff
 // note: This is more like "interacted with box" and not active
-B32 ui_is_active_id(Str8 box_id);
+B32 ui_is_id_active(Str8 box_id);
 // void ui_set_active_id(Str8 box_id);
 // void ui_reset_active_id_match(Str8 box_id);
 //

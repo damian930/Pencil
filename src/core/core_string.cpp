@@ -227,21 +227,21 @@ B32 str8_is_substring(Str8 str, Str8 test_sub, Str8_match_flags flags)
   return is_sub;
 }
 
-B32 str8_is_front(Str8 str, Str8 other)
+B32 str8_is_front(Str8 str, Str8 other, Str8_match_flags flags)
 {
   if (str.count == 0) { return false; }
   if (str.count < other.count) { return false; }
   Str8 test_str = str8_substring(str, 0, other.count);
-  B32 result = str8_match(test_str, other, 0);
+  B32 result = str8_match(test_str, other, flags);
   return result;
 }
 
-B32 str8_is_back(Str8 str, Str8 other)
+B32 str8_is_back(Str8 str, Str8 other, Str8_match_flags flags)
 {
   if (str.count == 0) { return false; }
   if (str.count < other.count) { return false; }
   Str8 test_str = str8_substring(str, str.count - other.count, str.count);
-  B32 result = str8_match(test_str, other, 0);
+  B32 result = str8_match(test_str, other, flags);
   return result;
 }
 

@@ -71,8 +71,8 @@ tu_specific Str8 str8_substring(Str8 str, U64 start_index, U64 end_index);
 tu_specific Str8 str8_substring_range(Str8 str, RangeU64 range);
 tu_specific B32 str8_match(Str8 str, Str8 other, Str8_match_flags flags);
 tu_specific B32 str8_is_substring(Str8 str, Str8 test_sub, Str8_match_flags flags);
-tu_specific B32 str8_is_front(Str8 str, Str8 other);
-tu_specific B32 str8_is_back(Str8 str, Str8 other);
+tu_specific B32 str8_is_front(Str8 str, Str8 other, Str8_match_flags flags);
+tu_specific B32 str8_is_back(Str8 str, Str8 other, Str8_match_flags flags);
 tu_specific Str8 str8_chop_front(Str8 str, U64 end_index);
 tu_specific Str8 str8_chop_back(Str8 str, U64 n_chars_to_chop);
 tu_specific Str8 str8_chop_front_if_match(Str8 str, Str8 other, Str8_match_flags flags);
@@ -84,6 +84,7 @@ tu_specific Str8 str8_trim_back(Str8 str);
 tu_specific Str8 str8_trim(Str8 str);
 tu_specific Str8 str8_to_lower(Arena* arena, Str8 str);
 tu_specific Str8 str8_to_upper(Arena* arena, Str8 str);
+
 
 // - chars
 tu_specific B32 char_is_lower(U8 ch);

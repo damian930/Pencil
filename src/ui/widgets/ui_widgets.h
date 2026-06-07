@@ -638,7 +638,7 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
   }
 }
  
-B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
+void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
   FP_Font font                 = ui_get_font();
   Str8 buffer_str              = str8_manual(text_buffer, *text_buffer_size);
@@ -650,7 +650,7 @@ B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64*
 
   // todo: Right now i am modifiying this here, but this shoud not modify it, but rather just display it
   UI_Actions actions = ui_actions_from_id(edit_box_id);
-  if (ui_is_active_id(edit_box_id))
+  if (ui_is_id_active(edit_box_id))
   {
     Scratch scratch = get_scratch(0, 0);
     {
@@ -702,7 +702,7 @@ B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64*
       {
         ui_spacer(ui_px(space_before_section_start));
       
-        if (ui_is_active_id(edit_box_id))
+        if (ui_is_id_active(edit_box_id))
         {
           F32 cursor_size = 2.0f;
           ui_set_next_size_x(ui_px(cursor_size));
@@ -715,7 +715,7 @@ B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64*
       {
         ui_spacer(ui_px(space_before_section_start));
 
-        if (ui_is_active_id(edit_box_id))
+        if (ui_is_id_active(edit_box_id))
         {
           F32 cursor_size = 2.0f;
           ui_set_next_size_x(ui_px(space_inside_section));
@@ -729,22 +729,8 @@ B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64*
         }
       }
     }
-  }
+  };
 
-  B32 enter_pressed = false;
-  if (ui_is_active_id(edit_box_id))
-  {
-    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-    {
-      if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__enter)
-      {
-        enter_pressed = true;
-        os_consume_frame_event(ev);
-        break;
-      }
-    }
-  }
-  return enter_pressed;
 }
 
 
