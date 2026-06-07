@@ -244,42 +244,44 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
         UI_PaddedBox(ui_px(100), Axis2__y)
         {
           static F32 value = 50.0f;
-          value = ui_slider(Str8FromC("Slider id"), v2f32(200, 100), blue(), red(), value, { 0, 100 });
 
           ui_spacer(ui_px(25));
-
-          Arena* arena = arena_alloc(Megabytes(4), true, 1);
-          U32* test_addr = ArenaPush(arena, U32);
-          BP;
 
           ui_set_next_size_x(ui_px(200));
           ui_set_next_size_y(ui_px(200));
           ui_set_next_layout_axis(Axis2__y);
           ui_set_next_b_color(v4f32(0.2f, 0.2f, 0.2f, 1.0f));
-          ui_set_next_border(1, red());
+          // ui_set_next_border(1, red());
           UI_Box* clip_box = ui_box_make(Str8FromC("Clip box"), UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
           UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);
           if (clip_box_data.is_found)
           {
-            // BP;
-            V2F32 dims = range_v2f32_dims(clip_box_data.on_screen_bbox);
-
-
-            clip_box->clip_data.clip_value[Axis2__y] = value;
+            clip_box->clip_data.clip_value[Axis2__y] = -1.0f * value;
           }
-          
+
           UI_Parent(clip_box)
           {
+            ui_set_next_size_x(ui_px(10));
+            ui_set_next_size_y(ui_px(10));
+            ui_set_next_b_color(blue());
+            ui_box_make(Str8{}, UI_Box_flag__has_background);
+
             for EachIndex(word_index, ArrayCount(words))
             {
-              UI_Size size = ui_px(800);
-              size.strictness = 0.0f;
-              ui_set_next_size_x(ui_px(100));
-              ui_set_next_size_y(size);
-              ui_box_make(Str8{}, 0);
-
-              // ui_label(words[word_index]);
+              ui_label(words[word_index]);
             }
+
+            ui_set_next_size_x(ui_px(10));
+            ui_set_next_size_y(ui_px(10));
+            ui_set_next_b_color(blue());
+            ui_box_make(Str8{}, UI_Box_flag__has_background);
+          }
+
+          ui_spacer(ui_px(50));
+
+          if (clip_box_data.is_found)
+          {
+            value = ui_slider(Str8FromC("Slider id"), v2f32(200, 100), blue(), red(), value, { 0, clip_box_data.inner_content_dims.y - range_v2f32_dims(clip_box_data.on_screen_bbox).y });
           }
         }
 

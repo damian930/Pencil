@@ -73,12 +73,12 @@ V2F32 ui_get_mouse_pos() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 void ui_init()
 {
-  Arena* arena = arena_alloc(Kilobytes(64), false, 0);
+  Arena* arena = arena_alloc(Megabytes(64), false, 0);
   _ui_g_context = ArenaPush(arena, UI_Context);
   _ui_g_context->context_arena = arena;
-  _ui_g_context->style_stacks_arena = arena_alloc(Kilobytes(64), false, 0);
+  _ui_g_context->style_stacks_arena = arena_alloc(Megabytes(64), false, 0);
   for EachArrElement(i, _ui_g_context->build_arenas) { 
-    _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), false, 0); 
+    _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), true, (i == 0 ? 1 : 44444)); // TODO: The stable address here shoud be removed 
   }
 
   _ui_g_context->root_box            = &_ui_g_zero_box;
@@ -423,13 +423,10 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
 
 void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
 {
-  if (axis == Axis2__y && str8_match(Str8FromC("Clip box"), root->parent->id, 0)) { BP; }
-
   // Clip boxes represent something like a viewport, for that reason clip offset exists.
   // That means that immediate children for a clip box are not to be made smaller in size
   // by the layout fixing codepath, though their children work as ussual.
-  B32 is_parent_a_clip_box = (ui_box_is_zero(root->parent) && (root->parent->flags & UI_Box_flag__clip_x<<axis));
-  if (!is_parent_a_clip_box)
+  if (!(root->flags & UI_Box_flag__clip_x<<axis))
   { 
     F32 available_space = root->final_on_screen_size.v[axis];
     if (root->flags & UI_Box_flag__floating_x<<axis)
@@ -550,7 +547,8 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip_b
   F32 children_size_sum = 0.0f;
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    children_size_sum += child->final_on_screen_size.v[axis];
+    if (root->layout_axis == axis) { children_size_sum += child->final_on_screen_size.v[axis]; }
+    else { children_size_sum = Max(children_size_sum, child->final_on_screen_size.v[axis]); }
 
     F32 prev_total_offset = total_offset[axis]; 
     total_offset[axis] = root->final_on_screen_bbox.min.v[axis];
@@ -618,7 +616,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
   { 
     box_data.is_found           = true; 
     box_data.on_screen_bbox     = box->final_on_screen_bbox; 
-    box_data.inner_content_size = box->inner_content_dims;
+    box_data.inner_content_dims = box->inner_content_dims;
   }
   return box_data;
 }

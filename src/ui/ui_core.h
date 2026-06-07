@@ -145,7 +145,7 @@ struct UI_Box {
 struct UI_Box_data {
   B32 is_found;
   RangeV2F32 on_screen_bbox;
-  V2F32 inner_content_size;
+  V2F32 inner_content_dims;
 };
 
 struct UI_Context {
