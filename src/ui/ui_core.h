@@ -35,12 +35,11 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__clip_x = (1 << 7), 
   UI_Box_flag__clip_y = (1 << 8), 
 
-  UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
-  UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
+  // UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
+  // UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
 
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
-  UI_Box_flag__dont_draw_overflow = UI_Box_flag__dont_draw_overflow_x|UI_Box_flag__dont_draw_overflow_y, 
 };
 typedef U32 UI_Box_flags;
 
@@ -131,6 +130,7 @@ struct UI_Box {
   V2F32 final_parent_offset;  
 
   // Final ui build data (This accounts for everything: float, clip, ...)
+  V2F32 inner_content_dims;
   RangeV2F32 final_on_screen_bbox;   
   
   // Per build box tree
@@ -143,8 +143,9 @@ struct UI_Box {
 };
 
 struct UI_Box_data {
-  B32 found;
+  B32 is_found;
   RangeV2F32 on_screen_bbox;
+  V2F32 inner_content_size;
 };
 
 struct UI_Context {
@@ -273,8 +274,8 @@ B32 ui_has_active();
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
 UI_Box* ui_get_box_prev_frame(Str8 id);
-UI_Box_data ui_get_box_data_prev_frame_from_box(UI_Box* box);
-UI_Box_data ui_get_box_data_prev_frame_from_id(Str8 id);
+UI_Box_data ui_box_data_from_box_prev_frame(UI_Box* box);
+UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id);
 
 // - Actions
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
@@ -380,7 +381,7 @@ FP_Font ui_get_font();
     02. Color Swatch           A box that is purely a color. The atom of your theme system.
     03. Divider                Horizontal/vertical rule. May carry a label.
     04. Spacer                 Invisible box that enforces spacing units.
-    05. Icon                   SVG or glyph at a fixed size. Inherits color.
+    05. Icon                   SVG  glyph at a fixed size. Inherits color.
     06. Avatar                 Image or initials in a circle/square. Fixed sizes.
     07. Badge / Tag            Small pill with text and optional color variant.
     08. Spinner / Loader       Animated indicator of indeterminate progress.

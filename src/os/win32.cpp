@@ -24,6 +24,9 @@ struct OS_State {
   
   HINSTANCE app_instance;
   U64 perf_freq_count_per_sec;
+  U64 allocation_granularity;
+  U64 page_size;
+
   Str8 path_to_system_fonts;
 
   // Single window data
@@ -56,6 +59,14 @@ void os_init()
   LARGE_INTEGER freq_lr = {};
   BOOL succ = QueryPerformanceFrequency(&freq_lr); Assert(succ);
   __os_g_state->perf_freq_count_per_sec = freq_lr.QuadPart;
+
+  // Some system info
+  {
+    SYSTEM_INFO info = {};
+    GetSystemInfo(&info);
+    __os_g_state->allocation_granularity = (U64)info.dwAllocationGranularity;
+    __os_g_state->page_size = (U64)info.dwPageSize;
+  }
 
   // Getting the folder path in win32 to system fonts
   {
@@ -397,7 +408,44 @@ void os_consume_frame_event(OS_Event* event)
 }
 
 ///////////////////////////////////////////////////////////
+// - Memory
+//
+void* os_mem_reserve(U64 bytes_to_reserve, B32 start_at_specific_page, U32 allocation_granulatity_index)
+{
+  OS_State* os_state = os_get_state();
+  
+  void* v_alloc_addr = Null;
+  if (start_at_specific_page)
+  {
+    U64 start_addr = (allocation_granulatity_index + 1) * os_state->allocation_granularity;
+    U64 rounded_down_address = (start_addr / os_state->allocation_granularity) * os_state->allocation_granularity;
+    v_alloc_addr = (void*)rounded_down_address;
+  }
+  
+  // Rounding up to page_size
+  bytes_to_reserve = ((bytes_to_reserve + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
+  
+  void* result_mem = VirtualAlloc(v_alloc_addr, bytes_to_reserve, MEM_RESERVE, PAGE_NOACCESS);
+  return result_mem;
+}
+
+void* os_mem_commit(void* reserved_mem, U64 bytes_to_commit)
+{
+  OS_State* os_state = os_get_state();
+
+  // Rounding down the reserved mem to the page size for committing
+  reserved_mem = (void*)(((U64)reserved_mem / os_state->page_size) * os_state->page_size);
+  
+  // Rounding up to page_size
+  bytes_to_commit = ((bytes_to_commit + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
+  
+  void* result_mem = VirtualAlloc(reserved_mem, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
+  return result_mem;
+}
+
+///////////////////////////////////////////////////////////
 // - Windowing
+//
 V2F32 os_get_window_dims()
 {
   OS_State* os_state = os_get_state();
@@ -802,7 +850,7 @@ LRESULT win32_proc(
       else {
         switch (w_param)
         {
-          default:         { InvalidCodePath();  } break;
+          default:         { /*InvalidCodePath();*/  } break;
           case VK_SHIFT:   { key = Key__shift;       } break;
           case VK_CONTROL: { key = Key__control;     } break;
           case VK_DELETE:  { key = Key__delete;      } break;

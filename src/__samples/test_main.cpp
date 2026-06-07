@@ -8,8 +8,8 @@
 #include "core/core_include.h"
 #include "core/core_include.cpp"
 
-// #include "os/win32.h"
-// #include "os/win32.cpp"
+#include "os/win32.h"
+#include "os/win32.cpp"
 
 // #include "render/render.h"
 // #include "render/render.cpp"
@@ -29,40 +29,20 @@
 // #include "ui/widgets/ui_widgets.h"
 // #include "ui/widgets/ui_widgets.cpp"
 
-void test(U32* arr)
-{
-  
-}
-
-struct Ball {
-  V4F32 color;
-};
-
-struct State {
-  U64* p;
-  Ball balls[1000];
-  U64 count;
-};
-
-void add_ball(State* S)
-{
-  if (S->count < ArrayCount(S->balls))
-  {
-    Ball* ball = S->balls + S->count;
-    ball->color = blue();
-    S->count += 1;
-  }
-}
-
 int main()
 {
   allocate_thread_context();
+  os_init();
+  // r_init(); 
+  // d_init();
+  // fp_init();
+  // ui_init();
 
-  State state = {};
-  add_ball(&state);
-  add_ball(&state);
-  add_ball(&state);
-  add_ball(&state);
+  void* r_mem = os_mem_reserve(Kilobytes(64), true, 10);
+  void* c_mem = os_mem_commit(r_mem, Kilobytes(4));
+  U32* test = (U32*)r_mem;
+  *test = 5;
+  BP;
 
   return 0;
 }

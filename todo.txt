@@ -6,9 +6,8 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
-[ ] - for UI_Box_flag__clip_x draw it with scissoring based on the clip rect and recursive intersection
-[ ] - for UI_Box_flag__clip_x get recursive intersection rect to do inputs against
-[ ] - Move ui core to bboxes from rects, those are better for axis independant stuff
+[ ] - switch to v alloc to have stable addresses and then see when the clip box 800 px on y box size changes to 2 px in size for y axis.
+[ ] - Have inner content size for clip boxes be working
 
 [ ] - Have the window be full screen. 
 [ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.

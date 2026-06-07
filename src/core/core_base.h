@@ -361,6 +361,8 @@ tu_specific V3F32 lerp_v3f32(V3F32 v0, V3F32 v1, F32 t);
 tu_specific V4F32 lerp_v4f32(V4F32 v0, V4F32 v1, F32 t);
 tu_specific F32 lerp(F32 v0, F32 v1, F32 t);
 
+tu_specific F32 reverse_lerp_f32(F32 min, F32 max, F32 value);
+
 tu_specific U64 u64_from_2_u32(U32 high_order_word, U32 low_order_word);
 
 enum Day : U8 { 
@@ -670,6 +672,11 @@ struct RangeV2F32 {
 	V2F32 max;
 };
 
+tu_specific V2F32 range_v2f32_x0y0(RangeV2F32 r) { return v2f32(r.min.x, r.min.y); } 
+tu_specific V2F32 range_v2f32_x1y0(RangeV2F32 r) { return v2f32(r.max.x, r.min.y); }
+tu_specific V2F32 range_v2f32_x0y1(RangeV2F32 r) { return v2f32(r.min.x, r.max.y); }
+tu_specific V2F32 range_v2f32_x1y1(RangeV2F32 r) { return v2f32(r.max.x, r.max.y); } 
+
 tu_specific RangeV2F32 range_v2f32(V2F32 min, V2F32 max)
 {
 	RangeV2F32 range = {};
@@ -690,6 +697,7 @@ tu_specific V2F32 range_v2f32_dims(RangeV2F32 range)
 	V2F32 dims = {};
 	dims.x = range.max.x - range.min.x;
 	dims.y = range.max.y - range.min.y;
+	Assert(dims.x >= 0.0f && dims.y >= 0.0f);
 	return dims;
 }
 
@@ -768,6 +776,8 @@ union V4F32 {
 typedef V4F32 Vec4;
 typedef V4F32 V4;
 
+// todo: Might be nice to use a macro to have the double to float conversion not be a warning but me a part of macro
+//       i could use cpp func overload, but i for some reason dont like that that much
 tu_specific V4F32 v4f32(F32 x, F32 y, F32 z, F32 w) { V4F32 v = { x, y, z, w }; return v; }
 tu_specific V4F32 v4f32_all(F32 x) { return v4f32(x, x, x, x); }
 tu_specific B32 v4f32_match(V4F32 v1, V4F32 v2)

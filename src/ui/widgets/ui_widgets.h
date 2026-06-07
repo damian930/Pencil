@@ -145,6 +145,47 @@ B32 ui_slider(Str8 slider_id, const UI_Slider_style* slider_style, F32 current_v
 ///////////////////////////////////////////////////////////
 // ---- WORK IN PROGRESS FOR A TEXT INPUT FIELD
 //
+F32 ui_slider(Str8 id, V2F32 dims, V4F32 b_color, V4F32 thumb_color, F32 current_value, RangeF32 value_range)
+{
+  clamp_f32_inplace(&current_value, value_range.min, value_range.max);
+  
+  ui_set_next_size_x(ui_px(dims.x));
+  ui_set_next_size_y(ui_px(dims.y));
+  ui_set_next_b_color(b_color);
+  UI_Box* slider_main_box = ui_box_make(id, UI_Box_flag__has_background);
+
+  F32 value_ratio = reverse_lerp_f32(value_range.min, value_range.max, current_value); 
+
+  UI_Parent(slider_main_box)
+  {
+    ui_set_next_size_x(ui_px(dims.x * value_ratio));
+    ui_set_next_size_y(ui_px(dims.y));
+    ui_set_next_b_color(thumb_color);
+    UI_Box* filled_part = ui_box_make(id, UI_Box_flag__has_background);
+  }
+
+  F32 new_value_ratio = value_ratio;
+  UI_Box_data slider_main_data   = ui_box_data_from_box_prev_frame(slider_main_box);
+  UI_Actions slider_main_actions = ui_actions_from_box(slider_main_box);
+  if (slider_main_data.is_found)
+  {
+    V2F32 slider_main_box_origin = range_v2f32_x0y0(slider_main_data.on_screen_bbox);
+    V2F32 slider_main_box_dims   = range_v2f32_dims(slider_main_data.on_screen_bbox);
+    V2F32 mouse_pos              = ui_get_mouse_pos();
+    if (slider_main_actions.is_down)
+    {
+      new_value_ratio = reverse_lerp_f32(slider_main_data.on_screen_bbox.min.x, slider_main_data.on_screen_bbox.max.x, mouse_pos.x); 
+    }
+  }
+
+  F32 new_value = lerp_f32(value_range.min, value_range.max, new_value_ratio);
+  clamp_f32_inplace(&new_value, value_range.min, value_range.max);
+  return new_value;
+}
+
+///////////////////////////////////////////////////////////
+// ---- WORK IN PROGRESS FOR A TEXT INPUT FIELD
+//
 enum UI_Text_op_kind : U32 {  
   UI_Text_op_kind__NONE,
   UI_Text_op_kind__move_cursor,
@@ -604,36 +645,49 @@ void ui_text_edit_box(V2F32 px_dims, U8* text_buffer, U64 text_buffer_size, U64 
   ui_set_next_size_x(ui_px(px_dims.x));
   ui_set_next_size_y(ui_px(px_dims.y));
   ui_set_next_b_color(blue());
-  UI_Box* wrapper_box = ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__dont_draw_overflow);
+  UI_Box* wrapper_box = ui_box_make(Str8FromC("Text edit box id"), UI_Box_flag__has_background|UI_Box_flag__clip);
+  
+  UI_Box_data wrapper_box_data = ui_box_data_from_box_prev_frame(wrapper_box);
+
+  Str8 str_before_cursor = str8_substring(str8_manual(text_buffer, text_buffer_size), 0, cursor_pos);
+  V2F32 dims = fp_measure_text(str_before_cursor, font);
+  F32 cusror_width = 2.0f;
+  F32 buffer_zone_size = 20.0f;
+  F32 offset = 0.0f;
+  if (wrapper_box_data.is_found)
+  {
+    if (dims.x > px_dims.x - buffer_zone_size)
+    {
+      BP;
+      // todo: Adjest the clip here
+      F32 space_that_text_can_take = px_dims.x - buffer_zone_size - cusror_width;
+      offset = -1 * range_v2f32_dims(wrapper_box_data.on_screen_bbox).x - space_that_text_can_take;
+    }
+  }
+
   UI_Parent(wrapper_box)
   {
     // Drawing the text 
     ui_label(str8_manual(text_buffer, text_buffer_size));
 
-    // Drawing the cursor
-    Str8 str_before_cursor = str8_substring(str8_manual(text_buffer, text_buffer_size), 0, cursor_pos);
-    V2F32 dims = fp_measure_text(str_before_cursor, font);
     
-    F32 clip_offset = 0.0f;
-    if (dims.x > px_dims.x)
-    {
-      clip_offset = dims.x - px_dims.x - 2;
-    }
+    
+
+    wrapper_box->clip_data.clip_value[Axis2__x] = offset;
 
     ui_set_next_size_x(ui_px(px_dims.x));
     ui_set_next_size_y(ui_px(px_dims.y)); 
     ui_set_next_layout_axis(Axis2__x);
-    UI_Box* floating_box = ui_box_make(Str8{}, UI_Box_flag__floating);
-    // floating_box->clip_offset = clip_offset;
-    
-    UI_Parent(floating_box)
+    UI_Box* cursor_box = ui_box_make(Str8{}, UI_Box_flag__floating|UI_Box_flag__clip);
+    cursor_box->clip_data.clip_value[Axis2__x] = offset;
+    UI_Parent(cursor_box)
     {
       ui_spacer(ui_px(dims.x));
 
-      ui_set_next_size_x(ui_px(2));
+      ui_set_next_size_x(ui_px(cusror_width));
       ui_set_next_size_y(ui_px(px_dims.y));
       ui_set_next_b_color(red());
-      UI_Box* cursor_box = ui_box_make(Str8{}, UI_Box_flag__has_background);
+      UI_Box* cursor = ui_box_make(Str8{}, UI_Box_flag__has_background);
     }
   }
 }

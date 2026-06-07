@@ -252,6 +252,9 @@ F32 os_get_time_since_last_frame();
 OS_Event_list* os_get_frame_event_list();
 void os_consume_frame_event(OS_Event* event);
 
+// - Memory
+// TODO:
+
 // - Windowing
 V2F32 os_get_window_dims();
 V2F32 os_get_client_area_dims();

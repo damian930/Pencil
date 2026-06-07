@@ -39,6 +39,8 @@ V3F32 lerp_v3f32(V3F32 v0, V3F32 v1, F32 t) { return v3f32(lerp_f32(v0.x, v1.x, 
 V4F32 lerp_v4f32(V4F32 v0, V4F32 v1, F32 t) { return v4f32(lerp_f32(v0.x, v1.x, t), lerp_f32(v0.y, v1.y, t), lerp_f32(v0.z, v1.z, t), lerp_f32(v0.w, v1.w, t)); }
 F32 lerp(F32 v0, F32 v1, F32 t) { return lerp_f32(v0, v1, t); }
 
+F32 reverse_lerp_f32(F32 min, F32 max, F32 value) { return (value - min) / (max - min); }
+
 U64 u64_from_2_u32(U32 high_order_word, U32 low_order_word)
 {
 	U64 result = ((((U64)high_order_word) << 32) | low_order_word);

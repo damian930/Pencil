@@ -198,6 +198,43 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       // pencil_update(&P, !ui_has_active(), false);
     }
 
+    Str8 words[] = {
+    Str8FromC("apple"),    Str8FromC("bridge"),   Str8FromC("cloud"),
+    Str8FromC("dragon"),   Str8FromC("ember"),    Str8FromC("forest"),
+    Str8FromC("glacier"),  Str8FromC("harbor"),   Str8FromC("island"),
+    Str8FromC("jungle"),   Str8FromC("kettle"),   Str8FromC("lantern"),
+    Str8FromC("marble"),   Str8FromC("needle"),   Str8FromC("ocean"),
+    Str8FromC("pillar"),   Str8FromC("quartz"),   Str8FromC("raven"),
+    Str8FromC("saddle"),   Str8FromC("thunder"),  Str8FromC("umbrella"),
+    Str8FromC("valley"),   Str8FromC("walnut"),   Str8FromC("xenon"),
+    Str8FromC("yellow"),   Str8FromC("zipper"),   Str8FromC("anchor"),
+    Str8FromC("barrel"),   Str8FromC("candle"),   Str8FromC("dagger"),
+    Str8FromC("eclipse"),  Str8FromC("falcon"),   Str8FromC("goblin"),
+    Str8FromC("hammer"),   Str8FromC("inferno"),  Str8FromC("jackal"),
+    Str8FromC("kernel"),   Str8FromC("lemon"),    Str8FromC("magnet"),
+    Str8FromC("nomad"),    Str8FromC("orbit"),    Str8FromC("pebble"),
+    Str8FromC("quiver"),   Str8FromC("riddle"),   Str8FromC("saber"),
+    Str8FromC("tundra"),   Str8FromC("urchin"),   Str8FromC("viper"),
+    Str8FromC("whisper"),  Str8FromC("xerox"),    Str8FromC("yonder"),
+    Str8FromC("zenith"),   Str8FromC("acorn"),    Str8FromC("blizzard"),
+    Str8FromC("crater"),   Str8FromC("dungeon"),  Str8FromC("erosion"),
+    Str8FromC("fissure"),  Str8FromC("gravel"),   Str8FromC("horizon"),
+    Str8FromC("ignite"),   Str8FromC("javelin"),  Str8FromC("kelp"),
+    Str8FromC("lava"),     Str8FromC("mirage"),   Str8FromC("nexus"),
+    Str8FromC("obsidian"), Str8FromC("phantom"),  Str8FromC("quasar"),
+    Str8FromC("rubble"),   Str8FromC("sphinx"),   Str8FromC("totem"),
+    Str8FromC("uplift"),   Str8FromC("vertex"),   Str8FromC("warden"),
+    Str8FromC("xylem"),    Str8FromC("yak"),      Str8FromC("zephyr"),
+    Str8FromC("abyss"),    Str8FromC("beacon"),   Str8FromC("citadel"),
+    Str8FromC("debris"),   Str8FromC("epoch"),    Str8FromC("fjord"),
+    Str8FromC("geyser"),   Str8FromC("hydra"),    Str8FromC("inlet"),
+    Str8FromC("jolt"),     Str8FromC("knoll"),    Str8FromC("ledge"),
+    Str8FromC("mist"),     Str8FromC("nave"),     Str8FromC("opal"),
+    Str8FromC("prism"),    Str8FromC("quarry"),   Str8FromC("reef"),
+    Str8FromC("shard"),    Str8FromC("talon"),    Str8FromC("vault"),
+    Str8FromC("wraith"),
+};
+
     { // Testing the ui for text input 
       d_fill_with_color(black());
       DeferLoop(ui_begin_build(os_get_window_dims(), os_get_mouse_pos()), ui_end_build())
@@ -206,64 +243,66 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
         UI_PaddedBox(ui_px(100), Axis2__y)
         {
-          // todo: Slider that would make the clip larger for a box and basically scroll it and then 
-          //       the box will have boxes inside with color and when hovered will blit the screen with that color
-          V4F32 colors[] = { red(), green(), blue(), yellow(), pink(), teal(), orange(), taupe(), magenta() };
-          static F32 clip_value = -50.0f;
+          static F32 value = 50.0f;
+          value = ui_slider(Str8FromC("Slider id"), v2f32(200, 100), blue(), red(), value, { 0, 100 });
 
-          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+          ui_spacer(ui_px(25));
+
+          Arena* arena = arena_alloc(Megabytes(4));
+          U32* test_addr = ArenaPush(arena, U32);
+          BP;
+
+          ui_set_next_size_x(ui_px(200));
+          ui_set_next_size_y(ui_px(200));
+          ui_set_next_layout_axis(Axis2__y);
+          ui_set_next_b_color(v4f32(0.2, 0.2, 0.2, 1));
+          ui_set_next_border(1, red());
+          UI_Box* clip_box = ui_box_make(Str8FromC("Clip box"), UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
+          UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);
+          if (clip_box_data.is_found)
           {
-            if (ev->kind == OS_Event_kind__wheel)
+            // BP;
+            V2F32 dims = range_v2f32_dims(clip_box_data.on_screen_bbox);
+
+
+            clip_box->clip_data.clip_value[Axis2__y] = value;
+          }
+          
+          UI_Parent(clip_box)
+          {
+            for EachIndex(word_index, ArrayCount(words))
             {
-              clip_value += ev->wheel_event.scroll_data * 10;
+              UI_Size size = ui_px(800);
+              size.strictness = 0.0f;
+              ui_set_next_size_x(ui_px(100));
+              ui_set_next_size_y(size);
+              ui_box_make(Str8{}, 0);
+
+              // ui_label(words[word_index]);
             }
           }
-
-          UI_PaddedBox(ui_px(100), Axis2__x)
-          {
-            ui_set_next_size_x(ui_px(300));
-            ui_set_next_size_y(ui_px(200));
-            ui_set_next_b_color(white());
-            ui_set_next_layout_axis(Axis2__x);
-            UI_Box* wrapper = ui_box_make(Str8FromC("Test id"), UI_Box_flag__has_background|UI_Box_flag__clip);
-            wrapper->clip_data.clip_value[Axis2__x] = clip_value;
-
-            UI_Parent(wrapper)
-            {
-              for EachIndex(i, ArrayCount(colors))
-              {
-                ui_spacer(ui_px(25));
-
-                ui_set_next_size_x(ui_px(50));
-                ui_set_next_size_y(ui_px(50));
-                ui_set_next_b_color(colors[i]);
-                UI_Box* color_box = ui_box_make_f("%lld color_box", UI_Box_flag__has_background, i);
-                UI_Actions actions = ui_actions_from_box(color_box);
-                if (actions.is_hovered)
-                {
-                  d_fill_with_color(colors[i]);                  
-                }
-              }
-              ui_spacer(ui_px(25));
-            }
-          }
-
-          // { // Edit box
-          //   static U8 buffer[64]    = {};
-          //   static U64 buffer_count = 0;
-          //   static U64 cursor_pos   = 0;
-          //   static U64 section_pos  = 0;
-
-          //   Scratch scratch = get_scratch(0, 0);
-          //   {
-          //     UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
-          //     ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
-          //   }
-          //   end_scratch(&scratch);
-
-          //   ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
-          // }
         }
+
+        /*
+        UI_PaddedBox(ui_px(100), Axis2__y)
+        {
+          { // Edit box
+            static U8 buffer[64]    = {};
+            static U64 buffer_count = 0;
+            static U64 cursor_pos   = 0;
+            static U64 section_pos  = 0;
+
+            Scratch scratch = get_scratch(0, 0);
+            {
+              UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+              ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
+            }
+            end_scratch(&scratch);
+
+            ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
+          }
+        }
+        */
       }
       
       // d_fill_with_color(black());
