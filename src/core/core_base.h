@@ -728,7 +728,8 @@ tu_specific B32 __is_memory_zero(U8* p, U64 size)
 	}
 	return is_zero;
 }
-#define IsMemZero(var) __is_memory_zero((U8*)&var, sizeof(var)) 
+#define IsMemZero(var)    __is_memory_zero((U8*)&(var), sizeof((var))) 
+#define IsZeroStruct(var) IsMemZero(var)
 
 #define MemCopySafe(dest, src) \
 	do { \

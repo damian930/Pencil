@@ -73,12 +73,12 @@ V2F32 ui_get_mouse_pos() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 void ui_init()
 {
-  Arena* arena = arena_alloc(Megabytes(64));
+  Arena* arena = arena_alloc(Kilobytes(64), false, 0);
   _ui_g_context = ArenaPush(arena, UI_Context);
   _ui_g_context->context_arena = arena;
-  _ui_g_context->style_stacks_arena = arena_alloc(Megabytes(64));
+  _ui_g_context->style_stacks_arena = arena_alloc(Kilobytes(64), false, 0);
   for EachArrElement(i, _ui_g_context->build_arenas) { 
-    _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64)); 
+    _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), false, 0); 
   }
 
   _ui_g_context->root_box            = &_ui_g_zero_box;
@@ -101,9 +101,9 @@ void ui_init()
 void ui_release()
 {
   for EachArrElement(i, _ui_g_context->build_arenas) {
-    arena_release(_ui_g_context->build_arenas[i]);
+    arena_release(&_ui_g_context->build_arenas[i]);
   }
-  arena_release(_ui_g_context->context_arena);
+  arena_release(&_ui_g_context->context_arena);
   _ui_g_context = 0;
 }
 

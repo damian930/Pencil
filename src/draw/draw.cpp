@@ -18,12 +18,12 @@ D_State* d_get_state() { return &__d_g_state; }
 
 void d_init()
 {
-  __d_g_state.arena_for_draw_commands = arena_alloc(Megabytes(64));
+  __d_g_state.arena_for_draw_commands = arena_alloc(Kilobytes(64), false, 0);
 }
 
 void d_release() 
 { 
-  arena_release(__d_g_state.arena_for_draw_commands);
+  arena_release(&__d_g_state.arena_for_draw_commands);
   __d_g_state = D_State{};
 }
 

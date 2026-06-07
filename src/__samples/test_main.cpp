@@ -42,15 +42,7 @@ int main()
   // void* c_mem = os_mem_commit(r_mem, Kilobytes(4));
   // U32* test = (U32*)r_mem;
   // *test = 5;
-  OS_Mem_chunk mem_chunk = os_reserve_mem_chunck(2, false, 0);
-  B32 succ = os_commit_mem_pages_to_chunck(&mem_chunk, 1);
-  // B32 succ2 = os_commit_mem_pages_to_chunck(&mem_chunk, 1);
-  for EachIndex(i, mem_chunk.n_pages_commited * os_get_mem_page_size() + 1)
-  {
-    if (i == os_get_mem_page_size()) { os_commit_mem_pages_to_chunck(&mem_chunk, 1); }
-    U8* byte = (U8*)mem_chunk.base_p + i;
-    *byte = (U8)i;
-  }
   BP;
+
   return 0;
 }

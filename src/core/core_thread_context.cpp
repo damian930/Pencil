@@ -28,7 +28,7 @@ void allocate_thread_context()
   HandleLater(context->id <= s32_max);
   for EachIndex(i, ArrayCount(context->scrach_arenas_buffer))
   {
-    context->scrach_arenas_buffer[i] = arena_alloc(Megabytes(64));
+    context->scrach_arenas_buffer[i] = arena_alloc(Gigabytes(64), false, 0);
   }
 
   Assert(context->id != u64_max); // :))
@@ -40,7 +40,7 @@ void release_thread_context()
   Assert(context->is_initialised);
   for EachIndex(i, ArrayCount(context->scrach_arenas_buffer))
   {
-    arena_release(context->scrach_arenas_buffer[i]);
+    arena_release(&context->scrach_arenas_buffer[i]);
   }
   *context = Thread_context{};
 }

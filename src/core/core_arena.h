@@ -3,32 +3,28 @@
 
 #include "core/core_base.h"
 
+struct Mem_chunk {
+  void* base_p;
+  U64 n_pages_reserved;
+  U64 n_pages_commited;
+};
+
 struct Arena {
-  U8* base_p;
-  U64 bytes_allocated;
+  Mem_chunk mem_chunck;
   U64 metadata_size;
   U64 bytes_used;
 };
-// struct Arena {
-//   U8* base_p;
-//   U64 bytes_reserved;
-//   U64 bytes_commited;
-
-//   U64 metadata_size;
-//   U64 bytes_used;
-// };
 
 struct Temp_arena {
   Arena* arena;
   U64 stored_index;
 };
 
-#define ArenaMinAllocSize 1024 * 4 // todo: This might just be the macro from the os that specifies the size of a page to be allocated
-StaticAssert(ArenaMinAllocSize > sizeof(Arena)); // This is for meta data just in case
+global U64 __arena_g_page_size = Kilobytes(4);
 
 // - arena stuff
-tu_specific Arena* arena_alloc(U64 size_to_alloc);
-tu_specific void arena_release(Arena* arena);
+tu_specific Arena* arena_alloc(U64 size_to_reserve, B32 start_at_specific_page, U32 allocation_granulatity_index);
+tu_specific void arena_release(Arena** arena);
 
 tu_specific U8* arena_push_nozero(Arena* arena, U64 size_to_push);
 tu_specific U8* arena_push(Arena* arena, U64 size_to_push);

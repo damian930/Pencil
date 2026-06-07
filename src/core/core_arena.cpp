@@ -2,77 +2,75 @@
 #define BASE_CORE_ARENA_CPP
 
 #include "core/core_arena.h"
-
 #include "os/win32.cpp"
+
+#define ArenaMinAllocSize 1024 * 4 
+StaticAssert(ArenaMinAllocSize > sizeof(Arena)); // This is for meta data just in case
+
+// #ifndef __ArenaReserveMemChunk
+// StaticAssert(false, "Define from the os layer must be made to compile arena");
+// #endif
+
+// #ifndef __ArenaCommitMemPagesToChunk
+// StaticAssert(false, "Define from the os layer must be made to compile arena");
+// #endif
+
+// #ifndef __ ArenaDecommitMemPagesFromChunk
+// StaticAssert(false, "Define from the os layer must be made to compile arena");
+// #endif
+
+// #ifndef __ArenaReleaseMemChunk
+// StaticAssert(false, "Define from the os layer must be made to compile arena");
+// #endif
 
 ///////////////////////////////////////////////////////////
 // - arena stuff
 //
-Arena* arena_alloc(U64 size_to_alloc)
+Arena* arena_alloc(U64 size_to_reserve, B32 start_at_specific_page, U32 allocation_granulatity_index)
 {
-  if (size_to_alloc < ArenaMinAllocSize)
-  {
-    size_to_alloc = ArenaMinAllocSize;
-  }
-  U8* mem = (U8*)malloc(size_to_alloc);
-  if (!mem)
-  {
-    BreakPoint();
-    printf("Arena allocation failed, out of memory for malloc i guess.");
-    exit(1);
-  }
-  Arena* arena = (Arena*)mem;
-  arena->base_p = mem;
-  arena->bytes_allocated = size_to_alloc;
-  arena->metadata_size = sizeof(Arena); 
-  arena->bytes_used = arena->metadata_size;
+  if (size_to_reserve < ArenaMinAllocSize) { size_to_reserve = ArenaMinAllocSize; }
+
+  U64 n_pages_to_reserve = ((size_to_reserve + __arena_g_page_size - 1) / __arena_g_page_size);
+
+  Mem_chunk mem_chunk = os_reserve_mem_chunk(n_pages_to_reserve, start_at_specific_page, allocation_granulatity_index);
+  if (IsZeroStruct(mem_chunk)) { InvalidCodePath(); exit(1); }
+
+  B32 commit_succ = os_commit_mem_pages_to_chunk(&mem_chunk, 1);
+  if (!commit_succ) { InvalidCodePath(); exit(1); }
+
+  Arena* arena = (Arena*)mem_chunk.base_p;
+  arena->mem_chunck    = mem_chunk;
+  arena->metadata_size = sizeof(Arena);
+  arena->bytes_used    = sizeof(Arena);
   return arena;
 }
-/*
-Arena* arena_alloc(U64 n_bytes, B32 start_at_specific_page, U32 allocation_granulatity_index)
-{ 
-  if (n_bytes < ArenaMinAllocSize) { n_bytes = ArenaMinAllocSize; }
 
-  U64 page_size      = os_get_mem_page_size();
-  U64 n_pages_needed = ((n_bytes + page_size) / page_size) * page_size;
-  void* reserved_mem = os_mem_reserve_page(n_pages_needed, start_at_specific_page, allocation_granulatity_index);
-
-  if (reserved_mem == 0) { BP; exit(1);  }
-
-  os_mem_commit(mem, ArenaMinAllocSize);
-  if (!mem)
-  {
-    BreakPoint();
-    printf("Arena allocation failed. \n");
-    exit(1);
-  }
-  Arena* arena = (Arena*)mem;
-  arena->base_p          = (U8*)mem;
-  arena->bytes_allocated = size_to_alloc;
-  arena->metadata_size   = sizeof(Arena); 
-  arena->bytes_used      = arena->metadata_size;
-  return arena;
-}
-*/
-
-void arena_release(Arena* arena)
+void arena_release(Arena** arena)
 {
-  free(arena->base_p);
+  B32 succ = os_release_mem_chunk(&(*arena)->mem_chunck);
+  *arena = 0; 
+  if (!succ) { BP; }
 }
 
 U8* arena_push_nozero(Arena* arena, U64 size_to_push)
 {
-  // note: I have houd this too happend some times when you write some code with state for the first time.
-  //       You forget to init the arena. Debuggers dont show this very well, so i just added this.
-  if (arena == 0) { BreakPoint(); } 
-
-  if (arena->bytes_used + size_to_push > arena->bytes_allocated)
+  if (arena->bytes_used + size_to_push > arena->mem_chunck.n_pages_commited * __arena_g_page_size)
   {
-    BreakPoint();
-    printf("Attempted a push onto arena and there was no more memory on the arena left.");
-    exit(1);
+    U64 bytes_we_have_place_for      = (arena->mem_chunck.n_pages_commited * __arena_g_page_size) - arena->bytes_used;
+    U64 bytes_we_dont_have_place_for = size_to_push - bytes_we_have_place_for;
+
+    U64 pages_needed        = ((bytes_we_dont_have_place_for + __arena_g_page_size - 1) / __arena_g_page_size) * __arena_g_page_size;
+    U64 pages_we_can_commit = arena->mem_chunck.n_pages_reserved - arena->mem_chunck.n_pages_commited;
+
+    B32 succ = false;
+    if (pages_we_can_commit >= pages_needed)
+    {
+      succ = os_commit_mem_pages_to_chunk(&arena->mem_chunck, pages_needed);
+    }
+    if (!succ) { BP; exit(1); }
   }
-  U8* result_p = arena->base_p + arena->bytes_used;
+
+  U8* result_p = (U8*)arena->mem_chunck.base_p + arena->bytes_used;
   arena->bytes_used += size_to_push;
   return result_p;
 }
@@ -86,13 +84,13 @@ U8* arena_push(Arena* arena, U64 size_to_push)
 
 B32 arena_is_consumed(Arena* arena)
 {
-  B32 result = arena->bytes_used == arena->bytes_allocated;
+  B32 result = arena->bytes_used == (arena->mem_chunck.n_pages_commited * os_get_mem_page_size());
   return result;
 }
 
 B32 arena_can_fit(Arena* arena, U64 size)
 {
-  U64 bytes_left = arena->bytes_allocated - arena->bytes_used;
+  U64 bytes_left = (arena->mem_chunck.n_pages_commited * os_get_mem_page_size()) - arena->bytes_used;
   B32 result = (bytes_left >= size);
   return result; 
 }

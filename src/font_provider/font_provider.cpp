@@ -34,14 +34,14 @@ FP_State* fp_get_state()
 
 void fp_init()
 {
-  Arena* arena = arena_alloc(Megabytes(64));
+  Arena* arena = arena_alloc(Megabytes(64), false, 0);
   __fp_g_state = ArenaPush(arena, FP_State);
   __fp_g_state->state_arena = arena;
 }
 
 void fp_release()
 {
-  arena_release(__fp_g_state->state_arena);
+  arena_release(&__fp_g_state->state_arena);
   __fp_g_state = 0; 
 }
 

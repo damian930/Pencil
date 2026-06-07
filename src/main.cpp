@@ -248,14 +248,14 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
           ui_spacer(ui_px(25));
 
-          Arena* arena = arena_alloc(Megabytes(4));
+          Arena* arena = arena_alloc(Megabytes(4), true, 1);
           U32* test_addr = ArenaPush(arena, U32);
           BP;
 
           ui_set_next_size_x(ui_px(200));
           ui_set_next_size_y(ui_px(200));
           ui_set_next_layout_axis(Axis2__y);
-          ui_set_next_b_color(v4f32(0.2, 0.2, 0.2, 1));
+          ui_set_next_b_color(v4f32(0.2f, 0.2f, 0.2f, 1.0f));
           ui_set_next_border(1, red());
           UI_Box* clip_box = ui_box_make(Str8FromC("Clip box"), UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
           UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);

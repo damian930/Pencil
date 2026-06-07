@@ -24,9 +24,7 @@ struct OS_State {
   
   HINSTANCE app_instance;
   U64 perf_freq_count_per_sec;
-  U64 allocation_granularity;
-  U64 page_size;
-
+  
   Str8 path_to_system_fonts;
 
   // Single window data
@@ -44,17 +42,31 @@ struct OS_State {
   F32 start_time_for_this_frame;
 };
 
-global OS_State* __os_g_state = 0;
+// These are used for alloations. We need allocation to allocat the arena for the os layer.
+// For that reason we store them here and not inside the os layer state data.
+global U64 __os_g_allocation_granularity = Kilobytes(64);
+global U64 __os_g_page_size              = Kilobytes(4);
+global OS_State* __os_g_state            = 0;
 
 ///////////////////////////////////////////////////////////
 // - State
 //
 void os_init()
 {
-  Arena* arena = arena_alloc(Megabytes(64));
+  { // Getting things needed for allocations that we need to create state
+    SYSTEM_INFO info = {};
+    GetSystemInfo(&info);
+    __os_g_allocation_granularity = (U64)info.dwAllocationGranularity;
+    __os_g_page_size              = (U64)info.dwPageSize;
+  }
+
+  // Bootstraping the page size from the os to arena
+  __arena_g_page_size = __os_g_page_size;
+
+  Arena* arena = arena_alloc(Kilobytes(64), false, 0);
   __os_g_state = ArenaPush(arena, OS_State);
   __os_g_state->state_arena = arena; 
-
+  
   // Performance frequency
   LARGE_INTEGER freq_lr = {};
   BOOL succ = QueryPerformanceFrequency(&freq_lr); Assert(succ);
@@ -64,8 +76,6 @@ void os_init()
   {
     SYSTEM_INFO info = {};
     GetSystemInfo(&info);
-    __os_g_state->allocation_granularity = (U64)info.dwAllocationGranularity;
-    __os_g_state->page_size = (U64)info.dwPageSize;
   }
 
   // Getting the folder path in win32 to system fonts
@@ -76,8 +86,8 @@ void os_init()
     Str8 str = str8_from_wstr(__os_g_state->state_arena, wstr);
     __os_g_state->path_to_system_fonts = str;
   }
-
-  __os_g_state->frame_arena = arena_alloc(Megabytes(64));
+ 
+  __os_g_state->frame_arena = arena_alloc(Kilobytes(64), false, 0);
 }
 
 void os_release()
@@ -295,6 +305,114 @@ Str8 os_get_current_dir_path(Arena* arena)
 }
 
 ///////////////////////////////////////////////////////////
+// - Memory
+//
+Mem_chunk os_reserve_mem_chunk(U64 n_pages, B32 start_at_specific_page, U32 allocation_granulatity_index)
+{
+  OS_State* os_state = os_get_state();
+  
+  // todo: If i am not mistacke, we waste some space here by not checking if we reserve more than pages since
+  //       ganularity might be a couple of pages
+  void* v_alloc_addr = Null;
+  if (start_at_specific_page) {
+    v_alloc_addr = (void*)((allocation_granulatity_index + 1) * __os_g_allocation_granularity);
+  }
+  U64 bytes_to_reserve = n_pages * __os_g_page_size;
+  
+  void* mem = VirtualAlloc(v_alloc_addr, bytes_to_reserve, MEM_RESERVE, PAGE_NOACCESS);
+  
+  Mem_chunk result_mem_chunk = {};
+  {
+    MEMORY_BASIC_INFORMATION mem_info = {};
+    U64 vq_result = VirtualQuery(mem, &mem_info, sizeof(mem_info));
+    if (vq_result == sizeof(mem_info))
+    {
+      if (mem_info.RegionSize == bytes_to_reserve) {
+        result_mem_chunk.base_p           = mem;
+        result_mem_chunk.n_pages_reserved = n_pages;
+      }
+    }
+  }
+  return result_mem_chunk;
+}
+
+B32 os_commit_mem_pages_to_chunk(Mem_chunk* mem_chunk, U64 n_pages)
+{
+  if (mem_chunk == 0) { InvalidCodePath(); return false; }
+  if (mem_chunk->n_pages_reserved == mem_chunk->n_pages_commited) { return false; }
+
+  OS_State* os_state = os_get_state();
+
+  U64 pages_left_to_commit = mem_chunk->n_pages_reserved - mem_chunk->n_pages_commited;
+  if (n_pages > pages_left_to_commit) { InvalidCodePath(); n_pages = pages_left_to_commit; }
+
+  U64 bytes_to_commit = (mem_chunk->n_pages_commited + n_pages) * __os_g_page_size; 
+  void* mem = VirtualAlloc(mem_chunk->base_p, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
+
+  B32 succ = false;
+  if (mem != 0) // Failed to commit 
+  {
+    MEMORY_BASIC_INFORMATION mem_info = {};
+    U64 vq_result = VirtualQuery(mem_chunk->base_p, &mem_info, sizeof(mem_info));
+    if (vq_result == sizeof(mem_info)) 
+    {
+      if (mem_info.RegionSize == ((mem_chunk->n_pages_commited + n_pages) * __os_g_page_size)) {
+        succ = true;
+        mem_chunk->n_pages_commited += n_pages;
+      } 
+    } 
+  } 
+  return succ;
+}
+
+B32 os_decommit_mem_pages_from_chuck(Mem_chunk* mem_chunk, U64 n_pages)
+{
+  if (mem_chunk == 0) { InvalidCodePath(); return false; }
+  if (mem_chunk->n_pages_commited == 0) { InvalidCodePath(); return false; }
+
+  OS_State* os_state = os_get_state();
+  
+  if (n_pages > mem_chunk->n_pages_commited) { n_pages = mem_chunk->n_pages_commited; }
+
+  U64 n_pages_left_commited_after_decommition = mem_chunk->n_pages_commited - n_pages;
+  void* base_p_for_decommit_range             = (void*)((U64)mem_chunk->base_p + (n_pages_left_commited_after_decommition * __os_g_page_size));
+  U64 bytes_to_decommit                       = n_pages * __os_g_page_size; 
+  BOOL decommit_succ                          = VirtualFree(base_p_for_decommit_range, bytes_to_decommit, MEM_DECOMMIT);
+
+  if (decommit_succ) {
+    mem_chunk->n_pages_commited -= n_pages;
+  }
+  return decommit_succ;
+}
+
+B32 os_release_mem_chunk(Mem_chunk* mem_chunk)
+{
+  if (mem_chunk == 0) { InvalidCodePath(); return false; }
+
+  OS_State* os_state = os_get_state();
+  B32 release_succ = VirtualFree(mem_chunk->base_p, 0, MEM_RELEASE);
+  if (release_succ) {
+    *mem_chunk = Mem_chunk{};
+  }
+  return release_succ;
+}
+
+U64 os_get_mem_page_size()
+{
+  return __os_g_page_size;
+}
+
+// // Defines for core/Arena
+// #define __ArenaReserveMemChunk(n_pages, start_at_specific_page, allocation_granulatity_index) \
+//     os_reserve_mem_chunk((n_pages), (start_at_specific_page), (allocation_granulatity_index))
+// #define __ArenaCommitMemPagesToChunk(mem_chunk, n_pages) \
+//     os_commit_mem_pages_to_chunk((mem_chunk), (n_pages))
+// #define __ArenaDecommitMemPagesFromChunk(mem_chunk, n_pages) \
+//     os_decommit_mem_pages_from_chuck((mem_chunk), (n_pages))
+// #define __ArenaReleaseMemChunk(mem_chunk) \
+//     os_release_mem_chunk((mem_chunk))
+
+///////////////////////////////////////////////////////////
 // - Frame
 //
 void os_frame_begin()
@@ -406,95 +524,6 @@ void os_consume_frame_event(OS_Event* event)
     InvalidCodePath("What a bad api for real");
   }
 }
-
-///////////////////////////////////////////////////////////
-// - Memory
-//
-U64 os_get_mem_page_size()
-{
-  return os_get_state()->page_size;
-}
-
-U64 os_get_allocation_graularity()
-{
-  return os_get_state()->allocation_granularity;
-}
-
-struct OS_Mem_chunk {
-  void* base_p;
-  U64 n_pages_reserved;
-  U64 n_pages_commited;
-};
-
-OS_Mem_chunk os_reserve_mem_chunck(U64 n_pages, B32 start_at_specific_page, U32 allocation_granulatity_index)
-{
-  OS_State* os_state = os_get_state();
-  
-  void* v_alloc_addr = Null;
-  if (start_at_specific_page) {
-    v_alloc_addr = (void*)((allocation_granulatity_index + 1) * os_state->allocation_granularity);
-  }
-  U64 bytes_to_reserve = n_pages * os_state->page_size;
-  
-  void* mem = VirtualAlloc(v_alloc_addr, bytes_to_reserve, MEM_RESERVE, PAGE_NOACCESS);
-  
-  OS_Mem_chunk result_mem_chunk = {};
-  {
-    MEMORY_BASIC_INFORMATION mem_info = {};
-    U64 vq_result = VirtualQuery(mem, &mem_info, sizeof(mem_info));
-    if (vq_result == sizeof(mem_info))
-    {
-      if (mem_info.RegionSize == bytes_to_reserve) {
-        result_mem_chunk.base_p           = mem;
-        result_mem_chunk.n_pages_reserved = n_pages;
-      }
-    }
-  }
-  return result_mem_chunk;
-}
-
-B32 os_commit_mem_pages_to_chunck(OS_Mem_chunk* mem_chunk, U64 n_pages)
-{
-  OS_State* os_state = os_get_state();
-
-  if (mem_chunk->n_pages_reserved > mem_chunk->n_pages_reserved)  { InvalidCodePath(); return false; }
-  if (mem_chunk->n_pages_reserved == mem_chunk->n_pages_commited) { return false; }
-
-  U64 pages_left_to_commit = mem_chunk->n_pages_reserved - mem_chunk->n_pages_commited;
-  if (n_pages > pages_left_to_commit) { InvalidCodePath(); n_pages = pages_left_to_commit; }
-
-  U64 bytes_to_commit = (mem_chunk->n_pages_commited + n_pages) * os_state->page_size; 
-  void* mem = VirtualAlloc(mem_chunk->base_p, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
-
-  B32 succ = false;
-  if (mem != 0) // Failed to commit 
-  {
-    MEMORY_BASIC_INFORMATION mem_info = {};
-    U64 vq_result = VirtualQuery(mem_chunk->base_p, &mem_info, sizeof(mem_info));
-    if (vq_result == sizeof(mem_info)) 
-    {
-      if (mem_info.RegionSize == ((mem_chunk->n_pages_commited + n_pages) * os_state->page_size)) {
-        succ = true;
-        mem_chunk->n_pages_commited += n_pages;
-      }
-    }
-  }
-  return succ;
-}
-
-// void* os_mem_commit(void* , U64 bytes_to_commit)
-// {
-//   OS_State* os_state = os_get_state();
-
-//   // Rounding down the reserved mem to the page size for committing
-//   reserved_mem = (void*)(((U64)reserved_mem / os_state->page_size) * os_state->page_size);
-  
-//   // Rounding up to page_size
-//   bytes_to_commit = ((bytes_to_commit + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
-  
-//   void* result_mem = VirtualAlloc(reserved_mem, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
-//   return result_mem;
-// }
 
 ///////////////////////////////////////////////////////////
 // - Windowing

@@ -239,7 +239,12 @@ B32 os_file_write_end(OS_File file, Data_buffer buffer);
 Str8 os_get_current_dir_path(Arena* arena);
 #define OS_FileOpenClose(file_var_name, file_path, access_flags) DeferInitReleaseLoop(OS_File file_var_name = os_file_open(file_path, access_flags), os_file_close(&file_var_name))
 
-// - Frame
+// - Memory
+Mem_chunk os_reserve_mem_chunk(U64 n_pages, B32 start_at_specific_page, U32 allocation_granulatity_index);
+B32 os_commit_mem_pages_to_chunk(Mem_chunk* mem_chunk, U64 n_pages);
+B32 os_decommit_mem_pages_from_chuck(Mem_chunk* mem_chunk, U64 n_pages);
+B32 os_release_mem_chunk(Mem_chunk* mem_chunk);
+U64 os_get_mem_page_size();
 
 // note/todo: I dont really like this list api for events, i would rather it just be whatever and the caller just gets them and consumed them based
 //            on som api not like we have now. Maybe it would make sense to just have different calls like:
@@ -251,9 +256,6 @@ void os_frame_end();
 F32 os_get_time_since_last_frame();
 OS_Event_list* os_get_frame_event_list();
 void os_consume_frame_event(OS_Event* event);
-
-// - Memory
-// TODO:
 
 // - Windowing
 V2F32 os_get_window_dims();
