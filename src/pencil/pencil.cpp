@@ -26,7 +26,7 @@
 //
 void pencil_init(Pencil_state* P)
 {
-  P->frame_arena = arena_alloc(Megabytes(64));
+  P->frame_arena = arena_alloc(Megabytes(64), false, 0);
   
   P->current_mode = Pencil_mode__draw;
   
@@ -135,16 +135,14 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
     mouse_states[button].went_up   = false;
   }
   // Updating mouse frame data based on the new os frame events
-  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  for (OS_Event* event = os_get_frame_event_list()->first; event; event = event->next)
   {
-    OS_Event* event = os_get_state()->frame_events + i;
-    if (event->kind == OS_Event_kind__mouse && !event->is_consumed)
+    if (event->kind == OS_Event_kind__mouse)
     {
       Pencil_mouse_button_state* button = mouse_states + event->mouse_event.button;
       if (event->mouse_event.went_down) { button->went_down = true; button->is_down = true; button->is_up = false;}
       if (event->mouse_event.went_up) { button->went_up = true; button->is_up = true; button->is_down = false; }
-      
-      event->is_consumed = true;
+      os_consume_frame_event(event);
     }
   }
   //
@@ -174,30 +172,27 @@ void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse)
 
   }
   // Updating key frame data based on the new os frame events
-  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  for (OS_Event* event = os_get_frame_event_list()->first; event; event = event->next)
   {
-    OS_Event* event = os_get_state()->frame_events + i;
-    if (event->kind == OS_Event_kind__key && !event->is_consumed)
+    if (event->kind == OS_Event_kind__key)
     {
       Pencil_key_states* key = key_states + event->key_event.key;
       if (event->key_event.went_down) { key->went_down = true; key->is_down = true; key->is_up = false;}
       if (event->key_event.went_up) { key->went_up = true; key->is_up = true; key->is_down = false; }
       if (event->key_event.repeat_down) { key->repeat_down = true; }
-
-      event->is_consumed = true;
+      os_consume_frame_event(event);
     }
   }
   //
   //
   // Wheel stuff
   F32 wheel_scroll = 0.0f;
-  for (U64 i = 0; i < os_get_state()->frame_event_count; i += 1)
+  for (OS_Event* event = os_get_frame_event_list()->first; event; event = event->next)
   {
-    OS_Event* event = os_get_state()->frame_events + i;
-    if (event->kind == OS_Event_kind__wheel && event->is_consumed)
+    if (event->kind == OS_Event_kind__wheel)
     {
       wheel_scroll = event->wheel_event.scroll_data;
-      event->is_consumed = true;
+      os_consume_frame_event(event);
       break;
     }
   }
@@ -880,6 +875,88 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
   ui_end_build();
 }
 */
+
+void pencil_do_command_ui(Pencil_state* P, FP_Font font)
+{
+  if (!P->show_command_ui) { return; }
+  ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
+  ui_push_font(font);
+
+  static U8 buffer[64]    = {};
+  static U64 buffer_count = 0;
+  static U64 cursor_pos   = 0;
+  static U64 section_pos  = 0;
+
+  V4F32 nice_grey   = v4f32(0.15f, 0.17f, 0.20f, 1.0f);
+  V4F32 border_grey = v4f32(0.6980f, 0.7098f, 0.7373f, 1.0f);
+
+  UI_Col()
+  {
+    ui_spacer(ui_px(50));
+
+    UI_Row()
+    {
+      ui_spacer(ui_p_of_p(1.0f, 0.0f));    
+
+      Str8 command_box_wrapper_id              = Str8FromC("command_box_wrapper_id");
+      UI_Box_data command_box_wrapper_box_data = ui_box_data_from_box_id_prev_frame(command_box_wrapper_id);
+      
+      ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
+      ui_set_next_size_y(ui_children_sum());
+      ui_set_next_b_color(nice_grey);
+      UI_Box* box = ui_box_make(command_box_wrapper_id, UI_Box_flag__has_background);
+      UI_Parent(box)
+      {
+        F32 edit_box_width = range_v2f32_dims(command_box_wrapper_box_data.on_screen_bbox).x;
+        
+        UI_PaddedBox(ui_px(2), Axis2__y)
+        {
+          ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
+          ui_set_next_size_y(ui_children_sum());
+          ui_set_next_border(1, border_grey);
+          UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_borders))
+          {
+            UI_PaddedBox(ui_px(2), Axis2__x)
+            {
+              B32 text_done = ui_text_edit_box(Str8FromC("Text edit box for commnads"), edit_box_width, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
+              if (text_done)
+              {
+                run_command_from_name(P, str8_manual(buffer, buffer_count));
+              }
+            }
+          }
+        }
+      }
+
+      ui_spacer(ui_p_of_p(1.0f, 0.0f));    
+    }
+  }
+
+  /*
+  UI_PaddedBox(ui_px(100), Axis2__y)
+  {
+    { // Edit box
+      static U8 buffer[64]    = {};
+      static U64 buffer_count = 0;
+      static U64 cursor_pos   = 0;
+      static U64 section_pos  = 0;
+
+      Scratch scratch = get_scratch(0, 0);
+      {
+        UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+        ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
+      }
+      end_scratch(&scratch);
+
+      ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
+    }
+  }
+  */
+
+
+  ui_end_build();
+
+}
 
 ///////////////////////////////////////////////////////////
 // - Other

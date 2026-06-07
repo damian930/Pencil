@@ -253,7 +253,7 @@ U8 u8_from_key(Key key, B32 is_shift_down, B32* out_is_printable)
     key_print_data_arr[Key__d]             = {'d',  'D',  true};
     key_print_data_arr[Key__e]             = {'e',  'E',  true};
     key_print_data_arr[Key__f]             = {'f',  'F',  true};
-    key_print_data_arr[Key__g]             = {'P',  'P',  true};
+    key_print_data_arr[Key__g]             = {'g',  'G',  true};
     key_print_data_arr[Key__h]             = {'h',  'H',  true};
     key_print_data_arr[Key__i]             = {'i',  'I',  true};
     key_print_data_arr[Key__j]             = {'j',  'J',  true};
@@ -380,7 +380,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
   
   for (OS_Event* ev = event_list->first; ev; ev = ev->next)
   {
-    if (ev->kind == OS_Event_kind__key)
+    if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down))
     {
       switch (ev->key_event.key)
       {
@@ -637,59 +637,114 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
     clamp_u64_inplace(cursor_pos, 0, *current_text_size);
   }
 }
-
-void ui_text_edit_box(V2F32 px_dims, U8* text_buffer, U64 text_buffer_size, U64 cursor_pos, U64 section_pos)
+ 
+B32 ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
-  FP_Font font = ui_get_font();
+  FP_Font font                 = ui_get_font();
+  Str8 buffer_str              = str8_manual(text_buffer, *text_buffer_size);
+  UI_Box_data wrapper_box_data = ui_box_data_from_box_id_prev_frame(edit_box_id);
+  F32 font_height              = fp_get_font_height(font);
 
-  ui_set_next_size_x(ui_px(px_dims.x));
-  ui_set_next_size_y(ui_px(px_dims.y));
-  ui_set_next_b_color(blue());
-  UI_Box* wrapper_box = ui_box_make(Str8FromC("Text edit box id"), UI_Box_flag__has_background|UI_Box_flag__clip);
-  
-  UI_Box_data wrapper_box_data = ui_box_data_from_box_prev_frame(wrapper_box);
+  Str8 str_before_cursor = str8_front(buffer_str, *cursor_pos); 
+  F32 str_before_cursor_len = fp_measure_text(str_before_cursor, font).x;
 
-  Str8 str_before_cursor = str8_substring(str8_manual(text_buffer, text_buffer_size), 0, cursor_pos);
-  V2F32 dims = fp_measure_text(str_before_cursor, font);
-  F32 cusror_width = 2.0f;
-  F32 buffer_zone_size = 20.0f;
-  F32 offset = 0.0f;
-  if (wrapper_box_data.is_found)
+  // todo: Right now i am modifiying this here, but this shoud not modify it, but rather just display it
+  UI_Actions actions = ui_actions_from_id(edit_box_id);
+  if (ui_is_active_id(edit_box_id))
   {
-    if (dims.x > px_dims.x - buffer_zone_size)
+    Scratch scratch = get_scratch(0, 0);
     {
-      BP;
-      // todo: Adjest the clip here
-      F32 space_that_text_can_take = px_dims.x - buffer_zone_size - cusror_width;
-      offset = -1 * range_v2f32_dims(wrapper_box_data.on_screen_bbox).x - space_that_text_can_take;
+      UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+      ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
+    }
+    end_scratch(&scratch);
+
+    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+    {
+      if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__escape && ev->key_event.went_down)
+      {
+        ui_reset_active_id_match(edit_box_id);
+      }
     }
   }
 
+  F32 clip_offset = 0.0f;
+  clip_offset = (edit_box_width / 2) - str_before_cursor_len;
+
+  ui_set_next_size_x(ui_px(edit_box_width));
+  ui_set_next_size_y(ui_px(font_height));
+  ui_set_next_layout_axis(Axis2__x);
+  UI_Box* wrapper_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
+  wrapper_box->clip_data.clip_value[Axis2__x] = clip_offset;
+  wrapper_box->hold_active_after_mouse_up     = true;
   UI_Parent(wrapper_box)
   {
-    // Drawing the text 
-    ui_label(str8_manual(text_buffer, text_buffer_size));
+    ui_label(buffer_str);
 
-    
-    
-
-    wrapper_box->clip_data.clip_value[Axis2__x] = offset;
-
-    ui_set_next_size_x(ui_px(px_dims.x));
-    ui_set_next_size_y(ui_px(px_dims.y)); 
+    ui_set_next_size_x(ui_children_sum());
+    ui_set_next_size_y(ui_px(font_height));
     ui_set_next_layout_axis(Axis2__x);
-    UI_Box* cursor_box = ui_box_make(Str8{}, UI_Box_flag__floating|UI_Box_flag__clip);
-    cursor_box->clip_data.clip_value[Axis2__x] = offset;
-    UI_Parent(cursor_box)
+    UI_Box* cursor_section_box = ui_box_make(edit_box_id, UI_Box_flag__floating);
+    UI_Parent(cursor_section_box)
     {
-      ui_spacer(ui_px(dims.x));
+      U64 section_start = Min(*cursor_pos, *section_pos);
+      U64 section_end   = Max(*cursor_pos, *section_pos);
 
-      ui_set_next_size_x(ui_px(cusror_width));
-      ui_set_next_size_y(ui_px(px_dims.y));
-      ui_set_next_b_color(red());
-      UI_Box* cursor = ui_box_make(Str8{}, UI_Box_flag__has_background);
+      Str8 str_before_section_start = str8_substring(buffer_str, 0, section_start);
+      Str8 str_inside_section       = str8_substring(buffer_str, section_start, section_end);
+      Str8 str_after_section_end    = str8_substring(buffer_str, section_end, buffer_str.count);
+
+      F32 space_before_section_start = fp_measure_text(str_before_section_start, font).x; 
+      F32 space_inside_section       = fp_measure_text(str_inside_section, font).x; 
+      F32 space_after_section_end    = fp_measure_text(str_after_section_end, font).x; 
+
+      if (section_start == section_end)
+      {
+        ui_spacer(ui_px(space_before_section_start));
+      
+        if (ui_is_active_id(edit_box_id))
+        {
+          F32 cursor_size = 2.0f;
+          ui_set_next_size_x(ui_px(cursor_size));
+          ui_set_next_size_y(ui_px(font_height));
+          ui_set_next_b_color(blue());
+          UI_Box* cursor_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
+        }
+      }
+      else 
+      {
+        ui_spacer(ui_px(space_before_section_start));
+
+        if (ui_is_active_id(edit_box_id))
+        {
+          F32 cursor_size = 2.0f;
+          ui_set_next_size_x(ui_px(space_inside_section));
+          ui_set_next_size_y(ui_px(font_height));
+          ui_set_next_b_color(blue());
+          UI_Box* section_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
+          UI_Parent(section_box)
+          {
+            ui_label(str_inside_section);
+          }
+        }
+      }
     }
   }
+
+  B32 enter_pressed = false;
+  if (ui_is_active_id(edit_box_id))
+  {
+    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+    {
+      if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__enter)
+      {
+        enter_pressed = true;
+        os_consume_frame_event(ev);
+        break;
+      }
+    }
+  }
+  return enter_pressed;
 }
 
 

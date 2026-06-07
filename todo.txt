@@ -6,9 +6,6 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
-[ ] - switch to v alloc to have stable addresses and then see when the clip box 800 px on y box size changes to 2 px in size for y axis.
-[ ] - Have inner content size for clip boxes be working
-
 [ ] - Have the window be full screen. 
 [ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.
 [ ] - Try the app a bit and if it works then start making the ui for it.

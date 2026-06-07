@@ -41,8 +41,8 @@ abstract.
 #include "ui/widgets/ui_widgets.h"
 #include "ui/widgets/ui_widgets.cpp"
 
-// #include "pencil/pencil.h"
-// #include "pencil/pencil.cpp"
+#include "pencil/pencil.h"
+#include "pencil/pencil.cpp"
 
 void OutputDebugStringF(const char* fmt, ...);
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
@@ -149,9 +149,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   ///////////////////////////////////////////////////////////
   // - App loop
   //
-  // Pencil_state P = {}; 
-  // P.current_mode = Pencil_mode__draw;
-  // pencil_init(&P);
+  Pencil_state P = {}; 
+  P.current_mode = Pencil_mode__draw;
+  pencil_init(&P);
   
   // Testing and working on font provider
   FP_Font font = {};
@@ -176,7 +176,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   F64 prev_frame_duration_sec = 0.0;
   for (;!os_window_should_close();)
   {
-    // if (P.terminate_app) { break; }
+    if (P.terminate_app) { break; }
 
     F64 frame_start_time_sec = os_get_time_for_timing_sec();
     // OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
@@ -194,128 +194,16 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     { // UI and Application update 
       // pencil_do_ui(&P, font);
-      // pencil_update(&P, false);
+      pencil_do_command_ui(&P, font);
+      pencil_update(&P, ui_has_active());
       // pencil_update(&P, !ui_has_active(), false);
-    }
-
-    Str8 words[] = {
-    Str8FromC("apple"),    Str8FromC("bridge"),   Str8FromC("cloud"),
-    Str8FromC("dragon"),   Str8FromC("ember"),    Str8FromC("forest"),
-    Str8FromC("glacier"),  Str8FromC("harbor"),   Str8FromC("island"),
-    Str8FromC("jungle"),   Str8FromC("kettle"),   Str8FromC("lantern"),
-    Str8FromC("marble"),   Str8FromC("needle"),   Str8FromC("ocean"),
-    Str8FromC("pillar"),   Str8FromC("quartz"),   Str8FromC("raven"),
-    Str8FromC("saddle"),   Str8FromC("thunder"),  Str8FromC("umbrella"),
-    Str8FromC("valley"),   Str8FromC("walnut"),   Str8FromC("xenon"),
-    Str8FromC("yellow"),   Str8FromC("zipper"),   Str8FromC("anchor"),
-    Str8FromC("barrel"),   Str8FromC("candle"),   Str8FromC("dagger"),
-    Str8FromC("eclipse"),  Str8FromC("falcon"),   Str8FromC("goblin"),
-    Str8FromC("hammer"),   Str8FromC("inferno"),  Str8FromC("jackal"),
-    Str8FromC("kernel"),   Str8FromC("lemon"),    Str8FromC("magnet"),
-    Str8FromC("nomad"),    Str8FromC("orbit"),    Str8FromC("pebble"),
-    Str8FromC("quiver"),   Str8FromC("riddle"),   Str8FromC("saber"),
-    Str8FromC("tundra"),   Str8FromC("urchin"),   Str8FromC("viper"),
-    Str8FromC("whisper"),  Str8FromC("xerox"),    Str8FromC("yonder"),
-    Str8FromC("zenith"),   Str8FromC("acorn"),    Str8FromC("blizzard"),
-    Str8FromC("crater"),   Str8FromC("dungeon"),  Str8FromC("erosion"),
-    Str8FromC("fissure"),  Str8FromC("gravel"),   Str8FromC("horizon"),
-    Str8FromC("ignite"),   Str8FromC("javelin"),  Str8FromC("kelp"),
-    Str8FromC("lava"),     Str8FromC("mirage"),   Str8FromC("nexus"),
-    Str8FromC("obsidian"), Str8FromC("phantom"),  Str8FromC("quasar"),
-    Str8FromC("rubble"),   Str8FromC("sphinx"),   Str8FromC("totem"),
-    Str8FromC("uplift"),   Str8FromC("vertex"),   Str8FromC("warden"),
-    Str8FromC("xylem"),    Str8FromC("yak"),      Str8FromC("zephyr"),
-    Str8FromC("abyss"),    Str8FromC("beacon"),   Str8FromC("citadel"),
-    Str8FromC("debris"),   Str8FromC("epoch"),    Str8FromC("fjord"),
-    Str8FromC("geyser"),   Str8FromC("hydra"),    Str8FromC("inlet"),
-    Str8FromC("jolt"),     Str8FromC("knoll"),    Str8FromC("ledge"),
-    Str8FromC("mist"),     Str8FromC("nave"),     Str8FromC("opal"),
-    Str8FromC("prism"),    Str8FromC("quarry"),   Str8FromC("reef"),
-    Str8FromC("shard"),    Str8FromC("talon"),    Str8FromC("vault"),
-    Str8FromC("wraith"),
-};
-
-    { // Testing the ui for text input 
-      d_fill_with_color(black());
-      DeferLoop(ui_begin_build(os_get_window_dims(), os_get_mouse_pos()), ui_end_build())
-      {
-        ui_push_font(font);
-
-        UI_PaddedBox(ui_px(100), Axis2__y)
-        {
-          static F32 value = 50.0f;
-
-          ui_spacer(ui_px(25));
-
-          ui_set_next_size_x(ui_px(200));
-          ui_set_next_size_y(ui_px(200));
-          ui_set_next_layout_axis(Axis2__y);
-          ui_set_next_b_color(v4f32(0.2f, 0.2f, 0.2f, 1.0f));
-          // ui_set_next_border(1, red());
-          UI_Box* clip_box = ui_box_make(Str8FromC("Clip box"), UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
-          UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);
-          if (clip_box_data.is_found)
-          {
-            clip_box->clip_data.clip_value[Axis2__y] = -1.0f * value;
-          }
-
-          UI_Parent(clip_box)
-          {
-            ui_set_next_size_x(ui_px(10));
-            ui_set_next_size_y(ui_px(10));
-            ui_set_next_b_color(blue());
-            ui_box_make(Str8{}, UI_Box_flag__has_background);
-
-            for EachIndex(word_index, ArrayCount(words))
-            {
-              ui_label(words[word_index]);
-            }
-
-            ui_set_next_size_x(ui_px(10));
-            ui_set_next_size_y(ui_px(10));
-            ui_set_next_b_color(blue());
-            ui_box_make(Str8{}, UI_Box_flag__has_background);
-          }
-
-          ui_spacer(ui_px(50));
-
-          if (clip_box_data.is_found)
-          {
-            value = ui_slider(Str8FromC("Slider id"), v2f32(200, 100), blue(), red(), value, { 0, clip_box_data.inner_content_dims.y - range_v2f32_dims(clip_box_data.on_screen_bbox).y });
-          }
-        }
-
-        /*
-        UI_PaddedBox(ui_px(100), Axis2__y)
-        {
-          { // Edit box
-            static U8 buffer[64]    = {};
-            static U64 buffer_count = 0;
-            static U64 cursor_pos   = 0;
-            static U64 section_pos  = 0;
-
-            Scratch scratch = get_scratch(0, 0);
-            {
-              UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
-              ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
-            }
-            end_scratch(&scratch);
-
-            ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
-          }
-        }
-        */
-      }
-      
-      // d_fill_with_color(black());
-      // r_clear_target(window_frame_buffer_target, red());
-      ui_draw();
     }
 
     { // Rendering
       // r_clear_target(window_frame_buffer_target, transparent());
-      // pencil_render(&P);
-      // if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
+      r_clear_target(window_frame_buffer_target, black());
+      pencil_render(&P);
+      if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
     }
 
     r_submit(window_frame_buffer_target, d_get_batch_list());

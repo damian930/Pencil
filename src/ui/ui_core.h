@@ -35,8 +35,7 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__clip_x = (1 << 7), 
   UI_Box_flag__clip_y = (1 << 8), 
 
-  // UI_Box_flag__dont_draw_overflow_x = (1 << 9), 
-  // UI_Box_flag__dont_draw_overflow_y = (1 << 10), 
+  UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
 
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
@@ -140,6 +139,9 @@ struct UI_Box {
   UI_Box* prev_sibling;
   UI_Box* parent;
   U64 children_count;
+
+  // === TESTING SOME NEW ACTIVE THINGS FOR INPUTS
+  B32 hold_active_after_mouse_up;
 };
 
 struct UI_Box_data {

@@ -119,6 +119,9 @@ struct Pencil_state {
   // Font font_texture_for_ui;
   // V2U64 last_screen_dims;
   B32 show_brush_ui_menu;
+  
+  // MID DEV HERE 
+  B32 show_command_ui = true;
 };
 
 // - Main passes

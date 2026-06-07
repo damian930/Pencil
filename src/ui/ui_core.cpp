@@ -253,7 +253,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   Arena* arena = ui_get_build_arena();
   arena_clear(arena);
   
-  // Deep copying these since they are allocated on the old build arenas
+  // Deep copying these since they are allocated on the old build arena
   ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_interacted_with_box_id);
 
   // Pushing defaults onto the style stacks
@@ -513,7 +513,7 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
       accumelated_offset += child->final_on_screen_size.v[axis]; 
     }
 
-    if (!(child->flags & UI_Box_flag__floating_x<<axis))
+    if (!(child->flags & UI_Box_flag__floating_x<<axis) || (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating))
     {
       child->final_parent_offset.v[axis] += root->clip_data.clip_value[axis];
     }
@@ -652,19 +652,26 @@ B32 ui_is_active_id(Str8 box_id)
   return str8_match(ui_get_context()->currently_interacted_with_box_id, box_id, 0); 
 }
 
+B32 ui_is_box_active(UI_Box* box)
+{
+  return ui_is_active_id(box->id);
+}
+
 // void ui_set_active_id(Str8 box_id)
 // {
 //   UI_Context* context = ui_get_context();
 //   context->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), box_id);
 // }
 
-// void ui_reset_active_id_match(Str8 box_id)
-// {
-//   UI_Context* context = ui_get_context();
-//   if (str8_match(context->currently_active_box_id, box_id, 0)) {
-//     ui_reset_active();
-//   }
-// }
+void ui_reset_active_id_match(Str8 box_id)
+{
+  UI_Context* context = ui_get_context();
+  if (str8_match(context->currently_interacted_with_box_id, box_id, 0)) {
+    context->currently_interacted_with_box_id                       = {};
+    context->currently_interacted_with_box__is_down                 = {};
+    context->currently_interacted_with_box__left_box_while_was_down = {};
+  }
+}
 
 B32 ui_is_active_box(UI_Box* box)
 {
@@ -780,9 +787,11 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
       {
         // New box is interacted, so setting the state for it
         Assert(!was_down);
-        Assert(ctx->currently_interacted_with_box_id.count == 0); 
-        Assert(ctx->currently_interacted_with_box__is_down == false);
-        Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
+
+        // NOTE: I removed these cause now we might have boxes that keep active after mouse relased
+        // Assert(ctx->currently_interacted_with_box_id.count == 0); 
+        // Assert(ctx->currently_interacted_with_box__is_down == false);
+        // Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
 
         is_down = true;
         ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
@@ -818,10 +827,13 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         Assert(ctx->currently_interacted_with_box_id.count != 0);
         is_down = false;
 
-        // Resetting retained stuff
-        ctx->currently_interacted_with_box_id = Str8{};
-        ctx->currently_interacted_with_box__is_down = false;
-        ctx->currently_interacted_with_box__left_box_while_was_down = false;
+        if (!prev_frame_box->hold_active_after_mouse_up)
+        {
+          // Resetting retained stuff
+          ctx->currently_interacted_with_box_id = Str8{};
+          ctx->currently_interacted_with_box__is_down = false;
+          ctx->currently_interacted_with_box__left_box_while_was_down = false;
+        }
       }
     }
   }
