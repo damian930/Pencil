@@ -3,6 +3,8 @@
 
 #include "core/core_arena.h"
 
+#include "os/win32.cpp"
+
 ///////////////////////////////////////////////////////////
 // - arena stuff
 //
@@ -26,6 +28,32 @@ Arena* arena_alloc(U64 size_to_alloc)
   arena->bytes_used = arena->metadata_size;
   return arena;
 }
+/*
+Arena* arena_alloc(U64 n_bytes, B32 start_at_specific_page, U32 allocation_granulatity_index)
+{ 
+  if (n_bytes < ArenaMinAllocSize) { n_bytes = ArenaMinAllocSize; }
+
+  U64 page_size      = os_get_mem_page_size();
+  U64 n_pages_needed = ((n_bytes + page_size) / page_size) * page_size;
+  void* reserved_mem = os_mem_reserve_page(n_pages_needed, start_at_specific_page, allocation_granulatity_index);
+
+  if (reserved_mem == 0) { BP; exit(1);  }
+
+  os_mem_commit(mem, ArenaMinAllocSize);
+  if (!mem)
+  {
+    BreakPoint();
+    printf("Arena allocation failed. \n");
+    exit(1);
+  }
+  Arena* arena = (Arena*)mem;
+  arena->base_p          = (U8*)mem;
+  arena->bytes_allocated = size_to_alloc;
+  arena->metadata_size   = sizeof(Arena); 
+  arena->bytes_used      = arena->metadata_size;
+  return arena;
+}
+*/
 
 void arena_release(Arena* arena)
 {

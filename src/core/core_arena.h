@@ -9,22 +9,22 @@ struct Arena {
   U64 metadata_size;
   U64 bytes_used;
 };
+// struct Arena {
+//   U8* base_p;
+//   U64 bytes_reserved;
+//   U64 bytes_commited;
+
+//   U64 metadata_size;
+//   U64 bytes_used;
+// };
 
 struct Temp_arena {
   Arena* arena;
   U64 stored_index;
 };
 
-#define ArenaMinAllocSize 1024 * 4
-
-// I cant seem to find a good way to handle if the user or arena_alloc passes in a small value that 
-// the sizeof(arena) itself cant be allocated. I could have a callback thing set up that gets implemented
-// by the user, so if something fucks up, then something happends, but i am not sure about that. 
-// I dont want to just have to check for not being able to allocate in code.
-// If arena fails, this does mean by design that the arena size that got preallocated is wrong and 
-// therefore shoud be changed. But i also dont want to check for fail on arena creation ever.
-// This is not an issue when using VAlloc, cause it has a min allocation that is 4Kb. 
-// I am going to use something similar, Min size for allocations for arenas.
+#define ArenaMinAllocSize 1024 * 4 // todo: This might just be the macro from the os that specifies the size of a page to be allocated
+StaticAssert(ArenaMinAllocSize > sizeof(Arena)); // This is for meta data just in case
 
 // - arena stuff
 tu_specific Arena* arena_alloc(U64 size_to_alloc);

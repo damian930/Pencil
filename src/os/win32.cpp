@@ -410,38 +410,91 @@ void os_consume_frame_event(OS_Event* event)
 ///////////////////////////////////////////////////////////
 // - Memory
 //
-void* os_mem_reserve(U64 bytes_to_reserve, B32 start_at_specific_page, U32 allocation_granulatity_index)
+U64 os_get_mem_page_size()
+{
+  return os_get_state()->page_size;
+}
+
+U64 os_get_allocation_graularity()
+{
+  return os_get_state()->allocation_granularity;
+}
+
+struct OS_Mem_chunk {
+  void* base_p;
+  U64 n_pages_reserved;
+  U64 n_pages_commited;
+};
+
+OS_Mem_chunk os_reserve_mem_chunck(U64 n_pages, B32 start_at_specific_page, U32 allocation_granulatity_index)
 {
   OS_State* os_state = os_get_state();
   
   void* v_alloc_addr = Null;
-  if (start_at_specific_page)
-  {
-    U64 start_addr = (allocation_granulatity_index + 1) * os_state->allocation_granularity;
-    U64 rounded_down_address = (start_addr / os_state->allocation_granularity) * os_state->allocation_granularity;
-    v_alloc_addr = (void*)rounded_down_address;
+  if (start_at_specific_page) {
+    v_alloc_addr = (void*)((allocation_granulatity_index + 1) * os_state->allocation_granularity);
   }
+  U64 bytes_to_reserve = n_pages * os_state->page_size;
   
-  // Rounding up to page_size
-  bytes_to_reserve = ((bytes_to_reserve + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
+  void* mem = VirtualAlloc(v_alloc_addr, bytes_to_reserve, MEM_RESERVE, PAGE_NOACCESS);
   
-  void* result_mem = VirtualAlloc(v_alloc_addr, bytes_to_reserve, MEM_RESERVE, PAGE_NOACCESS);
-  return result_mem;
+  OS_Mem_chunk result_mem_chunk = {};
+  {
+    MEMORY_BASIC_INFORMATION mem_info = {};
+    U64 vq_result = VirtualQuery(mem, &mem_info, sizeof(mem_info));
+    if (vq_result == sizeof(mem_info))
+    {
+      if (mem_info.RegionSize == bytes_to_reserve) {
+        result_mem_chunk.base_p           = mem;
+        result_mem_chunk.n_pages_reserved = n_pages;
+      }
+    }
+  }
+  return result_mem_chunk;
 }
 
-void* os_mem_commit(void* reserved_mem, U64 bytes_to_commit)
+B32 os_commit_mem_pages_to_chunck(OS_Mem_chunk* mem_chunk, U64 n_pages)
 {
   OS_State* os_state = os_get_state();
 
-  // Rounding down the reserved mem to the page size for committing
-  reserved_mem = (void*)(((U64)reserved_mem / os_state->page_size) * os_state->page_size);
-  
-  // Rounding up to page_size
-  bytes_to_commit = ((bytes_to_commit + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
-  
-  void* result_mem = VirtualAlloc(reserved_mem, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
-  return result_mem;
+  if (mem_chunk->n_pages_reserved > mem_chunk->n_pages_reserved)  { InvalidCodePath(); return false; }
+  if (mem_chunk->n_pages_reserved == mem_chunk->n_pages_commited) { return false; }
+
+  U64 pages_left_to_commit = mem_chunk->n_pages_reserved - mem_chunk->n_pages_commited;
+  if (n_pages > pages_left_to_commit) { InvalidCodePath(); n_pages = pages_left_to_commit; }
+
+  U64 bytes_to_commit = (mem_chunk->n_pages_commited + n_pages) * os_state->page_size; 
+  void* mem = VirtualAlloc(mem_chunk->base_p, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
+
+  B32 succ = false;
+  if (mem != 0) // Failed to commit 
+  {
+    MEMORY_BASIC_INFORMATION mem_info = {};
+    U64 vq_result = VirtualQuery(mem_chunk->base_p, &mem_info, sizeof(mem_info));
+    if (vq_result == sizeof(mem_info)) 
+    {
+      if (mem_info.RegionSize == ((mem_chunk->n_pages_commited + n_pages) * os_state->page_size)) {
+        succ = true;
+        mem_chunk->n_pages_commited += n_pages;
+      }
+    }
+  }
+  return succ;
 }
+
+// void* os_mem_commit(void* , U64 bytes_to_commit)
+// {
+//   OS_State* os_state = os_get_state();
+
+//   // Rounding down the reserved mem to the page size for committing
+//   reserved_mem = (void*)(((U64)reserved_mem / os_state->page_size) * os_state->page_size);
+  
+//   // Rounding up to page_size
+//   bytes_to_commit = ((bytes_to_commit + os_state->page_size - 1) / os_state->page_size) * os_state->page_size;
+  
+//   void* result_mem = VirtualAlloc(reserved_mem, bytes_to_commit, MEM_COMMIT, PAGE_READWRITE);
+//   return result_mem;
+// }
 
 ///////////////////////////////////////////////////////////
 // - Windowing
