@@ -288,6 +288,8 @@ V2F32 fp_measure_text(Str8 str, FP_Font font)
 
 F32 fp_get_font_height(FP_Font font)
 {
+  if (IsZeroStruct(font)) { BP; return 0.0f; }
+  
   return font.ascent + font.descent;
 }
 

@@ -193,6 +193,7 @@ enum UI_Text_op_kind : U32 {
   UI_Text_op_kind__copy_section,
   UI_Text_op_kind__paste_at_cursor,
   UI_Text_op_kind__insert_char_at_cursor, 
+  UI_Text_op_kind__stop_editing, 
 };
 
 enum UI_Text_op_move_specifier : U32 {
@@ -207,6 +208,11 @@ enum UI_Text_op_move_specifier : U32 {
 
 struct UI_Text_op {
   UI_Text_op_kind kind;
+  
+  UI_Text_op* next;
+  UI_Text_op* prev;
+
+  OS_Event* opt_os_event;
 
   // Fat struct data
   U8 char_to_insert;               
@@ -215,11 +221,6 @@ struct UI_Text_op {
   B8 override_move_and_move_to_section_min_if_ending_section;
   B8 override_move_and_move_to_section_max_if_ending_section;
   UI_Text_op_move_specifier move_specifier;
-
-  UI_Text_op* next;
-  UI_Text_op* prev;
-
-  // todo: Store an event here or just consume an event from the os to never use it twice
 };
 
 struct UI_Text_op_list {
@@ -374,6 +375,10 @@ UI_Text_op* ui_text_op_list_push(Arena* arena, UI_Text_op_list* list, UI_Text_op
   return op;
 }
 
+// note: This right now creates a list from all the events that we have, which per frame is not a lot, just a couple
+//       with no regard for keys that might cancel the editing of the box. Right now such key is Key__espcape.
+//       Test op is created for it, but after it new ops are still made. This is not ideal, thought is fine. 
+//       I am more concerned with the fact that we cant customise it right now.
 UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* event_list)
 {
   UI_Text_op_list result_op_list = {};
@@ -387,6 +392,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
         case Key__left_arrow:
         {
           UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          move->opt_os_event = ev;
           if (ev->key_event.modifiers & OS_Event_modifier__shift) { move->keep_section_start_after_op = true; }
           if (ev->key_event.modifiers & OS_Event_modifier__control) { 
             move->move_specifier = UI_Text_op_move_specifier___move_1_word_left; 
@@ -400,6 +406,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
         case Key__right_arrow:
         {
           UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          move->opt_os_event = ev; 
           if (ev->key_event.modifiers & OS_Event_modifier__shift) { move->keep_section_start_after_op = true; }
           if (ev->key_event.modifiers & OS_Event_modifier__control) { 
             move->move_specifier = UI_Text_op_move_specifier___move_1_word_right; 
@@ -413,6 +420,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
         case Key__home:
         {
           UI_Text_op* op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          op->opt_os_event = ev;
           op->move_specifier = UI_Text_op_move_specifier___move_to_line_start;
           if (ev->key_event.modifiers & OS_Event_modifier__shift) { op->keep_section_start_after_op = true; }
         } break;
@@ -420,6 +428,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
         case Key__end:
         {
           UI_Text_op* op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+          op->opt_os_event = ev;
           op->move_specifier = UI_Text_op_move_specifier___move_to_line_end;
           if (ev->key_event.modifiers & OS_Event_modifier__shift) { op->keep_section_start_after_op = true; }
         } break;
@@ -437,7 +446,8 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
           }
 
           // Section deletion op
-          ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+          UI_Text_op* final_delete_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+          final_delete_op->opt_os_event = ev;
         } break;
 
         case Key__delete:
@@ -453,7 +463,15 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
           }
 
           // Section deletion op
-          ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+          UI_Text_op* final_delete_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+          final_delete_op->opt_os_event = ev;
+        } break;
+
+        // note: This is test code here, added this on 9th of June 2026
+        case Key__escape:
+        {
+          UI_Text_op* stop_edit_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__stop_editing);
+          stop_edit_op->opt_os_event = ev;
         } break;
 
         default:
@@ -461,18 +479,21 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
           if (ev->key_event.key == Key__c && ev->key_event.modifiers & OS_Event_modifier__control) // Copy
           {
             UI_Text_op* copy_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__copy_section);
+            copy_op->opt_os_event = ev;
             copy_op->keep_section_start_after_op = true;
           }
           else if (ev->key_event.key == Key__v && ev->key_event.modifiers & OS_Event_modifier__control) // Paste
           {
-            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
-            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__paste_at_cursor);
+            UI_Text_op* ______________ = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+            UI_Text_op* final_paste_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__paste_at_cursor);
+            final_paste_op->opt_os_event = ev;
           }
           else if (ev->key_event.key == Key__x && ev->key_event.modifiers & OS_Event_modifier__control) // Cut
           {
             UI_Text_op* copy_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__copy_section);
             copy_op->keep_section_start_after_op = true;
-            ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+            UI_Text_op* final_delete_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
+            final_delete_op->opt_os_event = ev;
           }
           else if (ev->key_event.key == Key__a && ev->key_event.modifiers & OS_Event_modifier__control) // Select all
           {
@@ -480,6 +501,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
             move_1->move_specifier = UI_Text_op_move_specifier___move_to_line_start;
 
             UI_Text_op* move_2 = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
+            move_2->opt_os_event = ev;
             move_2->move_specifier = UI_Text_op_move_specifier___move_to_line_end;
             move_2->keep_section_start_after_op = true;
           }
@@ -492,6 +514,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
             {
               ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__delete_section);
               UI_Text_op* insert_op = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__insert_char_at_cursor);
+              insert_op->opt_os_event = ev;
               insert_op->char_to_insert = ch;
             }
           }
@@ -504,6 +527,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
 
 void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start)
 {
+  B32 stop_editing = false;
   for (UI_Text_op* text_op = text_op_list.first; text_op != 0; text_op = text_op->next)
   {
     switch (text_op->kind)
@@ -628,6 +652,11 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
         
         end_scratch(&scratch);
       } break;
+
+      case UI_Text_op_kind__stop_editing:
+      {
+        stop_editing = true;
+      } break;
     }
 
     if (!text_op->keep_section_start_after_op) { *section_start = *cursor_pos; }
@@ -635,51 +664,35 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
     // Just in case
     Assert(0 <= *cursor_pos && *cursor_pos <= *current_text_size);
     clamp_u64_inplace(cursor_pos, 0, *current_text_size);
+
+    if (text_op->opt_os_event) { os_consume_frame_event(text_op->opt_os_event); }
+
+    if (stop_editing) { break; }
   }
 }
  
 void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
+  Scratch scratch              = get_scratch(0, 0);
   FP_Font font                 = ui_get_font();
-  Str8 buffer_str              = str8_manual(text_buffer, *text_buffer_size);
-  UI_Box_data wrapper_box_data = ui_box_data_from_box_id_prev_frame(edit_box_id);
+  Str8 text_buffer_str          = str8_manual(text_buffer, *text_buffer_size);
   F32 font_height              = fp_get_font_height(font);
+  UI_Box_data edit_box_data    = ui_box_data_from_box_id_prev_frame(edit_box_id);
+  UI_Actions edit_box_actions  = ui_actions_from_id(edit_box_id);
 
-  Str8 str_before_cursor = str8_front(buffer_str, *cursor_pos); 
+  Str8 str_before_cursor    = str8_front(text_buffer_str, *cursor_pos); 
   F32 str_before_cursor_len = fp_measure_text(str_before_cursor, font).x;
 
-  // todo: Right now i am modifiying this here, but this shoud not modify it, but rather just display it
-  UI_Actions actions = ui_actions_from_id(edit_box_id);
-  if (ui_is_id_active(edit_box_id))
-  {
-    Scratch scratch = get_scratch(0, 0);
-    {
-      UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
-      ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
-    }
-    end_scratch(&scratch);
-
-    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-    {
-      if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__escape && ev->key_event.went_down)
-      {
-        ui_reset_active_id_match(edit_box_id);
-      }
-    }
-  }
-
-  F32 clip_offset = 0.0f;
-  clip_offset = (edit_box_width / 2) - str_before_cursor_len;
-
+  // Making ui for the data the user passed in
   ui_set_next_size_x(ui_px(edit_box_width));
   ui_set_next_size_y(ui_px(font_height));
   ui_set_next_layout_axis(Axis2__x);
-  UI_Box* wrapper_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
-  wrapper_box->clip_data.clip_value[Axis2__x] = clip_offset;
-  wrapper_box->hold_active_after_mouse_up     = true;
-  UI_Parent(wrapper_box)
+  UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
+  edit_box->clip_data.clip_value[Axis2__x] = (edit_box_width / 2) - str_before_cursor_len;
+  edit_box->hold_active_after_mouse_up     = true;
+  UI_Parent(edit_box)
   {
-    ui_label(buffer_str);
+    ui_label(text_buffer_str);
 
     ui_set_next_size_x(ui_children_sum());
     ui_set_next_size_y(ui_px(font_height));
@@ -690,9 +703,9 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
       U64 section_start = Min(*cursor_pos, *section_pos);
       U64 section_end   = Max(*cursor_pos, *section_pos);
 
-      Str8 str_before_section_start = str8_substring(buffer_str, 0, section_start);
-      Str8 str_inside_section       = str8_substring(buffer_str, section_start, section_end);
-      Str8 str_after_section_end    = str8_substring(buffer_str, section_end, buffer_str.count);
+      Str8 str_before_section_start = str8_substring(text_buffer_str, 0, section_start);
+      Str8 str_inside_section       = str8_substring(text_buffer_str, section_start, section_end);
+      Str8 str_after_section_end    = str8_substring(text_buffer_str, section_end, text_buffer_str.count);
 
       F32 space_before_section_start = fp_measure_text(str_before_section_start, font).x; 
       F32 space_inside_section       = fp_measure_text(str_inside_section, font).x; 
@@ -729,8 +742,69 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
         }
       }
     }
-  };
+  }
 
+  // Updating a copy of the users data to return
+  if (ui_is_id_active(edit_box_id))
+  {
+    UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+    ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
+
+    static F32 text_relative_pos_after_cursor_change = -1.0f;
+    static F32 text_relative_pos               = -1.0f;
+    static B32 cursor_was_set                  = false;
+
+
+    if (edit_box_actions.is_down && edit_box_data.is_found)
+    {
+      F32 rel_mouse_x   = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x;
+      text_relative_pos = rel_mouse_x - edit_box_data.clip_offset.x;
+    }
+    else if (!edit_box_actions.is_down)
+    {
+      text_relative_pos_after_cursor_change = -1.0f;
+      text_relative_pos               = -1.0f;
+      cursor_was_set                  = false;
+    }
+
+    if (text_relative_pos > 0.0f)
+    {
+      if (!cursor_was_set) 
+      {
+        cursor_was_set = true;
+
+        U64 clicked_char_index_1_more = 0;
+        F32 offset                    = 0.0f;
+        for EachIndex(i, text_buffer_str.count)
+        {
+          F32 char_width = fp_measure_text(str8_manual(text_buffer_str.data + i, 1), font).x;
+          RangeF32 char_bbox = {};
+          char_bbox.min = offset;
+          char_bbox.max = offset + char_width;
+          offset += char_width;
+          if (range_f32_within(char_bbox, text_relative_pos))
+          {
+            clicked_char_index_1_more = i + 1;
+            break;
+          }
+        }
+
+        *cursor_pos  = clicked_char_index_1_more - 1;
+        *section_pos = clicked_char_index_1_more - 1;
+
+        Str8 new_before_cursor_str = str8_front(text_buffer_str, *cursor_pos);
+        text_relative_pos_after_cursor_change = fp_measure_text(text_buffer_str, font).x; 
+      }
+      else if (text_relative_pos - text_relative_pos_after_cursor_change > 5.0f) 
+      {
+        // todo: Dont forget to clamp coords here to the box
+        BP;
+      } 
+    }
+
+  }
+
+  end_scratch(&scratch);
 }
 
 

@@ -297,8 +297,8 @@ typedef double F64;
 								list->name_for_last_in_list->name_for_next_in_node = 0; \
 							} \
 							else { \
-								node_to_pop->name_for_prev_in_node->next = node_to_pop->name_for_next_in_node; \
-								node_to_pop->name_for_next_in_node->prev = node_to_pop->name_for_prev_in_node; \
+								node_to_pop->name_for_prev_in_node->name_for_next_in_node = node_to_pop->name_for_next_in_node; \
+								node_to_pop->name_for_next_in_node->name_for_prev_in_node = node_to_pop->name_for_prev_in_node; \
 							} \
 						}
 

@@ -148,6 +148,7 @@ struct UI_Box_data {
   B32 is_found;
   RangeV2F32 on_screen_bbox;
   V2F32 inner_content_dims;
+  V2F32 clip_offset;
 };
 
 struct UI_Context {
@@ -165,10 +166,9 @@ struct UI_Context {
   F32 mouse_x;
   F32 mouse_y;
   //
-  // This is like "active" in Casey Muratory terms
-  Str8 currently_interacted_with_box_id;
-  B32 currently_interacted_with_box__is_down;
-  B32 currently_interacted_with_box__left_box_while_was_down;
+  Str8 active_box_id;
+  B32 active_box__is_down;
+  B32 active_box__left_box_while_was_down;
   //
   Arena* style_stacks_arena; 
   //

@@ -952,13 +952,17 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
                   }
                   ui_spacer(ui_px(5));
 
-
                   // Doing some stuff with events
                   for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
                   {
                     if (ev->kind == OS_Event_kind__key)
                     {
-                      if (ev->key_event.key == Key__escape) { ui_reset_active_id_match(edit_box_id); }
+                      if (ev->key_event.key == Key__escape) { 
+                        ui_reset_active_id_match(edit_box_id); 
+                        buffer_count = 0;
+                        cursor_pos   = 0;
+                        section_pos  = 0;
+                      }
                       if (ev->key_event.key == Key__enter) {
                         run_command_from_name(P, filtered_commands.first->str);
                       }

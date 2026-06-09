@@ -254,7 +254,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   arena_clear(arena);
   
   // Deep copying these since they are allocated on the old build arena
-  ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->currently_interacted_with_box_id);
+  ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->active_box_id);
 
   // Pushing defaults onto the style stacks
   ui_push_flags(ctx->defaults.flags);
@@ -617,6 +617,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
     box_data.is_found           = true; 
     box_data.on_screen_bbox     = box->final_on_screen_bbox; 
     box_data.inner_content_dims = box->inner_content_dims;
+    box_data.clip_offset        = v2f32(box->clip_data.clip_value[Axis2__x], box->clip_data.clip_value[Axis2__y]) ;
   }
   return box_data;
 }
@@ -649,7 +650,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
 
 B32 ui_is_id_active(Str8 box_id)
 {
-  return str8_match(ui_get_context()->currently_interacted_with_box_id, box_id, 0); 
+  return str8_match(ui_get_context()->active_box_id, box_id, 0); 
 }
 
 B32 ui_is_box_active(UI_Box* box)
@@ -666,10 +667,10 @@ B32 ui_is_box_active(UI_Box* box)
 void ui_reset_active_id_match(Str8 box_id)
 {
   UI_Context* context = ui_get_context();
-  if (str8_match(context->currently_interacted_with_box_id, box_id, 0)) {
-    context->currently_interacted_with_box_id                       = {};
-    context->currently_interacted_with_box__is_down                 = {};
-    context->currently_interacted_with_box__left_box_while_was_down = {};
+  if (str8_match(context->active_box_id, box_id, 0)) {
+    context->active_box_id                       = {};
+    context->active_box__is_down                 = {};
+    context->active_box__left_box_while_was_down = {};
   }
 }
 
@@ -690,7 +691,7 @@ B32 ui_is_active_box(UI_Box* box)
 
 B32 ui_has_active()
 {
-  return str8_match(ui_get_context()->currently_interacted_with_box_id, Str8{}, 0);
+  return str8_match(ui_get_context()->active_box_id, Str8{}, 0);
 }
 
 // void ui_reset_active()
@@ -743,7 +744,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   F32 mouse_wheel_move        = 0.0f;
 
   B32 some_other_box_is_being_interacted_with = false;
-  if (ctx->currently_interacted_with_box_id.count != 0 && !str8_match(ctx->currently_interacted_with_box_id, prev_frame_box->id, 0))
+  if (ctx->active_box_id.count != 0 && !str8_match(ctx->active_box_id, prev_frame_box->id, 0))
   {
     some_other_box_is_being_interacted_with = true;
   }
@@ -759,16 +760,12 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   // no need to load hover, we get it each frame just from the box rect.
   if (!some_other_box_is_being_interacted_with)
   {
-    was_down                = ctx->currently_interacted_with_box__is_down;
-    left_box_while_was_down = ctx->currently_interacted_with_box__left_box_while_was_down;
-    // note: is_down is not set, it is calculated next
+    was_down                = ctx->active_box__is_down;
+    left_box_while_was_down = ctx->active_box__left_box_while_was_down;
 
     if (is_hovered && !was_down)
     {
-      // todo: Have to get the event here from the os and comsume it
-
       // note: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
-      // todo: The events api sucks right now, but if it works, i will make a better one
       B32 mouse_left_went_down = false;
       {
         OS_Event_list* events = os_get_frame_event_list();
@@ -788,14 +785,14 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         // New box is interacted, so setting the state for it
         Assert(!was_down);
 
-        // NOTE: I removed these cause now we might have boxes that keep active after mouse relased
-        // Assert(ctx->currently_interacted_with_box_id.count == 0); 
-        // Assert(ctx->currently_interacted_with_box__is_down == false);
-        // Assert(ctx->currently_interacted_with_box__left_box_while_was_down == false);
-
         is_down = true;
-        ctx->currently_interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
-        ctx->currently_interacted_with_box__is_down = true;
+        ctx->active_box__is_down = true;
+        if (str8_match(ctx->active_box_id, this_frames_box->id, 0)) {
+          // Keeping the id
+        } else {
+          ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
+        }
+        ctx->active_box__left_box_while_was_down = false;
       }
     }
     else if (was_down)
@@ -804,7 +801,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 
       if (!is_hovered && is_down) { 
         left_box_while_was_down = true; 
-        ctx->currently_interacted_with_box__left_box_while_was_down = true;
+        ctx->active_box__left_box_while_was_down = true;
       }
 
       // todo: The events api sucks right now, but if it works, i will make a better one
@@ -824,15 +821,15 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 
       if (mouse_left_went_up)
       {
-        Assert(ctx->currently_interacted_with_box_id.count != 0);
+        Assert(ctx->active_box_id.count != 0);
+        Assert(ctx->active_box__is_down);
+        
         is_down = false;
-
+        ctx->active_box__is_down                 = false;
+        ctx->active_box__left_box_while_was_down = false;
         if (!prev_frame_box->hold_active_after_mouse_up)
         {
-          // Resetting retained stuff
-          ctx->currently_interacted_with_box_id = Str8{};
-          ctx->currently_interacted_with_box__is_down = false;
-          ctx->currently_interacted_with_box__left_box_while_was_down = false;
+          ctx->active_box_id                       = Str8{};
         }
       }
     }
