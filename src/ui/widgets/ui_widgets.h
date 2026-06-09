@@ -683,6 +683,8 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
   Str8 str_before_cursor    = str8_front(text_buffer_str, *cursor_pos); 
   F32 str_before_cursor_len = fp_measure_text(str_before_cursor, font).x;
 
+  
+
   // Making ui for the data the user passed in
   ui_set_next_size_x(ui_px(edit_box_width));
   ui_set_next_size_y(ui_px(font_height));
@@ -749,60 +751,47 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
   {
     UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
     ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
-
-    static F32 text_relative_pos_after_cursor_change = -1.0f;
-    static F32 text_relative_pos               = -1.0f;
-    static B32 cursor_was_set                  = false;
-
-
-    if (edit_box_actions.is_down && edit_box_data.is_found)
-    {
-      F32 rel_mouse_x   = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x;
-      text_relative_pos = rel_mouse_x - edit_box_data.clip_offset.x;
-    }
-    else if (!edit_box_actions.is_down)
-    {
-      text_relative_pos_after_cursor_change = -1.0f;
-      text_relative_pos               = -1.0f;
-      cursor_was_set                  = false;
-    }
-
-    if (text_relative_pos > 0.0f)
-    {
-      if (!cursor_was_set) 
-      {
-        cursor_was_set = true;
-
-        U64 clicked_char_index_1_more = 0;
-        F32 offset                    = 0.0f;
-        for EachIndex(i, text_buffer_str.count)
-        {
-          F32 char_width = fp_measure_text(str8_manual(text_buffer_str.data + i, 1), font).x;
-          RangeF32 char_bbox = {};
-          char_bbox.min = offset;
-          char_bbox.max = offset + char_width;
-          offset += char_width;
-          if (range_f32_within(char_bbox, text_relative_pos))
-          {
-            clicked_char_index_1_more = i + 1;
-            break;
-          }
-        }
-
-        *cursor_pos  = clicked_char_index_1_more - 1;
-        *section_pos = clicked_char_index_1_more - 1;
-
-        Str8 new_before_cursor_str = str8_front(text_buffer_str, *cursor_pos);
-        text_relative_pos_after_cursor_change = fp_measure_text(text_buffer_str, font).x; 
-      }
-      else if (text_relative_pos - text_relative_pos_after_cursor_change > 5.0f) 
-      {
-        // todo: Dont forget to clamp coords here to the box
-        BP;
-      } 
-    }
-
   }
+
+  // static F32 has_initial_mouse_x_when_down = false;
+  // static F32 initial_mouse_x_when_down     = 0.0f;
+  if (edit_box_data.is_found)
+  {
+    if (edit_box_actions.is_down)
+    {
+      F32 new_cursor_pos_in_px_in_text = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x - edit_box_data.clip_offset.x;
+      
+      F32 accumulated_offset = 0.0f;
+      for EachIndex(i, text_buffer_str.count)
+      {
+        U64 new_cursor_index = *cursor_pos;
+        F32 char_width       = fp_measure_text(str8_substring(text_buffer_str, i, i + 1), font).x;
+        RangeF32 char_range  = range_f32_make(accumulated_offset, accumulated_offset + char_width);
+        accumulated_offset += char_width;
+        if (range_f32_within(char_range, new_cursor_pos_in_px_in_text))
+        {
+          F32 mouse_diff_inside_char = char_range.min - new_cursor_pos_in_px_in_text;
+          F32 ratio = abs_f32(mouse_diff_inside_char) / range_f32_length(char_range);
+          if (0.0f <= ratio && ratio <= 0.5f) { // go to the left
+            new_cursor_index = i;
+          } else if (0.5f < ratio && ratio <= 1.0f) { // go to the right
+            new_cursor_index = i + 1;
+          }
+          *cursor_pos = new_cursor_index;
+          if (!edit_box_actions.was_down) { *section_pos = new_cursor_index; }
+        }
+      }
+    }
+  }
+
+
+  // idea:
+  // For the first click you map where to put the cursor, you put it there
+  // then if the mouse is held down you wait till it is draged far enought and then
+  // you figure out the new cursor position and keep the old one as the section start.
+  // return this data to the user 
+  
+
 
   end_scratch(&scratch);
 }

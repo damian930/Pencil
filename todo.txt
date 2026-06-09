@@ -11,9 +11,10 @@
 [ ] - Try the app a bit and if it works then start making the ui for it.
       [ ] - Command input field.
             [ ] - Text edit box
+                  [ ] - Make it be a normal text input that starts from the left
                   [x] - Cursor placement
-                  [ ] - Double click select all but the first click deselects stuff
                   [ ] - Selection with cursor like on google
+                  [ ] - Double click select all but the first click deselects stuff
 
             [ ] - Box with possible commands
             [ ] - Have the commands that have shortcuts assigned to them show the shortcuts like in vscode 
