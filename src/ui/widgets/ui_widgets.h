@@ -390,7 +390,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
     {
       switch (ev->key_event.key)
       {
-        case Key__left_arrow:
+        case Key__arrow_left:
         {
           UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
           move->opt_os_event = ev;
@@ -404,7 +404,7 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
           } 
         } break;
 
-        case Key__right_arrow:
+        case Key__arrow_right:
         {
           UI_Text_op* move = ui_text_op_list_push(arena, &result_op_list, UI_Text_op_kind__move_cursor);
           move->opt_os_event = ev; 
@@ -672,7 +672,6 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
   }
 }
  
-/*
 void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
   U64 start_size = *text_buffer_size;
@@ -736,7 +735,6 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   ui_set_next_layout_axis(Axis2__x);
   UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
   edit_box->clip_data.clip_value[Axis2__x] = new_clip_offset;
-  edit_box->hold_active_after_mouse_up     = true;
   UI_Parent(edit_box)
   {
     ui_label(text_buffer_str);
@@ -760,7 +758,7 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
 
       ui_spacer(ui_px(space_before_section_start));
       
-      if (ui_is_id_active(edit_box_id))
+      if (ui_is_active_id(edit_box_id))
       {
         ui_set_next_size_x(ui_px(section_start == section_end ? cursor_size : space_inside_section + cursor_size));
         ui_set_next_size_y(ui_px(font_height));
@@ -777,7 +775,7 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   }
 
   // Updating a copy of the users data to return
-  if (ui_is_id_active(edit_box_id))
+  if (ui_is_active_id(edit_box_id))
   {
     UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
     ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
@@ -787,6 +785,8 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   {
     if (edit_box_actions.is_down)
     {
+      ui_set_active_id(edit_box_id);
+
       F32 new_cursor_pos_in_px_in_text = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x - edit_box_data.clip_offset.x;
       
       F32 accumulated_offset = 0.0f;
@@ -820,6 +820,5 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   
   end_scratch(&scratch);
 }
-*/
 
 #endif

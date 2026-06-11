@@ -40,6 +40,10 @@ void ui_spacer(UI_Size size)
 
 UI_Actions ui_button(Str8 str_id) // todo: Remove the fucking rli events from there dude
 {
+  // TODO: Since we now dont set active from is_down, the button wont reset active.
+  //       I am not fixing this yet, cause i am not sure if its a bug. I will come back here when i notice it 
+  //       and understand the issue a bit more. This is why i have this TODO here
+
   ui_push_size_x(ui_text_size());
   ui_push_size_y(ui_text_size());
   UI_Box* box = ui_box_make(str_id, UI_Box_flag__has_background|

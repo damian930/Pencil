@@ -46,6 +46,29 @@ void OutputDebugStringF(const char* fmt, ...)
   #endif
 }
 
+static Str8 commands[] = {
+    Str8FromC("help"),
+    Str8FromC("quit"),
+    Str8FromC("list"),
+    Str8FromC("clear"),
+    Str8FromC("reload"),
+    Str8FromC("status"),
+    Str8FromC("connect"),
+    Str8FromC("disconnect"),
+    Str8FromC("run"),
+    Str8FromC("stop"),
+    Str8FromC("pause"),
+    Str8FromC("resume"),
+    Str8FromC("save"),
+    Str8FromC("load"),
+    Str8FromC("export"),
+    Str8FromC("import"),
+    Str8FromC("config"),
+    Str8FromC("info"),
+    Str8FromC("debug"),
+    Str8FromC("version"),
+};
+
 int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 {
   // Layers we allocate for the runtime 
@@ -103,97 +126,66 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
-                DeferInitReleaseLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
+    DeferInitReleaseLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
     {
       ui_push_font(font);
 
-      // todo: Have this whole ui be under a drop down box that we then traverse as well
-      static struct {
-        B32 is_text_next_to_button;
-        
-        B32 is_check_box_checked;
-        
-        B32 is_radio_bool;
-        U64 curent_radio_bool;
-      } state = {};
-
-      ui_set_next_flags(UI_Box_flag__has_background);
-      ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
-      UI_Wrapper(Axis2__y)
+      UI_PaddedBox(ui_p_of_p(1, 0), Axis2__y)
       {
-        // UI_PaddedBox(ui_px(25), Axis2__y)
+        static U8 buffer[64]    = {};
+        static U64 buffer_count = 0;
+        static U64 cursor_pos   = 0;
+        static U64 section_pos  = 0;
+
+        static U64 index_of_selected_command = 0;
+
+        V4F32 nice_grey = v4f32(0.15f, 0.17f, 0.20f, 1.0f);
+
+        ui_set_next_flags(UI_Box_flag__has_background);
+        ui_set_next_b_color(nice_grey);
+        UI_PaddedBox(ui_px(3), Axis2__y);
         {
-          UI_Row()
+          ui_set_next_flags(UI_Box_flag__has_background);
+          ui_set_next_b_color(pink());
+          Str8 edit_box_id = Str8FromC("Text edit box");
+          ui_text_edit_box(0.0f, edit_box_id, 200, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
+          if (ui_is_active_id(edit_box_id))
           {
-            // Button
-            ui_set_next_b_color(blue());
-            UI_Actions button_actions = ui_button_f("Button##id");
-            if (button_actions.is_clicked) { state.is_text_next_to_button = ToggleBool(state.is_text_next_to_button); }
-            if (state.is_text_next_to_button) { 
-              ui_spacer(ui_px(10));
-              ui_label_f("__ Some text heer __"); 
-            }
-          }
-
-          ui_spacer(ui_px(5));
-
-          // Checkbox
-          UI_Row()
-          {
-            ui_set_next_size_x(ui_px(25));
-            ui_set_next_size_y(ui_px(25));
-            ui_set_next_b_color(red());
-            UI_Box* check_box = ui_box_make(Str8FromC("Check_box_button_id"), UI_Box_flag__has_background);
-            UI_Actions check_box_actions = ui_actions_from_box(check_box);
-            if (check_box_actions.went_down) {
-              state.is_check_box_checked = ToggleBool(state.is_check_box_checked);
-            }
-            else if (check_box_actions.is_down) { 
-              check_box->shape_style.vertex_colors[0].a = 0.25; 
-              check_box->shape_style.vertex_colors[1].a = 0.25; 
-              check_box->shape_style.vertex_colors[2].a = 0.25; 
-              check_box->shape_style.vertex_colors[3].a = 0.25; 
-            }
-            else if (check_box_actions.is_hovered) { 
-              check_box->shape_style.vertex_colors[0].a = 0.5; 
-              check_box->shape_style.vertex_colors[1].a = 0.5; 
-              check_box->shape_style.vertex_colors[2].a = 0.5; 
-              check_box->shape_style.vertex_colors[3].a = 0.5; 
-            }
-
-            if (state.is_check_box_checked) {
-              ui_set_b_color(check_box, green());
-              ui_spacer(ui_px(10));
-              ui_label_f("Checkbox checked");
-            }
-          }
-
-          ui_spacer(ui_px(5));
-
-          UI_Row()
-          {
-            // todo: when tab, just go to the next navigatable box
-
-            for EachIndex(i, 3)
+            for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
             {
-              UI_Row()
+              if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__arrow_up)
               {
-                ui_set_next_size_x(ui_px(15));
-                ui_set_next_size_y(ui_px(15));
-                ui_set_next_b_color((state.curent_radio_bool == i ? white() : blue()));
-                UI_Box* radio = ui_box_make_f("radio_button##%lld", UI_Box_flag__has_background, i);
-                UI_Actions radio_actions = ui_actions_from_box(radio);
-                if (radio_actions.went_down) {
-                  state.is_radio_bool = true;
-                  state.curent_radio_bool = i; 
-                }
-
-                ui_spacer(ui_px(5));
-
-                ui_label_f("radio_%lld", i);
+                if (index_of_selected_command > 0) { index_of_selected_command -= 1; } 
+                os_consume_frame_event(ev);
+                break;
               }
+              else if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__arrow_down) {
+                index_of_selected_command += 1;
+                if (index_of_selected_command == ArrayCount(commands)) { index_of_selected_command -= 1; }
+                os_consume_frame_event(ev);
+                break;
+              }
+            }
+          }
+        }
 
-              ui_spacer(ui_px(10));
+        ui_spacer(ui_px(10));
+
+        ui_set_next_flags(UI_Box_flag__has_background);
+        ui_set_next_b_color(red());
+        UI_Col()
+        {
+          for EachIndex(command_index, ArrayCount(commands))
+          {
+            Str8 command = commands[command_index];
+            if (str8_is_front(command, str8_manual(buffer, buffer_count), 0)) {
+              UI_Actions button_ac = ui_button(commands[command_index]);
+              if (button_ac.is_navigated) { BP; }
+              if (command_index == index_of_selected_command)
+              {
+                ui_set_b_color(button_ac.new_box, orange());
+              }
+              ui_spacer(ui_px(5));
             }
           }
         }

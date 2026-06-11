@@ -863,7 +863,10 @@ UI_Actions ui_actions_from_id(Str8 id)
 void ui_set_active_id(Str8 id)
 {
   UI_Context* ctx = ui_get_context();
+
+  // I guess this is how it is supposed to work, not sure about reset yet thought
   ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), id);
+  ctx->navigated_box_id = str8_copy_alloc(ui_get_build_arena(), id);
 }
 
 void ui_reset_active_id(Str8 id)
@@ -878,6 +881,18 @@ void ui_reset_active()
 {
   UI_Context* ctx = ui_get_context();
   ctx->active_box_id = Str8{};
+}
+
+B32 ui_is_active_id(Str8 id)
+{
+  if (id.count == 0) { return false; }
+  UI_Context* ctx = ui_get_context();
+  return str8_match(ctx->active_box_id, id, 0);
+}
+
+B32 ui_is_active_box(UI_Box* box)
+{
+  return ui_is_active_id(box->id);
 }
 
 void ui_set_b_color(UI_Box* box, V4F32 color)

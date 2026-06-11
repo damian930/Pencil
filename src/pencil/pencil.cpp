@@ -921,7 +921,7 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
               Str8 edit_box_id = Str8FromC("Text edit box for commnads");
               ui_text_edit_box(0.0f, edit_box_id, edit_box_width, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
               
-              if (ui_is_id_active(edit_box_id))
+              if (ui_is_active_id(edit_box_id))
               {
                 Str8 edit_box_str = str8_manual(buffer, buffer_count);
                 DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))

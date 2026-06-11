@@ -687,10 +687,10 @@ Key key_from_str8(Str8 str)
   else if (str8_match(Str8FromC("slash"), str, Str8_match__ignore_case))           { result_key = Key__slash; }
 
   // Special
-  else if (str8_match(Str8FromC("left_arrow"), str, Str8_match__ignore_case)) { result_key = Key__left_arrow; }
-  else if (str8_match(Str8FromC("right_arrow"), str, Str8_match__ignore_case)) { result_key = Key__right_arrow; }
-  else if (str8_match(Str8FromC("up_arrow"), str, Str8_match__ignore_case)) { result_key = Key__up_arrow; }
-  else if (str8_match(Str8FromC("down_arrow"), str, Str8_match__ignore_case)) { result_key = Key__down_arrow; }
+  else if (str8_match(Str8FromC("left_arrow"), str, Str8_match__ignore_case)) { result_key = Key__arrow_left; }
+  else if (str8_match(Str8FromC("right_arrow"), str, Str8_match__ignore_case)) { result_key = Key__arrow_right; }
+  else if (str8_match(Str8FromC("up_arrow"), str, Str8_match__ignore_case)) { result_key = Key__arrow_up; }
+  else if (str8_match(Str8FromC("down_arrow"), str, Str8_match__ignore_case)) { result_key = Key__arrow_down; }
   else if (str8_match(Str8FromC("home"), str, Str8_match__ignore_case)) { result_key = Key__home; }
   else if (str8_match(Str8FromC("end"), str, Str8_match__ignore_case)) { result_key = Key__end; }
   else if (str8_match(Str8FromC("page_up"), str, Str8_match__ignore_case)) { result_key = Key__page_up; }
@@ -772,10 +772,10 @@ Str8 str8_from_key(Key key)
   else if (key == Key__slash)         { result = Str8FromC("slash"); }
 
   // Special
-  else if (key == Key__left_arrow)  { result = Str8FromC("left_arrow"); }
-  else if (key == Key__right_arrow) { result = Str8FromC("right_arrow"); }
-  else if (key == Key__up_arrow)    { result = Str8FromC("up_arrow"); }
-  else if (key == Key__down_arrow)  { result = Str8FromC("down_arrow"); }
+  else if (key == Key__arrow_left)  { result = Str8FromC("left_arrow"); }
+  else if (key == Key__arrow_right) { result = Str8FromC("right_arrow"); }
+  else if (key == Key__arrow_up)    { result = Str8FromC("up_arrow"); }
+  else if (key == Key__arrow_down)  { result = Str8FromC("down_arrow"); }
   else if (key == Key__home)        { result = Str8FromC("home"); }
   else if (key == Key__end)         { result = Str8FromC("end"); }
   else if (key == Key__page_up)     { result = Str8FromC("page_up"); }
@@ -964,10 +964,10 @@ LRESULT win32_proc(
           case VK_DELETE:  { key = Key__delete;      } break;
           case VK_BACK:    { key = Key__backspace;   } break;
           case VK_TAB:     { key = Key__tab;         } break;
-          case VK_LEFT:    { key = Key__left_arrow;  } break;
-          case VK_UP:      { key = Key__up_arrow;    } break;
-          case VK_RIGHT:   { key = Key__right_arrow; } break;
-          case VK_DOWN:    { key = Key__down_arrow;  } break;
+          case VK_LEFT:    { key = Key__arrow_left;  } break;
+          case VK_UP:      { key = Key__arrow_up;    } break;
+          case VK_RIGHT:   { key = Key__arrow_right; } break;
+          case VK_DOWN:    { key = Key__arrow_down;  } break;
           case VK_SPACE:   { key = Key__space;       } break;
           case VK_ESCAPE:  { key = Key__escape;      } break;
           case VK_RETURN:  { key = Key__enter;       } break;

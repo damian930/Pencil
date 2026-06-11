@@ -109,10 +109,10 @@ enum Key : U32 {
   Key__slash,          // '/'   shifted: '?'
 
   // Other 
-  Key__left_arrow,
-  Key__right_arrow,
-  Key__up_arrow,
-  Key__down_arrow,
+  Key__arrow_left,
+  Key__arrow_right,
+  Key__arrow_up,
+  Key__arrow_down,
   Key__home,
   Key__end,
   Key__page_up,
