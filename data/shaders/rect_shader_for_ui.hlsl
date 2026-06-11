@@ -42,8 +42,8 @@ struct PixelInput {
   // todo: pass 4 differnt nointerpolation cor_rs
   nointerpolation float corner_radius  : CORNER_R;
   
-  float4 border_color      : RECT_BORDER_COLOR;
-  float border_thickness   : BORDER_THICH;
+  nointerpolation float4 border_color      : RECT_BORDER_COLOR;
+  nointerpolation float border_thickness   : BORDER_THICH;
   
   nointerpolation float softness           : SOFTNESS;
   
@@ -76,17 +76,18 @@ PixelInput vs_main(VertexInput vertex_input)
     float2(0.0, 1.0), float2(1.0, 1.0),
   };
   
-  // float2 bordered_rect_vertex_in_px = rect_vertex_in_px + ((rect_vertex_coords[vertex_input.vertex_id] * 2 - 1.0) * float2(vertex_input.rect_border_thickness, vertex_input.rect_border_thickness));; 
   float2 rect_vertex_in_px = rect_origin + (rect_vertex_coords[vertex_input.vertex_id] * rect_dims);
 
-  // todo: Find a way to have this not take 3 lines 
+  // note: I hate that this takes 3 lines
   float2 rect_vertex_in_ndc = (rect_vertex_in_px / vp_dims) * 2.0;
-  rect_vertex_in_ndc.x = rect_vertex_in_ndc.x - 1.0; 
-  rect_vertex_in_ndc.y = 1.0 - rect_vertex_in_ndc.y;
+  rect_vertex_in_ndc.x      = rect_vertex_in_ndc.x - 1.0; 
+  rect_vertex_in_ndc.y      = 1.0 - rect_vertex_in_ndc.y;
 
   float rect_vertex_corner_r[4];
-  rect_vertex_corner_r[0] = vertex_input.rect_corner_radius_00; rect_vertex_corner_r[1] = vertex_input.rect_corner_radius_10;
-  rect_vertex_corner_r[2] = vertex_input.rect_corner_radius_01; rect_vertex_corner_r[3] = vertex_input.rect_corner_radius_11;
+  rect_vertex_corner_r[0] = vertex_input.rect_corner_radius_00; 
+  rect_vertex_corner_r[1] = vertex_input.rect_corner_radius_10;
+  rect_vertex_corner_r[2] = vertex_input.rect_corner_radius_01; 
+  rect_vertex_corner_r[3] = vertex_input.rect_corner_radius_11;
   for (uint i = 0; i < 4; i += 1) { rect_vertex_corner_r[i] = clamp(rect_vertex_corner_r[i], 0.0, 1.0); }
 
   PixelInput pixel_input;
@@ -107,8 +108,7 @@ PixelInput vs_main(VertexInput vertex_input)
 
 float4 ps_main(PixelInput pixel_input) : SV_TARGET
 {
-  float2 pos_px = pixel_input.pos.xy;
-
+  float2 pos_px   = pixel_input.pos.xy;
   float2 pos_norm = (pos_px - pixel_input.rect_origin) / pixel_input.rect_dims; 
   
   float4 top_color    = lerp(pixel_input.vertex_color[UV__00], pixel_input.vertex_color[UV__10], pos_norm.x);
@@ -117,6 +117,14 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
   
   float softness = pixel_input.softness;
 
+  {
+    float radius_in_px     = pixel_input.corner_radius * (min(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0);
+    float rect_outline_sdf = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
+    float smoothed = 1.0 - smoothstep(0.5 - softness, softness+0.5, rect_outline_sdf);
+    final_color.a *= smoothed;
+  }
+
+  /*
   float rect_outline_smoothing = 1.0f;
   {
     float2 inner_rect_origin = pixel_input.rect_origin + float2(softness, softness);
@@ -126,7 +134,9 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
     float rect_outline_sdf = sdf_rounded_rect(inner_rect_origin, inner_rect_dims, pos_px, radius_in_px);
     rect_outline_smoothing = 1 - smoothstep(0, 1.4*softness, rect_outline_sdf);
   }
+  */
 
+  /*
   float rect_inner_smoothing = 1.0f;
   if (pixel_input.border_thickness != 0.0)
   {
@@ -142,13 +152,15 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
       // rect_inner_smoothing = smoothstep(-softness, softness, rect_outline_sdf);
       rect_inner_smoothing = 1 - smoothstep(-2*softness, 0.0, -rect_outline_sdf);
     }
-  }  
+  } 
+  */ 
+
+  return final_color;
 
   // note: This is removed here, since rect_outline_smoothing makes the borders look white at some places for some reason.
   //       I dont have the will to fix the shader to be honest, i have already spent so much time on it. 
   //       Imma leave it for later
   // final_color.a *= rect_outline_smoothing;
   // final_color.a *= rect_inner_smoothing;
-
-  return final_color;
+  // return final_color;
 }

@@ -181,6 +181,8 @@ struct UI_Context {
   //
   Str8 active_box_id;
   //
+  OS_Cursor final_cursor;
+  //
   Arena* style_stacks_arena; 
   //
   // Default style stacks

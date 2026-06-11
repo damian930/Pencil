@@ -357,6 +357,8 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 
   ctx->mouse_x = mouse_pos.x;
   ctx->mouse_y = mouse_pos.y;
+
+  ctx->final_cursor = OS_Cursor__arrow;
 }
 
 void ui_end_build()
@@ -365,6 +367,8 @@ void ui_end_build()
   ui_pop_parent();
   ui_layout_box(ctx->root_box, Axis2__x);
   ui_layout_box(ctx->root_box, Axis2__y);
+
+  os_set_cursor(ctx->final_cursor);
 }
 
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
@@ -902,6 +906,12 @@ void ui_set_b_color(UI_Box* box, V4F32 color)
   box->shape_style.vertex_colors[UV__01] = color;
   box->shape_style.vertex_colors[UV__10] = color;
   box->shape_style.vertex_colors[UV__11] = color;
+}
+
+void ui_set_cursor(OS_Cursor cursor) 
+{
+  UI_Context* ctx = ui_get_context();
+  ctx->final_cursor = cursor;
 }
 
 ///////////////////////////////////////////////////////////

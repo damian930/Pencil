@@ -223,6 +223,7 @@ D3D11_INPUT_ELEMENT_DESC __r_g_texture_program_input_assembler_element_desc[] =
   { "SRC_RECT_SIZE",    0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, src_rect_size),    D3D11_INPUT_PER_INSTANCE_DATA, 1 },
   { "SRC_TEXTURE_DIMS", 0, DXGI_FORMAT_R32G32_FLOAT,       0, TypeFieldOffset(R_Texture_instance_data, src_texture_dims), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
 };
+// TODO: I am not sure if this is still a thing, remove if not
 D3D11_INPUT_ELEMENT_DESC __r_g_line_program_input_assembler_element_desc[] = 
 {
   { "LINE_COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 0, TypeFieldOffset(R_Line_instance_data, color), D3D11_INPUT_PER_INSTANCE_DATA, 1 },
