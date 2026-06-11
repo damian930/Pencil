@@ -6,6 +6,13 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
+[ ] - A way to restrict or allow hover of other elements when we are down on some box and we hover another. For this there should be a general logic, either hover is alowed or not, then we just add a way to have a different logic happend. That is why i said "either"
+[ ] - Remove hot right now
+[ ] - Add active id to the thing
+[ ] - See how you gonna do actions, does it have to have an id, or maybe some sort of flag, or maybe both
+[ ] - Test if is_down and is_active is the same for button
+[ ] - Test if is_down and is_active is not the same for non default boxes
+
 [ ] - Try to make a list with some buttons that you can hover and click and tab
 [ ] - Directories support from win32
 [ ] - UI might have identical ids, that is not great, in debug might be a good idea to check the ids and report if they are the same and then turn that off for release mode.

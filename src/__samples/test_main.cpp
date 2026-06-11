@@ -138,15 +138,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       {
         if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__tab && ev->key_event.went_down)
         {
-          if (!is_navigated_id_index) {
-            is_navigated_id_index = true;
-            navigated_id_index = 0;
-          } else {
-            navigated_id_index += 1;
-          }
+          is_navigated_id_index = true;
+          navigated_id_index += 1;
 
           if (navigated_id_index >= ArrayCount(ids)) {
-            is_navigated_id_index = false;
             navigated_id_index = 0;
           }
 
@@ -174,22 +169,25 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
                 Scratch scratch    = get_scratch(0, 0);
                 Str8 button_id     = ids[i];
                 UI_Actions actions = ui_actions_from_id(button_id);
-                
-                ui_set_next_b_color(red());
-                if (is_navigated_id_index && i == navigated_id_index && actions.is_hovered) {
-                  ui_set_next_b_color(green());
+
+                ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
+                if (is_navigated_id_index && navigated_id_index == i) {
+                  ui_set_active_id(button_id);
+                  OutputDebugStringF("Button done via navigation \n");
                 }
-                else if (is_navigated_id_index && i == navigated_id_index) { ui_set_next_b_color(orange()); }
-                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(0.5, 0, 1, 1)); }
-                else if (actions.is_down) { ui_set_next_b_color(v4f32(0.75, 0, 1, 1)); }
-                ui_set_next_size_y(ui_px(50));
-                ui_set_next_size_x(ui_px(100));
+
+                if (actions.is_active) {
+                  ui_set_next_b_color(orange());
+                }
+                else if (actions.is_down) {
+                  is_navigated_id_index = false;
+                  navigated_id_index = i;
+                  ui_set_active_id(button_id);
+                  OutputDebugStringF("Button done \n");
+                }
+                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(0.75, 0.75, 0.75, 1.0)); }
                 ui_button(button_id);
-                if (actions.is_clicked)
-                {
-                  OutputDebugStringF("%lld \n", i);
-                }
-    
+
                 ui_spacer(ui_px(5));
     
                 end_scratch(&scratch);
@@ -197,6 +195,22 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
             }
           }
         }
+      }
+
+      ui_spacer(ui_px(25));
+
+      ui_set_next_size_x(ui_px(100));
+      ui_set_next_size_y(ui_px(100));
+      ui_set_next_b_color(red());
+      UI_Actions button = ui_button(Str8FromC("Button other"));
+      if (button.is_down)
+      {
+        ui_set_active_id(button.new_box->id);
+        ui_set_b_color(button.new_box, green());
+        is_navigated_id_index = false;
+      } 
+      else {
+        ui_reset_active_id(button.new_box->id);
       }
     }
 

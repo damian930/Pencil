@@ -672,6 +672,7 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
   }
 }
  
+/*
 void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
   U64 start_size = *text_buffer_size;
@@ -819,6 +820,6 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   
   end_scratch(&scratch);
 }
-
+*/
 
 #endif

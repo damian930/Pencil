@@ -224,24 +224,26 @@ UI_Box* ui_get_parent()
   return ui_get_context()->current_parent_box;
 }
 
-UI_Box* find_hoverd_child_for_box(UI_Box* box)
-{
-  if (ui_box_is_zero(box)) { return &__ui_g_zero_box; }
+// note: This was used to find the most inner child that is hovered to set hot_box when we had hot boxes
+// 
+// UI_Box* find_hoverd_child_for_box(UI_Box* box)
+// {
+//   if (ui_box_is_zero(box)) { return &__ui_g_zero_box; }
 
-  // Hover is on this substree
-  UI_Box* result_box = &__ui_g_zero_box;
-  if (range_v2f32_within(box->final_on_screen_bbox, ui_get_mouse_pos()))
-  {
-    if (box->id.count != 0 && box->flags & UI_Box_flag__hoverable) { result_box = box; }
-    for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-    {
-      UI_Box* hovered_box_inside_children = find_hoverd_child_for_box(child);
-      if (!ui_box_is_zero(hovered_box_inside_children)) { result_box = hovered_box_inside_children; }
-    }
-  }
+//   // Hover is on this substree
+//   UI_Box* result_box = &__ui_g_zero_box;
+//   if (range_v2f32_within(box->final_on_screen_bbox, ui_get_mouse_pos()))
+//   {
+//     if (box->id.count != 0 && box->flags & UI_Box_flag__hoverable) { result_box = box; }
+//     for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+//     {
+//       UI_Box* hovered_box_inside_children = find_hoverd_child_for_box(child);
+//       if (!ui_box_is_zero(hovered_box_inside_children)) { result_box = hovered_box_inside_children; }
+//     }
+//   }
 
-  return result_box;
-}
+//   return result_box;
+// }
 
 void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 {
@@ -269,9 +271,8 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   arena_clear(arena);
   
   // Deep copying these since they are allocated on the old build arena
-  ctx->hot_box_id    = str8_copy_alloc(ui_get_build_arena(), ctx->hot_box_id);
-  ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->active_box_id);
-  ctx->navigated_id  = str8_copy_alloc(ui_get_build_arena(), ctx->navigated_id);
+  ctx->interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->interacted_with_box_id); 
+  ctx->active_box_id          = str8_copy_alloc(ui_get_build_arena(), ctx->active_box_id); 
 
   // Pushing defaults onto the style stacks
   ui_push_flags(ctx->defaults.flags);
@@ -296,12 +297,6 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 
   ctx->mouse_x = mouse_pos.x;
   ctx->mouse_y = mouse_pos.y;
-
-  // if (ctx->hot_on_mouse)
-  {
-    // This is the same as a global is_hovere id, not more than that
-    ctx->hot_box_id = find_hoverd_child_for_box(ctx->prev_frame_root_box)->id;
-  }
 }
 
 void ui_end_build()
@@ -645,83 +640,6 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
   return box_data;
 }
 
-// UI_Box_clip_data ui_get_box_clip_data_prev_frame(Str8 id)
-// {
-//   UI_Box_clip_data result_data = {};
-//   result_data.clip_offset = &_ui_g_clip_offset_stub;
-  
-//   UI_Box* box = ui_get_box_prev_frame(id);
-//   result_data.is_found = !ui_box_is_zero(box);
-//   if (result_data.is_found)
-//   {
-//     result_data.on_screen_dims = rect_dims(box->final_on_screen_rect);
-    
-//     result_data.content_dims = {};
-//     for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-//     {
-//       Axis2 axis = box->layout_axis;
-//       V2F32 child_dims = rect_dims(child->final_on_screen_rect);
-//       result_data.content_dims.v[axis] += child_dims.v[axis];
-//       axis = axis2_other(axis);
-//       result_data.content_dims.v[axis] = Max(result_data.content_dims.v[axis], child_dims.v[axis]);
-//     }
-
-//     result_data.clip_offset = &box->clip_offset;
-//   }
-//   return result_data;
-// } 
-
-B32 ui_is_id_active(Str8 box_id)
-{
-  return str8_match(ui_get_context()->active_box_id, box_id, 0); 
-}
-
-B32 ui_is_box_active(UI_Box* box)
-{
-  return ui_is_id_active(box->id);
-}
-
-// void ui_set_active_id(Str8 box_id)
-// {
-//   UI_Context* context = ui_get_context();
-//   context->currently_active_box_id = str8_copy_alloc(ui_get_build_arena(), box_id);
-// }
-
-void ui_reset_active_id_match(Str8 box_id)
-{
-  UI_Context* context = ui_get_context();
-  if (str8_match(context->active_box_id, box_id, 0)) {
-    context->active_box_id                       = {};
-    context->active_box__is_down                 = {};
-    context->active_box__left_box_while_was_down = {};
-  }
-}
-
-B32 ui_is_active_box(UI_Box* box)
-{
-  return ui_is_id_active(box->id);
-}
-
-// void ui_set_active_box(UI_Box* box)
-// {
-//   return ui_set_active_id(box->id);
-// }
-
-// void ui_reset_active_box_match(UI_Box* box)
-// {
-//   ui_reset_active_id_match(box->id);
-// }
-
-B32 ui_has_active()
-{
-  return str8_match(ui_get_context()->active_box_id, Str8{}, 0);
-}
-
-// void ui_reset_active()
-// {
-//   ui_get_context()->currently_active_box_id = Str8{};
-// }
-
 /* IDEAS ABOUT ACTIONS FOR POSSIBLE LATER:
   - Right now hover and active work very simply. The caller just asks for the events,
     the call then checks the boxe's rect and does hover and if mosue is down the active logic.
@@ -745,53 +663,53 @@ B32 ui_has_active()
 */
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 {
+  // TODO: You have to use a scissor rect here and then to recursive intersections if any parent in the tree for the box has clip flags set
+
   UI_Actions* result_actions = &this_frames_box->actions;
   if (this_frames_box->has_been_updated_this_build) { return *result_actions; }
   
-  // TODO: Right now its weird, figure out what box you want to return
-
   this_frames_box->has_been_updated_this_build = true;
-  result_actions->box = this_frames_box;
-  
-  if (this_frames_box->id.count == 0) { return *result_actions; } // We dont update a box that doesnt have id on it
-  
+    
+  // We dont update a box that doesnt have id on it
+  if (this_frames_box->id.count == 0) { return *result_actions; } 
+      
+  // We dont update boxes that are created this frame and were not present last frame
+  UI_Box* prev_frames_box = ui_get_box_prev_frame(this_frames_box->id);
+  if (ui_box_is_zero(prev_frames_box)) { Assert(IsZeroStruct(*result_actions)); *result_actions; } 
+
   UI_Context* ctx = ui_get_context();
-  
-  // todo: You have to use a scissor rect here and then to recursive intersections if any parent in the tree for the box has clip flags set
-  UI_Box* prev_frame_box = ui_get_box_prev_frame(this_frames_box->id);
-  if (ui_box_is_zero(prev_frame_box)) { return {}; } // We dont update boxes that are created this frame and were not present last frame
 
   // Data to get
   B32 is_hovered              = false;
   B32 is_down                 = false;
   B32 was_down                = false;
   B32 left_box_while_was_down = false;
-  // B32 is_navigated            = false;
-  F32 mouse_wheel_move        = 0.0f;
+  B32 is_active               = false;
 
-  B32 some_other_box_is_being_interacted_with = false;
-  if (ctx->active_box_id.count != 0 && !str8_match(ctx->active_box_id, prev_frame_box->id, 0))
-  {
-    some_other_box_is_being_interacted_with = true;
-  }
+  B32 some_other_box_is_being_interacted_with = (
+    ctx->interacted_with_box_id.count != 0 // There is a box that is interacted with right now
+    &&
+    !str8_match(ctx->interacted_with_box_id, prev_frames_box->id, 0) // We are not the box that is interacted with right now
+  );
 
-  is_hovered = str8_match(ctx->hot_box_id, this_frames_box->id, 0);
+  // TODO: Here only usethe visible rect for boxes 
+  //       This should know to not use the boxes inside clip elements that are clipped of the screen
+  //       Right now this is not done, cause i am taking care of other things and cant test this yet.
+  is_hovered = range_v2f32_within(prev_frames_box->final_on_screen_bbox, ui_get_mouse_pos());
 
-
-  // note:
   // Either there is no active box or we are the active box
-  // Since active box is retained, we just load the retained state of actions,
-  // no need to load hover, we get it each frame just from the box rect.
+  // Since interacted box data is retained across frame boundary, 
+  // we just load the retained state and possibly update it here.
+  // No need to load hover, we get it each frame just from the box rect.
   if (!some_other_box_is_being_interacted_with)
   {
-    was_down                = ctx->active_box__is_down;
-    left_box_while_was_down = ctx->active_box__left_box_while_was_down;
+    was_down                = ctx->interacted_with_box_id__is_mouse_down;
+    left_box_while_was_down = ctx->interacted_with_box_id__did_mouse_leave_box_while_was_down;
 
-
-    if (is_hovered && !was_down)
+    if (is_hovered && !was_down) // Mouse is up, check if we it goes down
     {
       // note: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
-      // B32 is_double_down       = false;
+      //       Might be nice to use mouse_pos from the prev frame or somethign like that, for now it should be fine
       B32 mouse_left_went_down = false;
       {
         OS_Event_list* events = os_get_frame_event_list();
@@ -800,7 +718,6 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
           if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.button == Mouse_button__left && ev->mouse_event.went_down)
           {
             mouse_left_went_down = true;
-            // is_double_down = ev->mouse_event.double_down;
             os_consume_frame_event(ev);
           }
         }
@@ -810,26 +727,24 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
       {
         // New box is interacted, so setting the state for it
         Assert(!was_down);
+        Assert(!left_box_while_was_down);
+        Assert(!ctx->interacted_with_box_id__is_mouse_down);
+        Assert(!ctx->interacted_with_box_id__did_mouse_leave_box_while_was_down);
+        Assert(str8_match(ctx->interacted_with_box_id, Str8{}, 0));
 
         is_down = true;
-        ctx->active_box__is_down = true;
-        if (str8_match(ctx->active_box_id, this_frames_box->id, 0)) {
-          // Keeping the id
-        } else {
-          ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
-        }
-        ctx->active_box__left_box_while_was_down = false;
+        ctx->interacted_with_box_id__is_mouse_down = true;
+        ctx->interacted_with_box_id__did_mouse_leave_box_while_was_down = false;
+        ctx->interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), this_frames_box->id);
       }
-
-      // if (mouse_left_went_down) { double_down = true; }
     }
-    else if (was_down)
+    else if (was_down) 
     {
-      is_down = was_down;
+      is_down = true;
 
       if (!is_hovered && is_down) { 
         left_box_while_was_down = true; 
-        ctx->active_box__left_box_while_was_down = true;
+        ctx->interacted_with_box_id__did_mouse_leave_box_while_was_down = true;
       }
 
       // todo: The events api sucks right now, but if it works, i will make a better one
@@ -849,30 +764,29 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
 
       if (mouse_left_went_up)
       {
-        Assert(ctx->active_box_id.count != 0);
-        Assert(ctx->active_box__is_down);
-        
+        Assert(was_down);
+        Assert(ctx->interacted_with_box_id__is_mouse_down);
+
         is_down = false;
-        ctx->active_box__is_down                 = false;
-        ctx->active_box__left_box_while_was_down = false;
-        if (!prev_frame_box->hold_active_after_mouse_up)
-        {
-          ctx->active_box_id                       = Str8{};
-        }
+        ctx->interacted_with_box_id__is_mouse_down                      = false;
+        ctx->interacted_with_box_id__did_mouse_leave_box_while_was_down = false;
+        ctx->interacted_with_box_id = Str8{};
       }
     }
   }
 
-  result_actions->box                     = prev_frame_box;
-  result_actions->is_hovered              = is_hovered;
-  result_actions->is_down                 = is_down;
-  result_actions->was_down                = was_down;
+  is_active = str8_match(ctx->active_box_id, this_frames_box->id, 0);
+
+  result_actions->old_box                 = prev_frames_box;            
+  result_actions->new_box                 = this_frames_box;            
+  result_actions->is_hovered              = is_hovered;            
+  result_actions->is_down                 = is_down;               
+  result_actions->was_down                = was_down;              
   result_actions->left_box_while_was_down = left_box_while_was_down;
   result_actions->is_clicked              = was_down && !is_down && !left_box_while_was_down;
   result_actions->went_down               = !was_down && is_down;
-  result_actions->went_up                 = was_down && !is_down;
-  // result_actions->is_navigated            = is_navigated;
-  result_actions->wheel_move              = mouse_wheel_move;
+  result_actions->went_up                 = was_down && !is_down;  
+  result_actions->is_active               = is_active;
 
   return *result_actions;
 }
@@ -883,6 +797,38 @@ UI_Actions ui_actions_from_id(Str8 id)
   UI_Box* box = ui_get_box_prev_frame(id);
   if (!ui_box_is_zero(box)) { actions = ui_actions_from_box(box); }
   return actions;
+}
+
+///////////////////////////////////////////////////////////
+// - Some new stuff that is yet unstructured
+//
+void ui_set_active_id(Str8 id)
+{
+  UI_Context* ctx = ui_get_context();
+  ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), id);
+}
+
+void ui_reset_active_id(Str8 id)
+{
+  UI_Context* ctx = ui_get_context();
+  if (str8_match(ctx->active_box_id, id, 0)) {
+    ui_reset_active();
+  }
+}
+
+void ui_reset_active()
+{
+  UI_Context* ctx = ui_get_context();
+  ctx->active_box_id = Str8{};
+}
+
+void ui_set_b_color(UI_Box* box, V4F32 color)
+{
+  if (ui_box_is_zero(box)) { return; }
+  box->shape_style.vertex_colors[UV__00] = color;
+  box->shape_style.vertex_colors[UV__01] = color;
+  box->shape_style.vertex_colors[UV__10] = color;
+  box->shape_style.vertex_colors[UV__11] = color;
 }
 
 ///////////////////////////////////////////////////////////

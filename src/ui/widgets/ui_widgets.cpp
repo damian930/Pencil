@@ -45,8 +45,7 @@ UI_Actions ui_button(Str8 str_id) // todo: Remove the fucking rli events from th
   UI_Box* box = ui_box_make(str_id, UI_Box_flag__has_background|
                                     UI_Box_flag__has_text_contents|
                                     UI_Box_flag__has_rounded_corners|
-                                    UI_Box_flag__has_borders|
-                                    UI_Box_flag__hoverable);
+                                    UI_Box_flag__has_borders);
   UI_Actions actions = ui_actions_from_box(box);
   return actions;
 }

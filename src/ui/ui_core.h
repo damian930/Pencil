@@ -37,7 +37,7 @@ enum UI_Box_flag : U32 {
 
   UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
 
-  UI_Box_flag__hoverable = (1 << 10), 
+  // UI_Box_flag__hoverable = (1 << 10), 
 
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
@@ -75,23 +75,22 @@ struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_f
 struct UI_Box;
 
 struct UI_Actions {
-  UI_Box* box;
+  UI_Box* old_box;
+  UI_Box* new_box;
   
-  // Basics
-  B32 is_hovered;
-  B32 is_down;
-  B32 was_down;
-  B32 left_box_while_was_down;
+  // Lower level actions
+  B32 is_hovered;              // This is fine for all the boxes, id is not needed, no state is needed
+  B32 is_down;                 // Cross frame state is needed, id to track if the box is the same between frames is needed
+  B32 was_down;                // Cross frame state is needed, id to track if the box is the same between frames is needed
+  B32 left_box_while_was_down; // Cross frame state is needed, id to track if the box is the same between frames is needed
+  //
+  // Composed for quick use
+  B32 is_clicked; // These are composed, so we need cross frame state and id
+  B32 went_down;  // These are composed, so we need cross frame state and id
+  B32 went_up;    // These are composed, so we need cross frame state and id
 
-  // B32 is_navigated;
-
-  // Composed
-  B32 is_clicked;
-  B32 went_down;
-  B32 went_up;
-
-  // Other
-  F32 wheel_move;
+  // Higher level actions
+  B32 is_active; 
 };
 
 typedef void (*UI_Box_custom_draw_func_type) (UI_Box* box);
@@ -120,7 +119,8 @@ struct UI_Box {
   UI_Box_custom_draw_func_type custom_draw_func;
   void* custom_draw_data;
 
-  Str8 id; // Per build  
+  // Per build  
+  Str8 id; 
   B32 has_been_updated_this_build;
   UI_Actions actions;
 
@@ -147,7 +147,7 @@ struct UI_Box {
   U64 children_count;
 
   // === TESTING SOME NEW ACTIVE THINGS FOR INPUTS
-  B32 hold_active_after_mouse_up;
+  // B32 hold_active_after_mouse_up;
 };
 
 struct UI_Box_data {
@@ -172,11 +172,11 @@ struct UI_Context {
   F32 mouse_x;
   F32 mouse_y;
   //
-  Str8 navigated_id;
-  Str8 hot_box_id; // TODO: Change this and such
+  Str8 interacted_with_box_id;
+  B32 interacted_with_box_id__is_mouse_down;
+  B32 interacted_with_box_id__did_mouse_leave_box_while_was_down;
+  //
   Str8 active_box_id;
-  B32 active_box__is_down;
-  B32 active_box__left_box_while_was_down;
   //
   Arena* style_stacks_arena; 
   //
@@ -268,19 +268,6 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis);
 // void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
 void ui_layout_box(UI_Box* root, Axis2 axis);
 
-// - Active box stuff
-// note: This is more like "interacted with box" and not active
-B32 ui_is_id_active(Str8 box_id);
-// void ui_set_active_id(Str8 box_id);
-// void ui_reset_active_id_match(Str8 box_id);
-//
-B32 ui_is_active_box(UI_Box* box);
-// void ui_set_active_box(UI_Box* box);
-// void ui_reset_active_box_match(UI_Box* box);
-//
-B32 ui_has_active();
-// void ui_reset_active();
-
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
 UI_Box* ui_get_box_prev_frame(Str8 id);
@@ -290,6 +277,9 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id);
 // - Actions
 UI_Actions ui_actions_from_box(UI_Box* this_frames_box);
 UI_Actions ui_actions_from_id(Str8 id);
+
+// - Some new stuff that is yet unstructured
+void ui_reset_active();
 
 // - Default box settings stacks
 void         ui_push_flags(UI_Box_flags v);       
