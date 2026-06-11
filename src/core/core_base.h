@@ -302,6 +302,25 @@ typedef double F64;
 							} \
 						}
 
+// TODO: This is new code, not yet part of the official code kind of thing
+#define DllPushBack_Name_NullFunc(dll_p, new_node_p, name_for_first_in_dll, name_for_last_in_dll, name_for_next_in_node, name_for_prev_in_node, is_node_null_func) \
+						if (   is_node_null_func((dll_p)->name_for_first_in_dll)                             \
+								&& is_node_null_func((dll_p)->name_for_last_in_dll)                              \
+						) { 									 												                          \
+							(dll_p)->name_for_first_in_dll = new_node_p;                            \
+							(dll_p)->name_for_last_in_dll = new_node_p; 													  \
+						} 																							 											  \
+						else if ((dll_p)->name_for_first_in_dll == (dll_p)->name_for_last_in_dll) { \
+							(dll_p)->name_for_first_in_dll->name_for_next_in_node = new_node_p;     \
+							(new_node_p)->name_for_prev_in_node = (dll_p)->name_for_first_in_dll;     \
+							(dll_p)->name_for_last_in_dll = new_node_p; 												 		\
+						} 											 												 												\
+						else { 									 												 												\
+							(dll_p)->name_for_last_in_dll->name_for_next_in_node = new_node_p; 			\
+							(new_node_p)->name_for_prev_in_node = (dll_p)->name_for_last_in_dll; 		  \
+ 							(dll_p)->name_for_last_in_dll = new_node_p;  											 			\
+						} 
+
 #define StackPush(list, new_node) StackPush_Name((list), (new_node), first, next)
 #define StackPop(list) StackPop_Name((list), first, next)
 

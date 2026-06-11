@@ -29,29 +29,6 @@
 #include "ui/widgets/ui_widgets.h"
 #include "ui/widgets/ui_widgets.cpp"
 
-// UI_Box* next_box_for_box_depth_first__nullable(UI_Box* box)
-// {
-//   // box has to be not null 
-//   // box has to have an id
-
-//   if (ui_box_is_zero(box)) { return &__ui_g_zero_box; }
-//   if (box->id.count == 0) { return &__ui_g_zero_box; }
-
-//   // go down to the first child, if it is present then we have it
-//   // if we dont have a child, then a sibling, if we dont have next sibling, then we move out to the 
-//   // parent and have the parent go next since it was alredy used before
-//   // Next sibling if present 
-
-//   if (box->id.count == 0) { return 0; }
-//   else if (!str8_match(original_id, box->id, 0)) { return box; }
-
-//   for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-//   {
-//     next_box_for_box_depth_first__nullable(original_id, child);
-//   }
-//   return &__ui_g_zero_box;
-// }
-
 void OutputDebugStringF(const char* fmt, ...)
 {
   #if DEBUG_MODE
@@ -126,98 +103,107 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
-    DeferInitReleaseLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
+                DeferInitReleaseLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
     {
       ui_push_font(font);
 
-      // todo: Start traversing with keys
-      static Str8 ids[]                = { Str8FromC("Button_1"), Str8FromC("Button_2"), Str8FromC("Button_3") };
-      static B32 is_navigated_id_index = false;
-      static U64 navigated_id_index    = 0;
-      for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-      {
-        if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__tab && ev->key_event.went_down)
-        {
-          is_navigated_id_index = true;
-          navigated_id_index += 1;
+      // todo: Have this whole ui be under a drop down box that we then traverse as well
+      static struct {
+        B32 is_text_next_to_button;
+        
+        B32 is_check_box_checked;
+        
+        B32 is_radio_bool;
+        U64 curent_radio_bool;
+      } state = {};
 
-          if (navigated_id_index >= ArrayCount(ids)) {
-            navigated_id_index = 0;
+      ui_set_next_flags(UI_Box_flag__has_background);
+      ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
+      UI_Wrapper(Axis2__y)
+      {
+        // UI_PaddedBox(ui_px(25), Axis2__y)
+        {
+          UI_Row()
+          {
+            // Button
+            ui_set_next_b_color(blue());
+            UI_Actions button_actions = ui_button_f("Button##id");
+            if (button_actions.is_clicked) { state.is_text_next_to_button = ToggleBool(state.is_text_next_to_button); }
+            if (state.is_text_next_to_button) { 
+              ui_spacer(ui_px(10));
+              ui_label_f("__ Some text heer __"); 
+            }
           }
 
-          // todo: This fucks up the ev->next if we consume the current event, then we dont have next 
-          //       or maybe we do, but this is not great in terms of the expectancy for the code logic here,
-          //       might need a better data structure here
-          // os_consume_frame_event(ev);
-        }
-      }
+          ui_spacer(ui_px(5));
 
-      UI_PaddedBox(ui_px(100), Axis2__x)
-      {
-        ui_set_next_size_x(ui_children_sum());
-        ui_set_next_size_y(ui_children_sum());
-        ui_set_next_b_color(blue());
-        UI_Box* wrapper = ui_box_make(Str8{}, UI_Box_flag__has_background);
-        UI_Parent(wrapper)
-        {
-          UI_Col()
+          // Checkbox
+          UI_Row()
           {
-            for EachIndex(i, ArrayCount(ids))
+            ui_set_next_size_x(ui_px(25));
+            ui_set_next_size_y(ui_px(25));
+            ui_set_next_b_color(red());
+            UI_Box* check_box = ui_box_make(Str8FromC("Check_box_button_id"), UI_Box_flag__has_background);
+            UI_Actions check_box_actions = ui_actions_from_box(check_box);
+            if (check_box_actions.went_down) {
+              state.is_check_box_checked = ToggleBool(state.is_check_box_checked);
+            }
+            else if (check_box_actions.is_down) { 
+              check_box->shape_style.vertex_colors[0].a = 0.25; 
+              check_box->shape_style.vertex_colors[1].a = 0.25; 
+              check_box->shape_style.vertex_colors[2].a = 0.25; 
+              check_box->shape_style.vertex_colors[3].a = 0.25; 
+            }
+            else if (check_box_actions.is_hovered) { 
+              check_box->shape_style.vertex_colors[0].a = 0.5; 
+              check_box->shape_style.vertex_colors[1].a = 0.5; 
+              check_box->shape_style.vertex_colors[2].a = 0.5; 
+              check_box->shape_style.vertex_colors[3].a = 0.5; 
+            }
+
+            if (state.is_check_box_checked) {
+              ui_set_b_color(check_box, green());
+              ui_spacer(ui_px(10));
+              ui_label_f("Checkbox checked");
+            }
+          }
+
+          ui_spacer(ui_px(5));
+
+          UI_Row()
+          {
+            // todo: when tab, just go to the next navigatable box
+
+            for EachIndex(i, 3)
             {
-              UI_PaddedBox(ui_px(5), Axis2__x)            
+              UI_Row()
               {
-                Scratch scratch    = get_scratch(0, 0);
-                Str8 button_id     = ids[i];
-                UI_Actions actions = ui_actions_from_id(button_id);
-
-                ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
-                if (is_navigated_id_index && navigated_id_index == i) {
-                  ui_set_active_id(button_id);
-                  OutputDebugStringF("Button done via navigation \n");
+                ui_set_next_size_x(ui_px(15));
+                ui_set_next_size_y(ui_px(15));
+                ui_set_next_b_color((state.curent_radio_bool == i ? white() : blue()));
+                UI_Box* radio = ui_box_make_f("radio_button##%lld", UI_Box_flag__has_background, i);
+                UI_Actions radio_actions = ui_actions_from_box(radio);
+                if (radio_actions.went_down) {
+                  state.is_radio_bool = true;
+                  state.curent_radio_bool = i; 
                 }
-
-                if (actions.is_active) {
-                  ui_set_next_b_color(orange());
-                }
-                else if (actions.is_down) {
-                  is_navigated_id_index = false;
-                  navigated_id_index = i;
-                  ui_set_active_id(button_id);
-                  OutputDebugStringF("Button done \n");
-                }
-                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(0.75, 0.75, 0.75, 1.0)); }
-                ui_button(button_id);
 
                 ui_spacer(ui_px(5));
-    
-                end_scratch(&scratch);
+
+                ui_label_f("radio_%lld", i);
               }
+
+              ui_spacer(ui_px(10));
             }
           }
         }
       }
 
-      ui_spacer(ui_px(25));
-
-      ui_set_next_size_x(ui_px(100));
-      ui_set_next_size_y(ui_px(100));
-      ui_set_next_b_color(red());
-      UI_Actions button = ui_button(Str8FromC("Button other"));
-      if (button.is_down)
-      {
-        ui_set_active_id(button.new_box->id);
-        ui_set_b_color(button.new_box, green());
-        is_navigated_id_index = false;
-      } 
-      else {
-        ui_reset_active_id(button.new_box->id);
-      }
+      Scratch scratch = get_scratch(0, 0);
+      Str8 str = str8_copy_alloc(scratch.arena, ui_get_context()->navigated_box_id);
+      OutputDebugStringF("Nav id: %s \n", str.data);
+      end_scratch(&scratch);
     }
-
-    // Scratch scratch = get_scratch(0, 0);
-    // Str8 hot_nt = str8_copy_alloc(scratch.arena, ui_get_context()->hot_box_id);
-    // OutputDebugStringF("Hot id: %s \n", hot_nt.data == 0 ? "None" : (char*)hot_nt.data);
-    // end_scratch(&scratch);
 
     r_clear_target(window_frame_buffer_target, black());
     ui_draw();

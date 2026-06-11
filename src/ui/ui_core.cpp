@@ -72,6 +72,12 @@ V2F32 ui_get_mouse_pos() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 
 void ui_init()
 {
+  __ui_g_zero_box.first_child  = &__ui_g_zero_box;
+  __ui_g_zero_box.last_child   = &__ui_g_zero_box;
+  __ui_g_zero_box.next_sibling = &__ui_g_zero_box;
+  __ui_g_zero_box.prev_sibling = &__ui_g_zero_box;
+  __ui_g_zero_box.parent       = &__ui_g_zero_box;
+
   Arena* arena = arena_alloc(Megabytes(64), false, 0);
   __ui_g_context = ArenaPush(arena, UI_Context);
   __ui_g_context->context_arena = arena;
@@ -122,6 +128,7 @@ Str8 ui_get_text_part_from_str8(Str8 id_and_text)
   return text;
 }
 
+
 UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
 {
   UI_Context* ctx = ui_get_context();
@@ -170,9 +177,13 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
     box->text_style.font = font;
   }
 
-  DllPushBack_Name(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling);
+  DllPushBack_Name_NullFunc(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling, ui_box_is_zero);
   box->parent = ui_get_parent();
   box->parent->children_count += 1;
+  box->first_child  = &__ui_g_zero_box;
+  box->last_child   = &__ui_g_zero_box;
+  box->next_sibling = &__ui_g_zero_box;
+  box->prev_sibling = &__ui_g_zero_box;
 
   // Resetting possible single use valus on the style stacks
   ui_pop_single_usage_flags();
@@ -245,6 +256,36 @@ UI_Box* ui_get_parent()
 //   return result_box;
 // }
 
+UI_Box* next_box_in_subtree_depth_first(UI_Box* start_box, B32 include_start_box)
+{
+  // Going over the sub-tree that start with start_box at the root
+  if (ui_box_is_zero(start_box)) { return &__ui_g_zero_box; }
+  if (start_box->id.count != 0 && include_start_box) { return start_box; }
+  for (UI_Box* child = start_box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    if (child->id.count != 0) { return child; }
+    UI_Box* possible_box = next_box_in_subtree_depth_first(child, false);
+    if (possible_box->id.count != 0) { return possible_box; }
+  }
+  return &__ui_g_zero_box;
+}
+
+UI_Box* need_a_name(UI_Box* start_box)
+{
+  if (ui_box_is_zero(start_box)) { return &__ui_g_zero_box; }
+  
+  UI_Box* test_box = next_box_in_subtree_depth_first(start_box, false);
+  if (!ui_box_is_zero(test_box)) { return test_box; }
+
+  for (UI_Box* sibling = start_box->next_sibling; !ui_box_is_zero(sibling); sibling = sibling->next_sibling)
+  {
+    test_box = next_box_in_subtree_depth_first(sibling, true);
+    if (!ui_box_is_zero(test_box)) { return test_box; }
+  }
+
+  return need_a_name(start_box->parent->next_sibling);
+}
+
 void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 {
   UI_Context* ctx = ui_get_context();
@@ -273,6 +314,25 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   // Deep copying these since they are allocated on the old build arena
   ctx->interacted_with_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->interacted_with_box_id); 
   ctx->active_box_id          = str8_copy_alloc(ui_get_build_arena(), ctx->active_box_id); 
+  ctx->navigated_box_id       = str8_copy_alloc(ui_get_build_arena(), ctx->navigated_box_id); 
+
+  for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+  {
+    if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__tab && ev->key_event.went_down) 
+    {
+      if (ctx->navigated_box_id.count == 0) { 
+        ctx->navigated_box_id = ctx->prev_frame_root_box->id; 
+      }
+      else {
+        UI_Box* current_nav_box   = ui_get_box_prev_frame(ctx->navigated_box_id);          
+        UI_Box* test_next_nav_box = need_a_name(current_nav_box);
+        ctx->navigated_box_id     = test_next_nav_box->id;
+      }
+        
+      os_consume_frame_event(ev);
+      break;
+    }
+  }
 
   // Pushing defaults onto the style stacks
   ui_push_flags(ctx->defaults.flags);
@@ -309,8 +369,6 @@ void ui_end_build()
 
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 {
-  // if (axis == Axis2__y && str8_match(Str8FromC("Clip box"), root->parent->id, 0)) { BP; }
-
   switch (root->semantic_size[axis].kind)
   {
     default: { } break;
@@ -594,24 +652,21 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
 // note: There might be weird thing going on with ids and text, dont forget about ##
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id)
 {
-  if (ui_box_is_zero(root)) { return &__ui_g_zero_box; }
-  if (id.count == 0)        { return &__ui_g_zero_box; }
+  if (id.count == 0)               { return &__ui_g_zero_box; }
+  if (ui_box_is_zero(root))        { return &__ui_g_zero_box; }
   if (str8_match(root->id, id, 0)) { return root; }
   
-  UI_Box* box = &__ui_g_zero_box;
-  for (UI_Box* child = root->first_child; child; child = child->next_sibling)
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    if (str8_match(child->id, id, 0))
-    {
-      box = child;
-      break;
-    }
     // note: I am not sure, but this shoud be faster
     //       since ui boxed are allocated in depth order
-    if (ui_box_is_zero(box)) { box = ui_get_box_from_tree(child, id); } 
-    if (!ui_box_is_zero(box)) { break; }
+    if (str8_match(child->id, id, 0)) { return child; }
+    else { 
+      UI_Box* box = ui_get_box_from_tree(child, id); 
+      if (!ui_box_is_zero(box)) { return box; }
+    }
   }
-  return box;
+  return &__ui_g_zero_box;
 }
 
 UI_Box* ui_get_box_prev_frame(Str8 id)
@@ -685,6 +740,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   B32 was_down                = false;
   B32 left_box_while_was_down = false;
   B32 is_active               = false;
+  B32 is_navigated            = false;
 
   B32 some_other_box_is_being_interacted_with = (
     ctx->interacted_with_box_id.count != 0 // There is a box that is interacted with right now
@@ -775,7 +831,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     }
   }
 
-  is_active = str8_match(ctx->active_box_id, this_frames_box->id, 0);
+  is_active    = str8_match(ctx->active_box_id, this_frames_box->id, 0);
+  is_navigated = str8_match(ctx->navigated_box_id, this_frames_box->id, 0);
 
   result_actions->old_box                 = prev_frames_box;            
   result_actions->new_box                 = this_frames_box;            
@@ -787,6 +844,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   result_actions->went_down               = !was_down && is_down;
   result_actions->went_up                 = was_down && !is_down;  
   result_actions->is_active               = is_active;
+  result_actions->is_navigated            = is_navigated;
 
   return *result_actions;
 }

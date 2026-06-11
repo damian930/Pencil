@@ -91,6 +91,7 @@ struct UI_Actions {
 
   // Higher level actions
   B32 is_active; 
+  B32 is_navigated;
 };
 
 typedef void (*UI_Box_custom_draw_func_type) (UI_Box* box);
@@ -175,6 +176,8 @@ struct UI_Context {
   Str8 interacted_with_box_id;
   B32 interacted_with_box_id__is_mouse_down;
   B32 interacted_with_box_id__did_mouse_leave_box_while_was_down;
+  //
+  Str8 navigated_box_id;
   //
   Str8 active_box_id;
   //
