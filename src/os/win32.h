@@ -162,6 +162,7 @@ struct OS_Event {
       Mouse_button button;
       B32 went_down;
       B32 went_up;
+      B32 double_down;
       V2F32 mouse_pos;
     } mouse_event;
   
@@ -297,5 +298,6 @@ Str8 str8_from_wstr(Arena* arena, WCHAR* wstr);
 void os_set_cursor(OS_Cursor cursor);
 OS_Cursor os_get_cursor();
 void os_show_cursor(B32 show);
+U64 os_get_mouse_double_click_max_time_ms();
 
 #endif

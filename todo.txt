@@ -6,14 +6,27 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
+[ ] - Try to make a list with some buttons that you can hover and click and tab
+[ ] - Directories support from win32
+[ ] - UI might have identical ids, that is not great, in debug might be a good idea to check the ids and report if they are the same and then turn that off for release mode.
+[ ] - Add hot element into the ui core to be able to have navigation traverse the hot elements tree.
+[ ] - Start using hashed instead of Str8 for UI_Box ids.
+[ ] - Add default font to the ui like in raylib or ryan by embedding it into the file
+[ ] - Test your first ever UI Navigation
+[ ] - Fix up borders
+[ ] - Try a different ui algo 
+      [ ] - Have padding as part of the algo
+      [ ] - Have child gap be a part of the algo
+      [ ] - Have border be a part of the aglo
+[ ] - Add support for double down mouse click events
 [ ] - Have the window be full screen. 
 [ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.
 [ ] - Try the app a bit and if it works then start making the ui for it.
       [ ] - Command input field.
             [ ] - Text edit box
-                  [ ] - Make it be a normal text input that starts from the left
+                  [x] - Make it be a normal text input that starts from the left
                   [x] - Cursor placement
-                  [ ] - Selection with cursor like on google
+                  [x] - Selection with cursor like on google
                   [ ] - Double click select all but the first click deselects stuff
 
             [ ] - Box with possible commands

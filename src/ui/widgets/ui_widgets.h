@@ -11,7 +11,8 @@
 void ui_label(Str8 str);
 void ui_label_f(const char* fmt, ...);
 void ui_spacer(UI_Size size);
-UI_Actions ui_button(Str8 str); 
+UI_Actions ui_button(Str8 str_id); 
+UI_Actions ui_button_f(const char* fmt, ...); 
 
 // - Layout stack
 void ui_layout_stack_begin(Axis2 axis); // todo: Call these like a layout stack
@@ -671,26 +672,69 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
   }
 }
  
-void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
+void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
+  U64 start_size = *text_buffer_size;
+
   Scratch scratch              = get_scratch(0, 0);
   FP_Font font                 = ui_get_font();
-  Str8 text_buffer_str          = str8_manual(text_buffer, *text_buffer_size);
+  F32 cursor_size              = 2.0f;
+  Str8 text_buffer_str         = str8_manual(text_buffer, *text_buffer_size);
   F32 font_height              = fp_get_font_height(font);
   UI_Box_data edit_box_data    = ui_box_data_from_box_id_prev_frame(edit_box_id);
   UI_Actions edit_box_actions  = ui_actions_from_id(edit_box_id);
 
-  Str8 str_before_cursor    = str8_front(text_buffer_str, *cursor_pos); 
-  F32 str_before_cursor_len = fp_measure_text(str_before_cursor, font).x;
+  Str8 str_before_cursor           = str8_substring(text_buffer_str, 0, *cursor_pos);
+  F32 str_before_cursor_size_in_px = fp_measure_text(str_before_cursor, font).x;
 
-  
+  F32 new_clip_offset = 0.0f;
+  if (edit_box_data.is_found)
+  {
+    new_clip_offset = edit_box_data.clip_offset.x;
+    
+    // Checking if cursor is to the right of the box now
+    if (str_before_cursor_size_in_px > -1.0f * edit_box_data.clip_offset.x + edit_box_width) 
+    {
+      // Finding a cursor string substring that fits into the edit box from the end of the cursor string
+      RangeU64 str_range_that_fits = range_u64_make(str_before_cursor.count, str_before_cursor.count);
+      {
+        F32 total_size = 0.0f;
+        for (U64 i = str_before_cursor.count; i > 0 ; i -= 1)
+        {
+          Str8 char_sub_str     = str8_substring(str_before_cursor, i - 1, i);
+          F32 char_sub_str_size = fp_measure_text(char_sub_str, font).x;
+          total_size += char_sub_str_size;
+          if (total_size > edit_box_width) { break; }
+          str_range_that_fits.min -= 1;
+        }
+      }
+
+      if (range_u64_count(str_range_that_fits) > 0)
+      {
+        Str8 cursor_str_that_fits           = str8_substring_range(str_before_cursor, str_range_that_fits);
+        F32 cursor_str_that_fits_size_in_px = fp_measure_text(cursor_str_that_fits, font).x;
+        Assert(cursor_str_that_fits_size_in_px <= edit_box_width);
+        F32 extra_space               = edit_box_width - cursor_str_that_fits_size_in_px;
+        F32 offset_till_str_that_fits = str_before_cursor_size_in_px - cursor_str_that_fits_size_in_px;
+        new_clip_offset = -1.0f * (offset_till_str_that_fits - extra_space + cursor_size);
+      }
+    }
+    else if (str_before_cursor_size_in_px < -1.0f * edit_box_data.clip_offset.x)
+    {
+      new_clip_offset = -1.0f * str_before_cursor_size_in_px;
+    }
+  }
+  Assert(new_clip_offset <= 0.0f);
+
+  // todo: If we delete something from the string, then we have to keep the cursor where it is if 
+  //       possibel and just adjest the offset by the number of chars deleted
 
   // Making ui for the data the user passed in
   ui_set_next_size_x(ui_px(edit_box_width));
   ui_set_next_size_y(ui_px(font_height));
   ui_set_next_layout_axis(Axis2__x);
   UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
-  edit_box->clip_data.clip_value[Axis2__x] = (edit_box_width / 2) - str_before_cursor_len;
+  edit_box->clip_data.clip_value[Axis2__x] = new_clip_offset;
   edit_box->hold_active_after_mouse_up     = true;
   UI_Parent(edit_box)
   {
@@ -713,32 +757,17 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
       F32 space_inside_section       = fp_measure_text(str_inside_section, font).x; 
       F32 space_after_section_end    = fp_measure_text(str_after_section_end, font).x; 
 
-      if (section_start == section_end)
-      {
-        ui_spacer(ui_px(space_before_section_start));
+      ui_spacer(ui_px(space_before_section_start));
       
-        if (ui_is_id_active(edit_box_id))
-        {
-          F32 cursor_size = 2.0f;
-          ui_set_next_size_x(ui_px(cursor_size));
-          ui_set_next_size_y(ui_px(font_height));
-          ui_set_next_b_color(blue());
-          UI_Box* cursor_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
-        }
-      }
-      else 
+      if (ui_is_id_active(edit_box_id))
       {
-        ui_spacer(ui_px(space_before_section_start));
-
-        if (ui_is_id_active(edit_box_id))
+        ui_set_next_size_x(ui_px(section_start == section_end ? cursor_size : space_inside_section + cursor_size));
+        ui_set_next_size_y(ui_px(font_height));
+        ui_set_next_b_color(blue());
+        UI_Box* cursor_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
+        UI_Parent(cursor_box) 
         {
-          F32 cursor_size = 2.0f;
-          ui_set_next_size_x(ui_px(space_inside_section));
-          ui_set_next_size_y(ui_px(font_height));
-          ui_set_next_b_color(blue());
-          UI_Box* section_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
-          UI_Parent(section_box)
-          {
+          if (section_start != section_end) {
             ui_label(str_inside_section);
           }
         }
@@ -753,8 +782,6 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
     ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
   }
 
-  // static F32 has_initial_mouse_x_when_down = false;
-  // static F32 initial_mouse_x_when_down     = 0.0f;
   if (edit_box_data.is_found)
   {
     if (edit_box_actions.is_down)
@@ -784,15 +811,12 @@ void ui_text_edit_box(Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64
     }
   }
 
-
   // idea:
   // For the first click you map where to put the cursor, you put it there
   // then if the mouse is held down you wait till it is draged far enought and then
   // you figure out the new cursor position and keep the old one as the section start.
   // return this data to the user 
   
-
-
   end_scratch(&scratch);
 }
 

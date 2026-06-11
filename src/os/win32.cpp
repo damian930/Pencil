@@ -1,9 +1,15 @@
 #ifndef OS_WIN32_CPP
 #define OS_WIN32_CPP 
 
+// General win32 stuff 
 #include "os/win32.h"
 #pragma comment (lib, "user32.lib")
 #pragma comment (lib, "oneCore.lib")
+//
+// Windows version and build getters
+#include "winnt.h"
+#pragma comment (lib, "ntdll.lib")
+extern "C" __declspec(dllimport) LONG WINAPI RtlGetVersion(RTL_OSVERSIONINFOW* lpVersionInformation);
 
 struct OS_Window {
   WNDCLASSEXA window_class;
@@ -24,7 +30,6 @@ struct OS_State {
   
   HINSTANCE app_instance;
   U64 perf_freq_count_per_sec;
-  
   Str8 path_to_system_fonts;
 
   // Single window data
@@ -32,6 +37,8 @@ struct OS_State {
 
   // Frame data
   Arena* frame_arena;
+  //
+  U64 frame_generation_counter;
   //
   OS_Event_list frame_event_list;
   //
@@ -53,6 +60,12 @@ global OS_State* __os_g_state            = 0;
 //
 void os_init()
 {
+  { // Making sure that the windows version that this app is going to run on 
+    // TODO: go over the os fucntions that you use and expect to be present in the users windows system,
+    //       dont run the app if those are not present on their systems, for theat use 
+    //       RtlGetVersion here to determine the version and the build iteration for windows.
+  }
+
   { // Getting things needed for allocations that we need to create state
     SYSTEM_INFO info = {};
     GetSystemInfo(&info);
@@ -304,6 +317,17 @@ Str8 os_get_current_dir_path(Arena* arena)
   return result_path;
 }
 
+// TODO: This is not in the heade yet
+B32 os_file_delete(Str8 file_name)
+{
+  // TODO: Check the max path here 
+  Scratch scratch = get_scratch(0, 0);
+  Str8 file_name_nt = str8_copy_alloc(scratch.arena, file_name);
+  B32 succ = DeleteFileA((char*)file_name_nt.data);
+  end_scratch(&scratch);
+  return succ;
+}
+
 ///////////////////////////////////////////////////////////
 // - Memory
 //
@@ -426,6 +450,8 @@ void os_frame_begin()
     os_state->this_frame_mouse_pos = v2f32(f32_neg_inf(), f32_neg_inf());
     arena_clear(os_state->frame_arena);
   }
+
+  os_state->frame_generation_counter += 1;
 
   // Creating frame events though the winproc
   for (MSG msg = {}; PeekMessageW(&msg, NULL, 0, 0, PM_REMOVE);)
@@ -990,6 +1016,7 @@ LRESULT win32_proc(
 
     // todo: look into WM_CHAR (https://learn.microsoft.com/en-us/windows/win32/learnwin32/keyboard-input)
 
+    case WM_LBUTTONDBLCLK: 
     case WM_LBUTTONDOWN: case WM_LBUTTONUP: 
     case WM_RBUTTONDOWN: case WM_RBUTTONUP:
     case WM_MBUTTONDOWN: case WM_MBUTTONUP:
@@ -998,10 +1025,12 @@ LRESULT win32_proc(
       OS_Event_modifiers modifiers = {};
       Mouse_button button          = {};
       B32 went_down                = {};
+      B32 double_down              = {};
       B32 got_up                   = {};
       V2F32 mouse_pos              = {};
 
       U64 win32_event_modifiers = w_param;
+      if (message == WM_LBUTTONDBLCLK) { button = Mouse_button__left; went_down = true; double_down = true; }
       if (message == WM_LBUTTONDOWN || message == WM_LBUTTONUP) { button = Mouse_button__left; went_down = (message == WM_LBUTTONDOWN); got_up = (message == WM_LBUTTONUP); }
       if (message == WM_RBUTTONDOWN || message == WM_RBUTTONUP) { button = Mouse_button__right; went_down = (message == WM_RBUTTONDOWN); got_up = (message == WM_RBUTTONUP); }
       if (message == WM_MBUTTONDOWN || message == WM_MBUTTONUP) { button = Mouse_button__middle; went_down = (message == WM_MBUTTONDOWN); got_up = (message == WM_MBUTTONUP); }
@@ -1022,11 +1051,12 @@ LRESULT win32_proc(
       if (win32_event_modifiers & MK_CONTROL) { modifiers |= OS_Event_modifier__control; }          
 
       event.kind      = OS_Event_kind__mouse;
-      event.mouse_event.modifiers = modifiers;
-      event.mouse_event.button    = button;
-      event.mouse_event.went_down = went_down;
-      event.mouse_event.went_up    = got_up;
-      event.mouse_event.mouse_pos = mouse_pos;
+      event.mouse_event.modifiers   = modifiers;
+      event.mouse_event.button      = button;
+      event.mouse_event.went_down   = went_down;
+      event.mouse_event.went_up     = got_up;
+      event.mouse_event.double_down = double_down;
+      event.mouse_event.mouse_pos   = mouse_pos;
 
       is_event_made = true;
       result = TRUE;
@@ -1156,6 +1186,12 @@ OS_Cursor os_get_cursor()
 void os_show_cursor(B32 show)
 {
   ShowCursor(show);
+}
+
+U64 os_get_mouse_double_click_max_time_ms()
+{
+  U64 time = (U64)GetDoubleClickTime();
+  return time;
 }
 
 #endif

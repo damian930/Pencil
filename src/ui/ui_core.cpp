@@ -11,9 +11,8 @@
 
 // todo: Struture this file based on the structure of the .h ui file
 
-UI_Context* _ui_g_context    = 0;
-UI_Box _ui_g_zero_box        = {};
-V2F32 _ui_g_clip_offset_stub = {};
+UI_Context* __ui_g_context    = 0;
+UI_Box __ui_g_zero_box        = {};
 
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 {
@@ -30,12 +29,12 @@ UI_Size ui_p_of_p(F32 value, F32 strictness) { return ui_size_make(UI_Size_kind_
 
 UI_Context* ui_get_context()
 {
-  return _ui_g_context;
+  return __ui_g_context;
 }
 
 void ui_set_context(UI_Context* context)
 {
-  _ui_g_context = context;
+  __ui_g_context = context;
 }
 
 Arena* ui_get_build_arena()
@@ -74,42 +73,42 @@ V2F32 ui_get_mouse_pos() { return v2f32(ui_get_mouse_x(), ui_get_mouse_y()); }
 void ui_init()
 {
   Arena* arena = arena_alloc(Megabytes(64), false, 0);
-  _ui_g_context = ArenaPush(arena, UI_Context);
-  _ui_g_context->context_arena = arena;
-  _ui_g_context->style_stacks_arena = arena_alloc(Megabytes(64), false, 0);
-  for EachArrElement(i, _ui_g_context->build_arenas) { 
-    _ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), true, (i == 0 ? 1 : 44444)); // TODO: The stable address here shoud be removed 
+  __ui_g_context = ArenaPush(arena, UI_Context);
+  __ui_g_context->context_arena = arena;
+  __ui_g_context->style_stacks_arena = arena_alloc(Megabytes(64), false, 0);
+  for EachArrElement(i, __ui_g_context->build_arenas) { 
+    __ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), true, (i == 0 ? 1 : 44444)); // TODO: The stable address here shoud be removed 
   }
 
-  _ui_g_context->root_box            = &_ui_g_zero_box;
-  _ui_g_context->current_parent_box  = &_ui_g_zero_box;
-  _ui_g_context->prev_frame_root_box = &_ui_g_zero_box; 
+  __ui_g_context->root_box            = &__ui_g_zero_box;
+  __ui_g_context->current_parent_box  = &__ui_g_zero_box;
+  __ui_g_context->prev_frame_root_box = &__ui_g_zero_box; 
 
-  _ui_g_context->defaults.flags       = UI_Box_flag__NONE;
-  _ui_g_context->defaults.layout_axis = Axis2__y;
-  _ui_g_context->defaults.size_x      = ui_children_sum();
-  _ui_g_context->defaults.size_y      = ui_children_sum();
-  _ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
-  _ui_g_context->defaults.softness    = 2.0f;
-  _ui_g_context->defaults.font        = {};
+  __ui_g_context->defaults.flags       = UI_Box_flag__NONE;
+  __ui_g_context->defaults.layout_axis = Axis2__y;
+  __ui_g_context->defaults.size_x      = ui_children_sum();
+  __ui_g_context->defaults.size_y      = ui_children_sum();
+  __ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
+  __ui_g_context->defaults.softness    = 2.0f;
+  __ui_g_context->defaults.font        = {};
   for EachEnumRange(i, UV, UV__00, UV__COUNT) { 
-    _ui_g_context->defaults.vertex_colors[i]  = transparent(); 
-    _ui_g_context->defaults.corner_radii.v[i] = 0.0f;
+    __ui_g_context->defaults.vertex_colors[i]  = transparent(); 
+    __ui_g_context->defaults.corner_radii.v[i] = 0.0f;
   }
 }
 
 void ui_release()
 {
-  for EachArrElement(i, _ui_g_context->build_arenas) {
-    arena_release(&_ui_g_context->build_arenas[i]);
+  for EachArrElement(i, __ui_g_context->build_arenas) {
+    arena_release(&__ui_g_context->build_arenas[i]);
   }
-  arena_release(&_ui_g_context->context_arena);
-  _ui_g_context = 0;
+  arena_release(&__ui_g_context->context_arena);
+  __ui_g_context = 0;
 }
 
 B32 ui_box_is_zero(UI_Box* box)
 {
-  return ((box == 0) || (box == &_ui_g_zero_box));
+  return ((box == 0) || (box == &__ui_g_zero_box));
 }
 
 Str8 ui_get_text_part_from_str8(Str8 id_and_text)
@@ -225,11 +224,27 @@ UI_Box* ui_get_parent()
   return ui_get_context()->current_parent_box;
 }
 
+UI_Box* find_hoverd_child_for_box(UI_Box* box)
+{
+  if (ui_box_is_zero(box)) { return &__ui_g_zero_box; }
+
+  // Hover is on this substree
+  UI_Box* result_box = &__ui_g_zero_box;
+  if (range_v2f32_within(box->final_on_screen_bbox, ui_get_mouse_pos()))
+  {
+    if (box->id.count != 0 && box->flags & UI_Box_flag__hoverable) { result_box = box; }
+    for (UI_Box* child = box->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+    {
+      UI_Box* hovered_box_inside_children = find_hoverd_child_for_box(child);
+      if (!ui_box_is_zero(hovered_box_inside_children)) { result_box = hovered_box_inside_children; }
+    }
+  }
+
+  return result_box;
+}
+
 void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 {
-  Assert(IsMemZero(_ui_g_clip_offset_stub));
-  _ui_g_clip_offset_stub = {};
-
   UI_Context* ctx = ui_get_context();
   
   // Resetting the prev build state
@@ -244,8 +259,8 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   for EachEnumRange(i, UV, UV__00, UV__COUNT) { ctx->vertex_color_stacks[i] = {}; }
 
   ctx->prev_frame_root_box = ctx->root_box;
-  ctx->root_box            = &_ui_g_zero_box;
-  ctx->current_parent_box  = &_ui_g_zero_box;
+  ctx->root_box            = &__ui_g_zero_box;
+  ctx->current_parent_box  = &__ui_g_zero_box;
   arena_clear(ctx->style_stacks_arena);
   
   // Creating the new build state
@@ -254,7 +269,9 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   arena_clear(arena);
   
   // Deep copying these since they are allocated on the old build arena
+  ctx->hot_box_id    = str8_copy_alloc(ui_get_build_arena(), ctx->hot_box_id);
   ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), ctx->active_box_id);
+  ctx->navigated_id  = str8_copy_alloc(ui_get_build_arena(), ctx->navigated_id);
 
   // Pushing defaults onto the style stacks
   ui_push_flags(ctx->defaults.flags);
@@ -279,6 +296,12 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
 
   ctx->mouse_x = mouse_pos.x;
   ctx->mouse_y = mouse_pos.y;
+
+  // if (ctx->hot_on_mouse)
+  {
+    // This is the same as a global is_hovere id, not more than that
+    ctx->hot_box_id = find_hoverd_child_for_box(ctx->prev_frame_root_box)->id;
+  }
 }
 
 void ui_end_build()
@@ -576,11 +599,11 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
 // note: There might be weird thing going on with ids and text, dont forget about ##
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id)
 {
-  if (ui_box_is_zero(root)) { return &_ui_g_zero_box; }
-  if (id.count == 0)        { return &_ui_g_zero_box; }
+  if (ui_box_is_zero(root)) { return &__ui_g_zero_box; }
+  if (id.count == 0)        { return &__ui_g_zero_box; }
   if (str8_match(root->id, id, 0)) { return root; }
   
-  UI_Box* box = &_ui_g_zero_box;
+  UI_Box* box = &__ui_g_zero_box;
   for (UI_Box* child = root->first_child; child; child = child->next_sibling)
   {
     if (str8_match(child->id, id, 0))
@@ -725,6 +748,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   UI_Actions* result_actions = &this_frames_box->actions;
   if (this_frames_box->has_been_updated_this_build) { return *result_actions; }
   
+  // TODO: Right now its weird, figure out what box you want to return
+
   this_frames_box->has_been_updated_this_build = true;
   result_actions->box = this_frames_box;
   
@@ -741,6 +766,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   B32 is_down                 = false;
   B32 was_down                = false;
   B32 left_box_while_was_down = false;
+  // B32 is_navigated            = false;
   F32 mouse_wheel_move        = 0.0f;
 
   B32 some_other_box_is_being_interacted_with = false;
@@ -749,10 +775,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     some_other_box_is_being_interacted_with = true;
   }
 
-  RangeV2F32 interaction_bbox = intersect_range_v2f32(prev_frame_box->final_on_screen_bbox, prev_frame_box->clip_data.clip_bbox);
-  if (is_v2f32_inside_range_v2f32(interaction_bbox, ui_get_mouse_pos())) {
-    is_hovered = true;
-  }
+  is_hovered = str8_match(ctx->hot_box_id, this_frames_box->id, 0);
+
 
   // note:
   // Either there is no active box or we are the active box
@@ -763,9 +787,11 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     was_down                = ctx->active_box__is_down;
     left_box_while_was_down = ctx->active_box__left_box_while_was_down;
 
+
     if (is_hovered && !was_down)
     {
       // note: This has a bit of de sync relative to the is_hovered bool since we test if is hovered based on a different mouse pos than the one that was when the mouse went down, most of the time this shoud be fine, but i am not sure about the other times
+      // B32 is_double_down       = false;
       B32 mouse_left_went_down = false;
       {
         OS_Event_list* events = os_get_frame_event_list();
@@ -774,8 +800,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
           if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.button == Mouse_button__left && ev->mouse_event.went_down)
           {
             mouse_left_went_down = true;
+            // is_double_down = ev->mouse_event.double_down;
             os_consume_frame_event(ev);
-            break;
           }
         }
       }
@@ -794,6 +820,8 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
         }
         ctx->active_box__left_box_while_was_down = false;
       }
+
+      // if (mouse_left_went_down) { double_down = true; }
     }
     else if (was_down)
     {
@@ -835,12 +863,16 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     }
   }
 
-  result_actions->is_hovered = is_hovered;
-  result_actions->is_down    = is_down;
-  result_actions->was_down   = was_down;
+  result_actions->box                     = prev_frame_box;
+  result_actions->is_hovered              = is_hovered;
+  result_actions->is_down                 = is_down;
+  result_actions->was_down                = was_down;
   result_actions->left_box_while_was_down = left_box_while_was_down;
-  result_actions->is_clicked = was_down && !is_down && !left_box_while_was_down;
-  result_actions->wheel_move = mouse_wheel_move;
+  result_actions->is_clicked              = was_down && !is_down && !left_box_while_was_down;
+  result_actions->went_down               = !was_down && is_down;
+  result_actions->went_up                 = was_down && !is_down;
+  // result_actions->is_navigated            = is_navigated;
+  result_actions->wheel_move              = mouse_wheel_move;
 
   return *result_actions;
 }

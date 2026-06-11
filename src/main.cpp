@@ -87,7 +87,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //
   {
     win32_state->window.window_class.cbSize        = sizeof(WNDCLASSEXA);
-    win32_state->window.window_class.style         = 0; // todo: Look into hredraw and vredraw
+    win32_state->window.window_class.style         = CS_DBLCLKS; // todo: Look into hredraw and vredraw
     win32_state->window.window_class.lpfnWndProc   = win32_proc;
     win32_state->window.window_class.hInstance     = app_instance;
     win32_state->window.window_class.hIcon         = Null;
@@ -195,12 +195,13 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     { // UI and Application update 
       // pencil_do_ui(&P, font);
-      // pencil_do_command_ui(&P, font);
+      pencil_do_command_ui(&P, font);
       // pencil_update(&P, ui_has_active());
       // pencil_update(&P, !ui_has_active(), false);
     }
 
     // Test ui for a text edit box
+    /*
     DeferLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
     { 
       ui_push_font(font);
@@ -214,9 +215,12 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       {
         Str8 edit_box_id = Str8FromC("Text edit box for commnads");
         
+        ui_spacer(ui_px(50));
+
+        U64 start_pos = buffer_count;
         ui_set_next_flags(UI_Box_flag__has_background);
         ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
-        ui_text_edit_box(edit_box_id, 200, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
+        ui_text_edit_box(0.0f, edit_box_id, 200, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
         
         if (ui_is_id_active(edit_box_id))
         {
@@ -236,9 +240,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
               {
                 if (ev->key_event.key == Key__escape) { 
                   ui_reset_active_id_match(edit_box_id); 
-                  buffer_count = 0;
-                  cursor_pos   = 0;
-                  section_pos  = 0;
+                  // buffer_count = 0;
+                  // cursor_pos   = 0;
+                  // section_pos  = 0;
                 }
                 if (ev->key_event.key == Key__enter) {
                   // run_command_from_name(P, filtered_commands.first->str);
@@ -252,6 +256,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       
       }
     }
+    */
 
     { // Rendering
       // r_clear_target(window_frame_buffer_target, transparent());

@@ -38,15 +38,28 @@ void ui_spacer(UI_Size size)
   ui_box_make(Str8{}, 0);
 }
 
-UI_Actions ui_button(Str8 str) // todo: Remove the fucking rli events from there dude
+UI_Actions ui_button(Str8 str_id) // todo: Remove the fucking rli events from there dude
 {
   ui_push_size_x(ui_text_size());
   ui_push_size_y(ui_text_size());
-  UI_Box* box = ui_box_make(str, UI_Box_flag__has_background|
-                                 UI_Box_flag__has_text_contents|
-                                 UI_Box_flag__has_rounded_corners|
-                                 UI_Box_flag__has_borders);
+  UI_Box* box = ui_box_make(str_id, UI_Box_flag__has_background|
+                                    UI_Box_flag__has_text_contents|
+                                    UI_Box_flag__has_rounded_corners|
+                                    UI_Box_flag__has_borders|
+                                    UI_Box_flag__hoverable);
   UI_Actions actions = ui_actions_from_box(box);
+  return actions;
+}
+
+UI_Actions ui_button_f(const char* fmt, ...)
+{
+  Scratch scratch = get_scratch(0, 0);
+  va_list argptr;
+  va_start(argptr, fmt);
+  Str8 str = str8_valist(scratch.arena, fmt, argptr);
+  va_end(argptr);
+  UI_Actions actions = ui_button(str);
+  end_scratch(&scratch);
   return actions;
 }
 

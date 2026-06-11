@@ -58,7 +58,7 @@ if "%dont_assert_handle_later_macros%"=="1" set pre_processor_defines=%pre_proce
 set common_compiler_flags=/nologo %errors_to_ignore% %pre_processor_defines% /INCREMENTAL:NO /I"../src" /W4 /MDd /FC /std:c++20 /permissive- 
 
 :: Common linker flags
-set common_linker_flags=/LIBPATH:"../src" /INCREMENTAL:NO
+set common_linker_flags=/LIBPATH:"../src" /LIBPATH:"C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\um\x64" /INCREMENTAL:NO
 
 :: Compiler command <compiler> __path_to_file_to_compile__ __optional_extra_flags__ 
 set debug_compile=call cl %common_compiler_flags% /Zi  

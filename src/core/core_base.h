@@ -706,7 +706,7 @@ tu_specific B32 range_v2f3_match(RangeV2F32 range, RangeV2F32 other)
 	return (v2f32_match(range.min, other.min) && v2f32_match(range.max, other.max));
 }
 
-tu_specific B32 is_v2f32_inside_range_v2f32(RangeV2F32 range, V2F32 vec)
+tu_specific B32 range_v2f32_within(RangeV2F32 range, V2F32 vec)
 {
 	return (
 		range.min.x <= vec.x && vec.x < range.max.x

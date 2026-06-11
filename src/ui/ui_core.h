@@ -37,6 +37,8 @@ enum UI_Box_flag : U32 {
 
   UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
 
+  UI_Box_flag__hoverable = (1 << 10), 
+
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
 };
@@ -81,8 +83,12 @@ struct UI_Actions {
   B32 was_down;
   B32 left_box_while_was_down;
 
+  // B32 is_navigated;
+
   // Composed
   B32 is_clicked;
+  B32 went_down;
+  B32 went_up;
 
   // Other
   F32 wheel_move;
@@ -166,6 +172,8 @@ struct UI_Context {
   F32 mouse_x;
   F32 mouse_y;
   //
+  Str8 navigated_id;
+  Str8 hot_box_id; // TODO: Change this and such
   Str8 active_box_id;
   B32 active_box__is_down;
   B32 active_box__left_box_while_was_down;
@@ -205,8 +213,8 @@ struct UI_Context {
 };
 
 // - Context variables
-extern UI_Context* _ui_g_context;
-extern UI_Box _ui_g_zero_box;
+extern UI_Context* __ui_g_context;
+extern UI_Box __ui_g_zero_box;
 // V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
 
 // - Size makers
@@ -342,9 +350,9 @@ void ui_set_next_softness(F32 softness);
 void ui_pop_single_usage_softness();
 F32  ui_get_softness();
 
-#define UI_BColor(v)            DeferLoop(ui_push_b_color(v),           ui_pop_color())
+#define UI_BColor(v)            DeferLoop(ui_push_b_color(v),           ui_pop_b_color())
 #define UI_Border(width, color) DeferLoop(ui_push_border(width, color), ui_pop_border())
-#define UI_Corner_radius(v)     DeferLoop(ui_push_corner_radius(v), ui_pop_corner_radius())
+#define UI_CornerR(v)           DeferLoop(ui_push_corner_r(v), ui_pop_corner_r())
 #define UI_Softness(v)          DeferLoop(ui_push_softness(v), ui_pop_softness())
 
 // - Style stack operations for text
