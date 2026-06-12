@@ -110,17 +110,36 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
 {
   float2 pos_px   = pixel_input.pos.xy;
   float2 pos_norm = (pos_px - pixel_input.rect_origin) / pixel_input.rect_dims; 
-  
+
   float4 top_color    = lerp(pixel_input.vertex_color[UV__00], pixel_input.vertex_color[UV__10], pos_norm.x);
   float4 bottom_color = lerp(pixel_input.vertex_color[UV__01], pixel_input.vertex_color[UV__11], pos_norm.x);
   float4 final_color  = lerp(top_color, bottom_color, pos_norm.y);
   
   float softness = pixel_input.softness;
 
+  float radius_in_px      = pixel_input.corner_radius * (min(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0);
+  float sdf_pixel_to_rect = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
+
+  if (pixel_input.border_thickness > 0.0) {
+    if (0.5 >= sdf_pixel_to_rect && sdf_pixel_to_rect >= -pixel_input.border_thickness) {
+      final_color = pixel_input.border_color;
+    } else {
+      discard;
+    }
+  }
+
+  if (sdf_pixel_to_rect > 0.0) { discard; }
+
+  if (softness != 0.0)
   {
-    float radius_in_px     = pixel_input.corner_radius * (min(pixel_input.rect_dims.x, pixel_input.rect_dims.y) / 2.0);
-    float rect_outline_sdf = sdf_rounded_rect(pixel_input.rect_origin, pixel_input.rect_dims, pos_px, radius_in_px);
-    float smoothed = 1.0 - smoothstep(0.5 - softness, softness+0.5, rect_outline_sdf);
+    // This does kind of soften the corners, but does remove the first pixel on the boundary,
+    // i dont really like that.
+    float smoothed = 1.0 - smoothstep(0.5 - softness, 0.5, sdf_pixel_to_rect);
+    
+    // This i randomly found out, but it makes sense. This does inside shadowing for a rect.
+    // Maybe not shadowing, but something similar.
+    // float smoothed = 1.0 - smoothstep(0.5 - softness, softness + 0.5, sdf_pixel_to_rect);
+    
     final_color.a *= smoothed;
   }
 

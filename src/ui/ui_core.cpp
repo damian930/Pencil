@@ -95,7 +95,7 @@ void ui_init()
   __ui_g_context->defaults.size_x      = ui_children_sum();
   __ui_g_context->defaults.size_y      = ui_children_sum();
   __ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
-  __ui_g_context->defaults.softness    = 2.0f;
+  __ui_g_context->defaults.softness    = 0.0f;
   __ui_g_context->defaults.font        = {};
   for EachEnumRange(i, UV, UV__00, UV__COUNT) { 
     __ui_g_context->defaults.vertex_colors[i]  = transparent(); 
@@ -1031,37 +1031,26 @@ void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
   // if (str8_match(root->id, Str8FromC("test id"), 0)) { BP; }
   #endif
 
-  // todo: I dont fully like this if here, but for now its like this 
+  // Custom draw func does a fully cursom draw
   if (root->custom_draw_func != 0) 
   {
     root->custom_draw_func(root); 
-
-    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-    {
-      BP;
-      // ui_draw_box(child, parent_scissor_bbox);
-    }
   }
   else 
   {
-    // if (str8_match(root->id, Str8FromC("Test id"), 0)) { BP; }
-
     Rect rect       = rect_from_range_v2f32(root->final_on_screen_bbox);
     RangeV2F32 bbox = root->final_on_screen_bbox;
 
-    if (root->flags & UI_Box_flag__has_background)
-    {
+    if (root->flags & UI_Box_flag__has_background) {
       d_draw_rect_pro(rect, root->shape_style.vertex_colors[UV__00], root->shape_style.vertex_colors[UV__01], root->shape_style.vertex_colors[UV__10], root->shape_style.vertex_colors[UV__11], root->shape_style.corner_radii, root->shape_style.softness); 
     }
 
-    if (root->flags & UI_Box_flag__has_text_contents)
-    {
+    if (root->flags & UI_Box_flag__has_text_contents) {
       d_draw_text(root->text_style.text, root->text_style.font, rect_get_origin(rect), white()); 
     }
     
     if (root->flags & UI_Box_flag__has_borders)
     {
-      Rect rect_for_outlines = rect_padded(rect, root->shape_style.border.width);
       d_draw_rect_inset_borders(rect, root->shape_style.border.color, root->shape_style.border.width, root->shape_style.corner_radii, root->shape_style.softness);
     }
   

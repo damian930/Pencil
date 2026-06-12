@@ -13,11 +13,11 @@
 #include "draw/draw.h"
 #include "draw/draw.cpp"
 
-// #include "ui/ui_core.h"
-// #include "ui/ui_core.cpp"
+#include "ui/ui_core.h"
+#include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
 #include "pencil.h"
 
@@ -879,13 +879,18 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 void pencil_do_command_ui(Pencil_state* P, FP_Font font)
 {
   if (!P->show_command_ui) { return; }
+
+  Scratch scratch = get_scratch(0, 0);
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
   ui_push_font(font);
 
-  static U8 buffer[64]    = {};
-  static U64 buffer_count = 0;
-  static U64 cursor_pos   = 0;
-  static U64 section_pos  = 0;
+  static struct {
+    U8 buffer[64];
+    U64 buffer_count;
+    U64 cursor_pos;
+    U64 section_pos;
+    U64 current_selected_command_index;
+  } command_edit_box_state = {};
 
   V4F32 nice_grey   = v4f32(0.15f, 0.17f, 0.20f, 1.0f);
   V4F32 border_grey = v4f32(0.6980f, 0.7098f, 0.7373f, 1.0f);
@@ -893,7 +898,6 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
   UI_Col()
   {
     ui_spacer(ui_px(50));
-
     UI_Row()
     {
       ui_spacer(ui_p_of_p(1.0f, 0.0f));    
@@ -904,107 +908,102 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
       ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
       ui_set_next_size_y(ui_children_sum());
       ui_set_next_b_color(nice_grey);
-      UI_Box* box = ui_box_make(command_box_wrapper_id, UI_Box_flag__has_background);
-      UI_Parent(box)
+      // ui_set_next_border(2, border_grey);
+      UI_Box* command_box_wrapper_box = ui_box_make(command_box_wrapper_id, UI_Box_flag__has_background);
+      UI_Parent(command_box_wrapper_box)
       {
         F32 edit_box_width = range_v2f32_dims(command_box_wrapper_box_data.on_screen_bbox).x;
+
+        Str8 edit_box_id = Str8FromC("Text edit box for commands");
         
-        UI_PaddedBox(ui_px(2), Axis2__y)
+        Edit_box_result edit_result = ui_text_edit_box(0.0f, edit_box_id, edit_box_width, Str8FromC("Search commands by name"), command_edit_box_state.buffer, &command_edit_box_state.buffer_count, ArrayCount(command_edit_box_state.buffer), &command_edit_box_state.cursor_pos, &command_edit_box_state.section_pos);
+        if (edit_result.is_typing)
         {
-          ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
-          ui_set_next_size_y(ui_children_sum());
-          ui_set_next_border(1, border_grey);
-          UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_borders))
+          Str8 edit_box_str = str8_manual(command_edit_box_state.buffer, command_edit_box_state.buffer_count);
+          
+          ui_spacer(ui_px(2));
+          ui_set_next_size_x(ui_px(10));
+          ui_set_next_size_y(ui_px(2));
+          ui_set_next_b_color(border_grey);
+          ui_box_make(Str8{}, UI_Box_flag__has_background);
+          ui_spacer(ui_px(2));
+
+          Str8_list filtered_commands = {};
+          for EachIndex(command_name_index, Command_id__COUNT)
           {
-            UI_PaddedBox(ui_px(2), Axis2__y)
+            Str8 command_name = command_names[command_name_index];
+            if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
             {
-              Str8 edit_box_id = Str8FromC("Text edit box for commnads");
-              ui_text_edit_box(0.0f, edit_box_id, edit_box_width, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
-              
-              if (ui_is_active_id(edit_box_id))
-              {
-                Str8 edit_box_str = str8_manual(buffer, buffer_count);
-                DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
-                {
-                  ui_spacer(ui_px(2));
-                
-                  ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
-                  ui_set_next_size_y(ui_px(2));
-                  ui_set_next_b_color(border_grey);
-                  ui_box_make(Str8{}, UI_Box_flag__has_background);
-  
-                  ui_spacer(ui_px(2));
-  
-                  Str8_list filtered_commands = {};
-                  for EachIndex(command_name_index, Command_id__COUNT)
-                  {
-                    Str8 command_name = command_names[command_name_index];
-                    if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
-                    {
-                      str8_list_append(scratch.arena, &filtered_commands, command_name);
-                    }
-                  }
-  
-                  for (Str8_node* node = filtered_commands.first; node; node = node->next)
-                  {
-                    ui_spacer(ui_px(5));
-                    ui_label(node->str);
-                  }
-                  ui_spacer(ui_px(5));
-
-                  // Doing some stuff with events
-                  for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-                  {
-                    if (ev->kind == OS_Event_kind__key)
-                    {
-                      if (ev->key_event.key == Key__escape) { 
-                        ui_reset_active_id_match(edit_box_id); 
-                        buffer_count = 0;
-                        cursor_pos   = 0;
-                        section_pos  = 0;
-                      }
-                      if (ev->key_event.key == Key__enter) {
-                        run_command_from_name(P, filtered_commands.first->str);
-                      }
-                    }
-                  }
-
-                }
-
-              }              
+              str8_list_append(scratch.arena, &filtered_commands, command_name);
             }
           }
-        }
+
+          if (edit_result.did_change_text)
+          {
+            command_edit_box_state.current_selected_command_index = 0;
+          }
+
+          U64 counter = 0;
+          Str8_node* chosen_node_nullable = 0;
+          for (Str8_node* node = filtered_commands.first; node; node = node->next)
+          {
+            ui_spacer(ui_px(5));
+
+            if (command_edit_box_state.current_selected_command_index == counter) { 
+              chosen_node_nullable = node;
+              ui_set_next_flags(UI_Box_flag__has_background);
+              ui_set_next_b_color(orange());
+            }
+            UI_Wrapper(Axis2__x)
+            {
+              ui_label(node->str);
+            }
+
+            counter += 1;
+          }
+          ui_spacer(ui_px(5));
+
+          // Doing some stuff with events
+          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+          {
+            if (ev->kind == OS_Event_kind__key)
+            {
+              if (ev->key_event.key == Key__enter && ev->key_event.went_down) 
+              {
+                if (chosen_node_nullable) {
+                  Str8 command = chosen_node_nullable->str;
+                  if (is_valid_command_name(command))
+                  {
+                    run_command_from_name(P, command);
+                    ui_reset_active_id(edit_box_id); 
+                    command_edit_box_state = {};
+                  }
+                }
+              }
+              else 
+              if (ev->key_event.key == Key__arrow_up && ev->key_event.went_down)
+              {
+                if (command_edit_box_state.current_selected_command_index > 0) {
+                  command_edit_box_state.current_selected_command_index -= 1;
+                }
+              }
+              else 
+              if (ev->key_event.key == Key__arrow_down && ev->key_event.went_down)
+              {
+                command_edit_box_state.current_selected_command_index += 1;
+              } 
+            }
+          }
+
+        }              
       }
 
       ui_spacer(ui_p_of_p(1.0f, 0.0f));    
     }
   }
 
-  /*
-  UI_PaddedBox(ui_px(100), Axis2__y)
-  {
-    { // Edit box
-      static U8 buffer[64]    = {};
-      static U64 buffer_count = 0;
-      static U64 cursor_pos   = 0;
-      static U64 section_pos  = 0;
-
-      Scratch scratch = get_scratch(0, 0);
-      {
-        UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
-        ui_aply_text_ops(op_list, buffer, ArrayCount(buffer), &buffer_count, &cursor_pos, &section_pos);
-      }
-      end_scratch(&scratch);
-
-      ui_text_edit_box(v2f32(200, 100), buffer, buffer_count, cursor_pos, section_pos);
-    }
-  }
-  */
-
-
   ui_end_build();
-
+  end_scratch(&scratch);
 }
 
 ///////////////////////////////////////////////////////////
@@ -1143,6 +1142,7 @@ void run_command_from_name(Pencil_state* P, Str8 command_name)
   else if (str8_match(command_name, command_names[Command_id__swap_to_draw],  Str8_match__ignore_case)) { command_swap_to_draw(P); }
   else if (str8_match(command_name, command_names[Command_id__toggle_line_fade], Str8_match__ignore_case)) { command_toggle_line_fade(P); }
   else if (str8_match(command_name, command_names[Command_id__swap_to_eraser], Str8_match__ignore_case)) { command_swap_to_eraser(P); }
+  else if (str8_match(command_name, command_names[Command_id__make_background_blue], Str8_match__ignore_case)) { command_make_background_blue(P); }
   else {
     InvalidCodePath();
   }
@@ -1172,6 +1172,25 @@ void command_swap_to_eraser(Pencil_state* P)
 {
   P->signal_swap_to_eraser = true;
 }
+
+void command_make_background_blue(Pencil_state* P)
+{
+  P->signal_make_b_blue = true;
+}
+
+B32 is_valid_command_name(Str8 command_name)
+{
+  B32 result = false;
+  for EachIndex(i, ArrayCount(command_names))
+  {
+    if (str8_match(command_name, command_names[i], Str8_match__ignore_case)) {
+      result = true;
+      break;
+    }
+  }
+  return result;
+}
+
 
 // todo: I would like to pass P here as const, and signals as a separate thing then to have it clear that ui doesnt modify the state at all
 #if DEBUG_MODE

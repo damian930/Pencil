@@ -46,6 +46,7 @@ struct Draw_record_registration_result {
   X(swap_to_ruler,    Str8FromC("Swap to ruller")   ) \
   X(terminate_app,    Str8FromC("Terminate app")    ) \
   X(toggle_line_fade, Str8FromC("Toggle line fade") ) \
+  X(make_background_blue, Str8FromC("Make background blue") ) \
 
 enum Command_id : U32 {
   // Command_id__NONE,
@@ -120,6 +121,8 @@ struct Pencil_state {
   // 
   B32 signal_swap_to_eraser;
   //
+  B32 signal_make_b_blue;
+  //
   B32 signal_swap_to_pen;
   //
   B32 signal_new_pen_color_hsva;
@@ -157,6 +160,8 @@ void command_swap_to_ruller(Pencil_state* P);
 void command_swap_to_draw(Pencil_state* P);
 void command_toggle_line_fade(Pencil_state* P);
 void command_swap_to_eraser(Pencil_state* P);
+void command_make_background_blue(Pencil_state* P);
+B32 is_valid_command_name(Str8 command_name);
 //
 //
 #if DEBUG_MODE

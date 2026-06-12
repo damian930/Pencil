@@ -6,7 +6,8 @@
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
 - Current feature working progress:
-[ ] - Have rounde corners and borders be working
+[ ] - Todo add a way to specify corner r in pixels and not only in %
+[ ] - Open up the text edit with a shortcut
 ===
 [ ] - A way to restrict or allow hover of other elements when we are down on some box and we hover another. For this there should be a general logic, either hover is alowed or not, then we just add a way to have a different logic happend. That is why i said "either"
 [ ] - Try to make a list with some buttons that you can hover and click and tab
@@ -72,6 +73,11 @@
 - Some quick ideas:
 [ ] - The issue with the rounded corners and then their children poking out might be fixed with a little scissor, that all,
       but that would require the gpu to switch contexts, since we would need to set a different scissor rect per each.
+
+- Other projects to learn from:
+[ ] - WCAP
+[ ] - RadDBG
+[ ] - DOOM + DOOM black book
 
 - Some notes:
 * -- The Alt/F10 logic works like this:

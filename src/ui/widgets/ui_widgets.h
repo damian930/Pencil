@@ -525,9 +525,12 @@ UI_Text_op_list ui_text_op_list_from_os_event_list(Arena* arena, OS_Event_list* 
   }
   return result_op_list;
 }
-
-void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start)
+ 
+void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_text_size, U64* current_text_size, U64* cursor_pos, U64* section_start, B32* opt_out_did_text_change, B32* opt_out_escaped)
 {
+  if (opt_out_did_text_change) { *opt_out_did_text_change = false; }
+  if (opt_out_escaped) { *opt_out_escaped = false; }
+
   B32 stop_editing = false;
   for (UI_Text_op* text_op = text_op_list.first; text_op != 0; text_op = text_op->next)
   {
@@ -587,6 +590,8 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
           // Moving the cursor
           *cursor_pos = range_to_delete.min;
           
+          if (opt_out_did_text_change) { *opt_out_did_text_change = true; }
+
           end_scratch(&scratch);
         }
       } break;
@@ -629,6 +634,9 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
       
         // // Moving the cursor
         // *cursor_pos += str_to_insert.count; // todo: This will be wrong if overflow, fix this
+      
+        if (opt_out_did_text_change) { *opt_out_did_text_change = true; }
+        
       } break;
 
       case UI_Text_op_kind__insert_char_at_cursor:
@@ -652,10 +660,13 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
         if (*cursor_pos < max_text_size && *cursor_pos < u64_max) { *cursor_pos += 1; }
         
         end_scratch(&scratch);
+
+        if (opt_out_did_text_change) { *opt_out_did_text_change = true; }
       } break;
 
       case UI_Text_op_kind__stop_editing:
       {
+        if (opt_out_escaped) { *opt_out_escaped = true; }
         stop_editing = true;
       } break;
     }
@@ -666,13 +677,19 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
     Assert(0 <= *cursor_pos && *cursor_pos <= *current_text_size);
     clamp_u64_inplace(cursor_pos, 0, *current_text_size);
 
+    // TODO: This might fuck up the list there
     if (text_op->opt_os_event) { os_consume_frame_event(text_op->opt_os_event); }
 
     if (stop_editing) { break; }
   }
 }
  
-void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
+struct Edit_box_result {
+  B32 is_typing;
+  B32 did_change_text;
+  B32 escaped;
+};
+Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, Str8 placeholder_str, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
   U64 start_size = *text_buffer_size;
 
@@ -733,60 +750,62 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
   ui_set_next_size_x(ui_px(edit_box_width));
   ui_set_next_size_y(ui_px(font_height));
   ui_set_next_layout_axis(Axis2__x);
-  UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
+  ui_set_next_b_color(red());
+  UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__has_background| UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
   edit_box->clip_data.clip_value[Axis2__x] = new_clip_offset;
   UI_Parent(edit_box)
   {
-    ui_label(text_buffer_str);
-
-    ui_set_next_size_x(ui_children_sum());
-    ui_set_next_size_y(ui_px(font_height));
-    ui_set_next_layout_axis(Axis2__x);
-    UI_Box* cursor_section_box = ui_box_make(edit_box_id, UI_Box_flag__floating);
-    UI_Parent(cursor_section_box)
+    if (text_buffer_str.count == 0 && !edit_box_actions.is_active)
     {
-      U64 section_start = Min(*cursor_pos, *section_pos);
-      U64 section_end   = Max(*cursor_pos, *section_pos);
-
-      Str8 str_before_section_start = str8_substring(text_buffer_str, 0, section_start);
-      Str8 str_inside_section       = str8_substring(text_buffer_str, section_start, section_end);
-      Str8 str_after_section_end    = str8_substring(text_buffer_str, section_end, text_buffer_str.count);
-
-      F32 space_before_section_start = fp_measure_text(str_before_section_start, font).x; 
-      F32 space_inside_section       = fp_measure_text(str_inside_section, font).x; 
-      F32 space_after_section_end    = fp_measure_text(str_after_section_end, font).x; 
-
-      ui_spacer(ui_px(space_before_section_start));
-      
-      if (ui_is_active_id(edit_box_id))
+      ui_label(placeholder_str);
+    } 
+    else 
+    {
+      ui_label(text_buffer_str);
+  
+      ui_set_next_size_x(ui_children_sum());
+      ui_set_next_size_y(ui_px(font_height));
+      ui_set_next_layout_axis(Axis2__x);
+      UI_Box* cursor_section_box = ui_box_make(edit_box_id, UI_Box_flag__floating);
+      UI_Parent(cursor_section_box)
       {
-        ui_set_next_size_x(ui_px(section_start == section_end ? cursor_size : space_inside_section + cursor_size));
-        ui_set_next_size_y(ui_px(font_height));
-        ui_set_next_b_color(blue());
-        UI_Box* cursor_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
-        UI_Parent(cursor_box) 
+        U64 section_start = Min(*cursor_pos, *section_pos);
+        U64 section_end   = Max(*cursor_pos, *section_pos);
+  
+        Str8 str_before_section_start = str8_substring(text_buffer_str, 0, section_start);
+        Str8 str_inside_section       = str8_substring(text_buffer_str, section_start, section_end);
+        Str8 str_after_section_end    = str8_substring(text_buffer_str, section_end, text_buffer_str.count);
+  
+        F32 space_before_section_start = fp_measure_text(str_before_section_start, font).x; 
+        F32 space_inside_section       = fp_measure_text(str_inside_section, font).x; 
+        F32 space_after_section_end    = fp_measure_text(str_after_section_end, font).x; 
+  
+        ui_spacer(ui_px(space_before_section_start));
+        
+        if (ui_is_active_id(edit_box_id))
         {
-          if (section_start != section_end) {
-            ui_label(str_inside_section);
+          ui_set_next_size_x(ui_px(section_start == section_end ? cursor_size : space_inside_section + cursor_size));
+          ui_set_next_size_y(ui_px(font_height));
+          ui_set_next_b_color(blue());
+          UI_Box* cursor_box = ui_box_make(edit_box_id, UI_Box_flag__has_background);
+          UI_Parent(cursor_box) 
+          {
+            if (section_start != section_end) {
+              ui_label(str_inside_section);
+            }
           }
         }
       }
     }
   }
 
-  // Updating a copy of the users data to return
-  if (ui_is_active_id(edit_box_id))
+  B32 did_text_change = false;
+  B32 escaped         = false; 
+  if (edit_box_actions.is_down)
   {
-    UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
-    ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos);
-  }
-
-  if (edit_box_data.is_found)
-  {
-    if (edit_box_actions.is_down)
+    ui_set_active_id(edit_box_id);
+    if (edit_box_data.is_found)
     {
-      ui_set_active_id(edit_box_id);
-
       F32 new_cursor_pos_in_px_in_text = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x - edit_box_data.clip_offset.x;
       
       F32 accumulated_offset = 0.0f;
@@ -811,14 +830,21 @@ void ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, U8* text
       }
     }
   }
-
-  // idea:
-  // For the first click you map where to put the cursor, you put it there
-  // then if the mouse is held down you wait till it is draged far enought and then
-  // you figure out the new cursor position and keep the old one as the section start.
-  // return this data to the user 
+  else if (edit_box_actions.is_active) 
+  {
+    UI_Text_op_list op_list = ui_text_op_list_from_os_event_list(scratch.arena, os_get_frame_event_list());
+    ui_aply_text_ops(op_list, text_buffer, buffer_max_count, text_buffer_size, cursor_pos, section_pos, &did_text_change, &escaped);
+    if (escaped) {
+      ui_reset_active();
+    }
+  }
   
   end_scratch(&scratch);
+  Edit_box_result result = {}; 
+  result.is_typing       = ui_is_active_box(edit_box);
+  result.did_change_text = did_text_change;
+  result.escaped         = escaped;
+  return result;
 }
 
 #endif

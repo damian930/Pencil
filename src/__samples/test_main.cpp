@@ -131,18 +131,18 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       ui_push_font(font);
 
       // Testing rounded corners and borders
-      UI_PaddedBox(ui_p_of_p(1, 0), Axis2__y)
+      /*
+      // UI_PaddedBox(ui_p_of_p(1, 0), Axis2__y)
       {
         static F32 smooth = 0.0f;
-    
-        
 
         ui_set_next_size_x(ui_px(200));
         ui_set_next_size_y(ui_px(100));
         ui_set_next_b_color(white());
         ui_set_next_corner_r(v4f32_all(0.25));
+        ui_set_next_border(2, blue());
         ui_set_next_softness(smooth);
-        ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
+        ui_box_make(Str8{}, UI_Box_flag__has_background|UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners);
     
         ui_spacer(ui_px(50));
 
@@ -153,12 +153,12 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
             if (ui_button(Str8FromC("UP")).is_clicked) { smooth += 1.0f; }
             if (ui_button(Str8FromC("DOWN")).is_clicked) { smooth -= 1.0f; }
           }
-          clamp_f32_inplace(&smooth, 0.0f, 10.0f);
+          clamp_f32_inplace(&smooth, 0.0f, 30.0f);
           ui_label_f("Smooth: %f", smooth);
         }
       }
+      */
 
-      /*
       UI_PaddedBox(ui_p_of_p(1, 0), Axis2__y)
       {
         ui_set_next_b_color(blue());
@@ -233,7 +233,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
           }
         }
       }
-      */
 
       Scratch scratch = get_scratch(0, 0);
       Str8 str = str8_copy_alloc(scratch.arena, ui_get_context()->navigated_box_id);
