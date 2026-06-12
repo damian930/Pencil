@@ -94,6 +94,7 @@ void ui_init()
   __ui_g_context->defaults.layout_axis = Axis2__y;
   __ui_g_context->defaults.size_x      = ui_children_sum();
   __ui_g_context->defaults.size_y      = ui_children_sum();
+  __ui_g_context->defaults.padding     = 0.0f;
   __ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
   __ui_g_context->defaults.softness    = 0.0f;
   __ui_g_context->defaults.font        = {};
@@ -142,6 +143,7 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   box->layout_axis             = ui_get_layout_axis();    
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
+  box->padding                 = ui_get_padding();
   
   {
     for EachEnumRange(i, UV, UV__00, UV__COUNT) {
@@ -190,6 +192,7 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   ui_pop_single_usage_layout_axis();
   ui_pop_single_usage_size_x();
   ui_pop_single_usage_size_y();
+  ui_pop_single_usage_padding();
   ui_pop_single_usage_b_color();
   ui_pop_single_usage_corner_r();
   ui_pop_single_usage_border();
@@ -295,6 +298,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   ctx->layout_axis_stack     = {};
   ctx->semantic_size_x_stack = {};
   ctx->semantic_size_y_stack = {};
+  ctx->padding_stack         = {};
   ctx->corner_radius_stack   = {};
   ctx->border_style_stack    = {};
   ctx->softness_stack        = {};
@@ -339,6 +343,7 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   ui_push_layout_axis(ctx->defaults.layout_axis);
   ui_push_size_x(ctx->defaults.size_x);
   ui_push_size_y(ctx->defaults.size_y);
+  ui_push_padding(ctx->defaults.padding);
   ui_push_b_color_uv(UV__00, ctx->defaults.vertex_colors[UV__00]);
   ui_push_b_color_uv(UV__01, ctx->defaults.vertex_colors[UV__01]);
   ui_push_b_color_uv(UV__10, ctx->defaults.vertex_colors[UV__10]);
@@ -371,6 +376,9 @@ void ui_end_build()
   os_set_cursor(ctx->final_cursor);
 }
 
+///////////////////////////////////////////////////////////
+// - Layout algorithm
+//
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 {
   switch (root->semantic_size[axis].kind)
@@ -379,14 +387,13 @@ void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 
     case UI_Size_kind__px:
     {
-      root->final_on_screen_size.v[axis] = root->semantic_size[axis].value;
-      if (f32_is_nan(root->final_on_screen_size.v[axis])) { BP; }
+      root->final_on_screen_size.v[axis] = root->semantic_size[axis].value + (2*root->padding);
     } break;
 
     case UI_Size_kind__text:
     {
       V2F32 dims = fp_measure_text(root->text_style.text, root->text_style.font);
-      root->final_on_screen_size.v[axis] = dims.v[axis];
+      root->final_on_screen_size.v[axis] = dims.v[axis] + (2*root->padding);
     } break;
   }
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
@@ -399,7 +406,7 @@ void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
 {
   switch (root->semantic_size[axis].kind)
   {
-    default: { } break;
+    default: {} break;
 
     case UI_Size_kind__percent_of_parent:
     {
@@ -414,7 +421,7 @@ void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
           Assert(parent->final_on_screen_size.v[axis] == 0.0f); 
         }
       }
-      root->final_on_screen_size.v[axis] = parent->final_on_screen_size.v[axis] * root->semantic_size[axis].value;
+      root->final_on_screen_size.v[axis] = (parent->final_on_screen_size.v[axis] * root->semantic_size[axis].value) + (2*root->padding);
     } break;
   }
 
@@ -443,9 +450,9 @@ void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis)
         if (child->flags & UI_Box_flag__floating_x<<axis) { continue; } 
      
         if (root->layout_axis == axis) {
-          root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; 
+          root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis] + (2*root->padding); 
         } else {
-          root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]); 
+          root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]) + (2*root->padding); 
         }
       }
 
@@ -584,13 +591,17 @@ void ui_do_layout_fixing(UI_Box* root, Axis2 axis)
 
 void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
 {
-  F32 accumelated_offset = 0.0f;
+  // if (root->padding != 0.0f && axis == Axis2__y) { BP; }
+  F32 accumelated_children_offset = 0.0f;
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    if (root->layout_axis == axis && !(child->flags & UI_Box_flag__floating_x<<axis)) 
+    if (!(child->flags & UI_Box_flag__floating_x<<axis))
     {
-      child->final_parent_offset.v[axis] = accumelated_offset;
-      accumelated_offset += child->final_on_screen_size.v[axis]; 
+      if (root->layout_axis == axis) { 
+        child->final_parent_offset.v[axis] = root->padding + accumelated_children_offset; 
+        accumelated_children_offset += child->final_on_screen_size.v[axis]; 
+      }
+      else { child->final_parent_offset.v[axis] = root->padding + accumelated_children_offset; }
     }
 
     if (!(child->flags & UI_Box_flag__floating_x<<axis) || (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating))
@@ -605,8 +616,6 @@ void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
 void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip_bbox)
 {
   static F32 total_offset[Axis2__COUNT]  = {};
-
-  // if (str8_match(Str8FromC("Clip box"), root->id, 0)) { BP; }
 
   // Positioning boxes regardless of clip
   root->final_on_screen_bbox.min.v[axis] = total_offset[axis] + root->final_parent_offset.v[axis];
@@ -652,6 +661,10 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
   RangeV2F32 parent_clip_bbox = range_v2f32(v2f32(-1000.0f, -1000.0f), v2f32(1000.0f, 1000.0f));
   ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
 }
+
+///////////////////////////////////////////////////////////
+// - Box data stuff
+//
 
 // note: There might be weird thing going on with ids and text, dont forget about ##
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id)
@@ -866,11 +879,18 @@ UI_Actions ui_actions_from_id(Str8 id)
 //
 void ui_set_active_id(Str8 id)
 {
+  if (id.count == 0) { return; }
+
   UI_Context* ctx = ui_get_context();
 
   // I guess this is how it is supposed to work, not sure about reset yet thought
-  ctx->active_box_id = str8_copy_alloc(ui_get_build_arena(), id);
+  ctx->active_box_id    = str8_copy_alloc(ui_get_build_arena(), id);
   ctx->navigated_box_id = str8_copy_alloc(ui_get_build_arena(), id);
+}
+
+void ui_set_active_box(UI_Box* box)
+{
+  ui_set_active_id(box->id);
 }
 
 void ui_reset_active_id(Str8 id)
@@ -897,6 +917,11 @@ B32 ui_is_active_id(Str8 id)
 B32 ui_is_active_box(UI_Box* box)
 {
   return ui_is_active_id(box->id);
+}
+
+B32 ui_has_active() 
+{
+  return (ui_get_context()->active_box_id.count != 0);
 }
 
 void ui_set_b_color(UI_Box* box, V4F32 color)
@@ -977,6 +1002,12 @@ void ui_pop_size_y()               { UI_Context* ctx = ui_get_context(); _UI_Sty
 void ui_set_next_size_y(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, v) }
 void ui_pop_single_usage_size_y()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
 UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, size_y) }
+
+void ui_push_padding(F32 v)        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, padding_stack, UI_Padding_node, v) }
+void ui_pop_padding()              { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, padding_stack, UI_Padding_node) }
+void ui_set_next_padding(F32 v)    { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, padding_stack, UI_Padding_node, v) }
+void ui_pop_single_usage_padding() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, padding_stack, UI_Padding_node) }
+F32  ui_get_padding()              { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, padding_stack, UI_Padding_node, padding) }
 
 ///////////////////////////////////////////////////////////
 // - Style box settings stacks

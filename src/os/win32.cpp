@@ -958,19 +958,22 @@ LRESULT win32_proc(
       else {
         switch (w_param)
         {
-          default:         { /*InvalidCodePath();*/  } break;
-          case VK_SHIFT:   { key = Key__shift;       } break;
-          case VK_CONTROL: { key = Key__control;     } break;
-          case VK_DELETE:  { key = Key__delete;      } break;
-          case VK_BACK:    { key = Key__backspace;   } break;
-          case VK_TAB:     { key = Key__tab;         } break;
-          case VK_LEFT:    { key = Key__arrow_left;  } break;
-          case VK_UP:      { key = Key__arrow_up;    } break;
-          case VK_RIGHT:   { key = Key__arrow_right; } break;
-          case VK_DOWN:    { key = Key__arrow_down;  } break;
-          case VK_SPACE:   { key = Key__space;       } break;
-          case VK_ESCAPE:  { key = Key__escape;      } break;
-          case VK_RETURN:  { key = Key__enter;       } break;
+          default:           { /*InvalidCodePath();*/  } break;
+          case VK_SHIFT:     { key = Key__shift;       } break;
+          case VK_CONTROL:   { key = Key__control;     } break;
+          case VK_DELETE:    { key = Key__delete;      } break;
+          case VK_BACK:      { key = Key__backspace;   } break;
+          case VK_TAB:       { key = Key__tab;         } break;
+          case VK_LEFT:      { key = Key__arrow_left;  } break;
+          case VK_UP:        { key = Key__arrow_up;    } break;
+          case VK_RIGHT:     { key = Key__arrow_right; } break;
+          case VK_DOWN:      { key = Key__arrow_down;  } break;
+          case VK_SPACE:     { key = Key__space;       } break;
+          case VK_ESCAPE:    { key = Key__escape;      } break;
+          case VK_RETURN:    { key = Key__enter;       } break;
+          case VK_OEM_COMMA: { key = Key__comma;       } break;
+          case VK_HOME:      { key = Key__home;        } break;
+          case VK_END:       { key = Key__end;        } break;
         }
       }
 

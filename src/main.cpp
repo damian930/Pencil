@@ -196,8 +196,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     { // UI and Application update 
       // pencil_do_ui(&P, font);
       pencil_do_command_ui(&P, font);
-      // pencil_update(&P, ui_has_active());
-      // pencil_update(&P, !ui_has_active(), false);
+      pencil_update(&P, ui_has_active());
     }
 
     // Test ui for a text edit box
@@ -259,13 +258,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     */
 
     { // Rendering
-      // r_clear_target(window_frame_buffer_target, transparent());
-      r_clear_target(window_frame_buffer_target, blue());
-      if (P.signal_make_b_blue) {
-        P.signal_make_b_blue = false;
-        r_clear_target(window_frame_buffer_target, black());
-      }
-      // pencil_render(&P);
+      r_clear_target(window_frame_buffer_target, transparent());
+      pencil_render(&P);
       // if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
       ui_draw();
     }

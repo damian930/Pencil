@@ -47,6 +47,7 @@ struct Draw_record_registration_result {
   X(terminate_app,    Str8FromC("Terminate app")    ) \
   X(toggle_line_fade, Str8FromC("Toggle line fade") ) \
   X(make_background_blue, Str8FromC("Make background blue") ) \
+  X(open_command_list, Str8FromC("Open command list")) \
 
 enum Command_id : U32 {
   // Command_id__NONE,
@@ -111,6 +112,10 @@ struct Pencil_state {
   //
   B32 terminate_app;
 
+  struct {
+    B32 open_command_list;
+  } ui_state;
+
   // Signals 
   //
   B32 signal_new_pen_size;
@@ -138,9 +143,6 @@ struct Pencil_state {
   // Font font_texture_for_ui;
   // V2U64 last_screen_dims;
   B32 show_brush_ui_menu;
-  
-  // MID DEV HERE 
-  B32 show_command_ui = true;
 };
 
 // - Main passes
@@ -161,6 +163,7 @@ void command_swap_to_draw(Pencil_state* P);
 void command_toggle_line_fade(Pencil_state* P);
 void command_swap_to_eraser(Pencil_state* P);
 void command_make_background_blue(Pencil_state* P);
+void command_open_command_list(Pencil_state* P);
 B32 is_valid_command_name(Str8 command_name);
 //
 //

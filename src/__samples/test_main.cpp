@@ -159,6 +159,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       }
       */
 
+      /*
       UI_PaddedBox(ui_p_of_p(1, 0), Axis2__y)
       {
         ui_set_next_b_color(blue());
@@ -231,6 +232,41 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
               ui_spacer(ui_px(5));
             }
           }
+        }
+      }
+      */
+
+      ui_set_next_size_x(ui_children_sum());
+      ui_set_next_size_y(ui_children_sum());
+      ui_set_next_b_color(blue());
+      ui_set_next_padding(5);
+      UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_background))
+      {
+        // ui_set_next_size_x(ui_px(50));
+        // ui_set_next_size_y(ui_px(50));
+        // ui_set_next_b_color(red());
+        // ui_box_make(Str8{}, UI_Box_flag__has_background);
+
+        ui_set_next_flags(UI_Box_flag__has_background);
+        ui_set_next_b_color(red());
+        UI_Col()
+        {
+          ui_label_f("Label 1");
+          ui_label_f("Label 2");
+          ui_label_f("Label 3");
+          ui_label_f("Label 4");
+          ui_label_f("Label 5");
+        }
+
+        ui_spacer(ui_px(10));
+
+        UI_Col()
+        {
+          ui_label_f("Label 1");
+          ui_label_f("Label 2");
+          ui_label_f("Label 3");
+          ui_label_f("Label 4");
+          ui_label_f("Label 5");
         }
       }
 

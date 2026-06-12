@@ -108,6 +108,8 @@ void pencil_init(Pencil_state* P)
     }
     cJSON_Delete(settings_json);
 
+    P->ui_state.open_command_list = true;
+
     end_scratch(&scratch);
   }
 }
@@ -878,7 +880,7 @@ void pencil_do_ui(Pencil_state* P, FP_Font font)
 
 void pencil_do_command_ui(Pencil_state* P, FP_Font font)
 {
-  if (!P->show_command_ui) { return; }
+  if (!P->ui_state.open_command_list) { return; }
 
   Scratch scratch = get_scratch(0, 0);
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
@@ -892,114 +894,109 @@ void pencil_do_command_ui(Pencil_state* P, FP_Font font)
     U64 current_selected_command_index;
   } command_edit_box_state = {};
 
-  V4F32 nice_grey   = v4f32(0.15f, 0.17f, 0.20f, 1.0f);
-  V4F32 border_grey = v4f32(0.6980f, 0.7098f, 0.7373f, 1.0f);
-
-  UI_Col()
+  Str8 command_list_box_id           = Str8FromC("command_box_wrapper_id");
+  
+  ui_set_next_size_x(ui_px(200));
+  ui_set_next_size_y(ui_px(200));
+  ui_set_next_b_color(nice_green());
+  UI_Box* commands_list_box = ui_box_make(command_list_box_id, UI_Box_flag__has_background);
+  UI_Parent(commands_list_box)
   {
-    ui_spacer(ui_px(50));
-    UI_Row()
-    {
-      ui_spacer(ui_p_of_p(1.0f, 0.0f));    
+    ui_set_next_flags(UI_Box_flag__has_background);
+    ui_set_next_b_color(red());
+    Str8 edit_box_id = Str8FromC("Text edit box for commands");
+    Edit_box_result edit_result = ui_text_edit_box(0.0f, edit_box_id, 200, Str8FromC("Search commands by name"), command_edit_box_state.buffer, &command_edit_box_state.buffer_count, ArrayCount(command_edit_box_state.buffer), &command_edit_box_state.cursor_pos, &command_edit_box_state.section_pos);
+    ui_set_active_box(edit_result.edit_box); 
 
-      Str8 command_box_wrapper_id              = Str8FromC("command_box_wrapper_id");
-      UI_Box_data command_box_wrapper_box_data = ui_box_data_from_box_id_prev_frame(command_box_wrapper_id);
+    Str8 edit_box_str = str8_manual(command_edit_box_state.buffer, command_edit_box_state.buffer_count);
       
-      ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
-      ui_set_next_size_y(ui_children_sum());
-      ui_set_next_b_color(nice_grey);
-      // ui_set_next_border(2, border_grey);
-      UI_Box* command_box_wrapper_box = ui_box_make(command_box_wrapper_id, UI_Box_flag__has_background);
-      UI_Parent(command_box_wrapper_box)
+    ui_spacer(ui_px(5));
+    ui_set_next_size_x(ui_p_of_p(1, 0));
+    ui_set_next_size_y(ui_px(2));
+    ui_set_next_b_color(white());
+    ui_box_make(Str8{}, UI_Box_flag__has_background);
+    ui_spacer(ui_px(5));
+
+    ui_set_next_size_x(ui_px(200));
+    ui_set_next_size_y(ui_px(150));
+    ui_set_next_layout_axis(Axis2__y);
+    ui_set_next_b_color(magenta());
+    UI_Box* command_list_clip_box = ui_box_make(Str8FromC("Command list clip box"), UI_Box_flag__has_background|UI_Box_flag__clip_y);
+    UI_Parent(command_list_clip_box)
+    {
+      // Creating a list of commands that are usefull to use based on the user text input
+      Str8_list filtered_commands = {};
+      for EachIndex(command_name_index, Command_id__COUNT)
       {
-        F32 edit_box_width = range_v2f32_dims(command_box_wrapper_box_data.on_screen_bbox).x;
-
-        Str8 edit_box_id = Str8FromC("Text edit box for commands");
-        
-        Edit_box_result edit_result = ui_text_edit_box(0.0f, edit_box_id, edit_box_width, Str8FromC("Search commands by name"), command_edit_box_state.buffer, &command_edit_box_state.buffer_count, ArrayCount(command_edit_box_state.buffer), &command_edit_box_state.cursor_pos, &command_edit_box_state.section_pos);
-        if (edit_result.is_typing)
+        Str8 command_name = command_names[command_name_index];
+        if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
         {
-          Str8 edit_box_str = str8_manual(command_edit_box_state.buffer, command_edit_box_state.buffer_count);
-          
-          ui_spacer(ui_px(2));
-          ui_set_next_size_x(ui_px(10));
-          ui_set_next_size_y(ui_px(2));
-          ui_set_next_b_color(border_grey);
-          ui_box_make(Str8{}, UI_Box_flag__has_background);
-          ui_spacer(ui_px(2));
-
-          Str8_list filtered_commands = {};
-          for EachIndex(command_name_index, Command_id__COUNT)
-          {
-            Str8 command_name = command_names[command_name_index];
-            if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
-            {
-              str8_list_append(scratch.arena, &filtered_commands, command_name);
-            }
-          }
-
-          if (edit_result.did_change_text)
-          {
-            command_edit_box_state.current_selected_command_index = 0;
-          }
-
-          U64 counter = 0;
-          Str8_node* chosen_node_nullable = 0;
-          for (Str8_node* node = filtered_commands.first; node; node = node->next)
-          {
-            ui_spacer(ui_px(5));
-
-            if (command_edit_box_state.current_selected_command_index == counter) { 
-              chosen_node_nullable = node;
-              ui_set_next_flags(UI_Box_flag__has_background);
-              ui_set_next_b_color(orange());
-            }
-            UI_Wrapper(Axis2__x)
-            {
-              ui_label(node->str);
-            }
-
-            counter += 1;
-          }
-          ui_spacer(ui_px(5));
-
-          // Doing some stuff with events
-          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-          {
-            if (ev->kind == OS_Event_kind__key)
-            {
-              if (ev->key_event.key == Key__enter && ev->key_event.went_down) 
-              {
-                if (chosen_node_nullable) {
-                  Str8 command = chosen_node_nullable->str;
-                  if (is_valid_command_name(command))
-                  {
-                    run_command_from_name(P, command);
-                    ui_reset_active_id(edit_box_id); 
-                    command_edit_box_state = {};
-                  }
-                }
-              }
-              else 
-              if (ev->key_event.key == Key__arrow_up && ev->key_event.went_down)
-              {
-                if (command_edit_box_state.current_selected_command_index > 0) {
-                  command_edit_box_state.current_selected_command_index -= 1;
-                }
-              }
-              else 
-              if (ev->key_event.key == Key__arrow_down && ev->key_event.went_down)
-              {
-                command_edit_box_state.current_selected_command_index += 1;
-              } 
-            }
-          }
-
-        }              
+          str8_list_append(scratch.arena, &filtered_commands, command_name);
+        }
       }
-
-      ui_spacer(ui_p_of_p(1.0f, 0.0f));    
+  
+      if (edit_result.did_change_text) { command_edit_box_state.current_selected_command_index = 0; }
+  
+      U64 counter = 0;
+      Str8_node* chosen_node_nullable = 0;
+      for (Str8_node* node = filtered_commands.first; node; node = node->next)
+      {
+        ui_spacer(ui_px(5));
+  
+        if (command_edit_box_state.current_selected_command_index == counter) { 
+          chosen_node_nullable = node;
+          ui_set_next_flags(UI_Box_flag__has_background);
+          ui_set_next_b_color(orange());
+        }
+        UI_Wrapper(Axis2__x)
+        {
+          ui_label(node->str);
+        }
+  
+        counter += 1;
+      }
+      ui_spacer(ui_px(5));
+      
+      // Doing some stuff with events
+      for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+      {
+        if (ev->kind == OS_Event_kind__key)
+        {
+          if (ev->key_event.key == Key__enter && ev->key_event.went_down) 
+          {
+            if (chosen_node_nullable) {
+              Str8 command = chosen_node_nullable->str;
+              if (is_valid_command_name(command))
+              {
+                run_command_from_name(P, command);
+                ui_reset_active_id(edit_box_id); 
+                P->ui_state.open_command_list = false;
+                command_edit_box_state = {};
+              }
+            }
+          }
+          else 
+          if (ev->key_event.key == Key__arrow_up && ev->key_event.went_down)
+          {
+            if (command_edit_box_state.current_selected_command_index > 0) {
+              command_edit_box_state.current_selected_command_index -= 1;
+            } else if (filtered_commands.node_count > 0) {
+              command_edit_box_state.current_selected_command_index = filtered_commands.node_count - 1;
+            }
+          }
+          else 
+          if (ev->key_event.key == Key__arrow_down && ev->key_event.went_down)
+          {
+            command_edit_box_state.current_selected_command_index += 1;
+            if (command_edit_box_state.current_selected_command_index == filtered_commands.node_count) {
+              command_edit_box_state.current_selected_command_index = 0;
+            }
+          } 
+        }
+      }
     }
+
+  
   }
 
   ui_end_build();
@@ -1143,6 +1140,7 @@ void run_command_from_name(Pencil_state* P, Str8 command_name)
   else if (str8_match(command_name, command_names[Command_id__toggle_line_fade], Str8_match__ignore_case)) { command_toggle_line_fade(P); }
   else if (str8_match(command_name, command_names[Command_id__swap_to_eraser], Str8_match__ignore_case)) { command_swap_to_eraser(P); }
   else if (str8_match(command_name, command_names[Command_id__make_background_blue], Str8_match__ignore_case)) { command_make_background_blue(P); }
+  else if (str8_match(command_name, command_names[Command_id__open_command_list], Str8_match__ignore_case)) { command_open_command_list(P); }
   else {
     InvalidCodePath();
   }
@@ -1177,6 +1175,12 @@ void command_make_background_blue(Pencil_state* P)
 {
   P->signal_make_b_blue = true;
 }
+
+void command_open_command_list(Pencil_state* P)
+{
+  P->ui_state.open_command_list = true;
+}
+
 
 B32 is_valid_command_name(Str8 command_name)
 {

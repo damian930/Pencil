@@ -19,6 +19,10 @@
     {
       "combination": "Control+E",
       "command": "Swap to eraser"
+    },
+    {
+      "combination": "Control+P",
+      "command": "Open command list"
     }
   ]
 }

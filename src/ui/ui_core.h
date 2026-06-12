@@ -53,6 +53,9 @@ struct UI_Layout_axis_stack { UI_Layout_axis_node* first; U64 count; B32 pop_aft
 //
 struct UI_Semantic_size_node  { UI_Size v; UI_Semantic_size_node* next; };
 struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop_after_first_use; };
+//
+struct UI_Padding_node  { F32 v; UI_Padding_node* next; };
+struct UI_Padding_stack { UI_Padding_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to the shape of the box
 struct UI_Vertex_color_node  { V4F32 v; UI_Vertex_color_node* next; };
@@ -117,6 +120,9 @@ struct UI_Box {
     // V4F32 text_color;
   } text_style;
 
+  // TODO: Try to have static padding and child_gap as part of the algo, i have having to build them myself
+  F32 padding;
+
   UI_Box_custom_draw_func_type custom_draw_func;
   void* custom_draw_data;
 
@@ -125,7 +131,6 @@ struct UI_Box {
   B32 has_been_updated_this_build;
   UI_Actions actions;
 
-  // TODO: This is test code for now
   struct {
     F32 clip_value[Axis2__COUNT];      // Offset per axis
     RangeV2F32 clip_bbox;
@@ -190,6 +195,7 @@ struct UI_Context {
   UI_Layout_axis_stack   layout_axis_stack;
   UI_Semantic_size_stack semantic_size_x_stack;
   UI_Semantic_size_stack semantic_size_y_stack;
+  UI_Padding_stack       padding_stack;
   //
   // Shape style stacks
   UI_Vertex_color_stack  vertex_color_stacks[UV__COUNT];
@@ -207,6 +213,7 @@ struct UI_Context {
     Axis2        layout_axis;
     UI_Size      size_x;
     UI_Size      size_y;
+    F32          padding;
 
     V4F32     vertex_colors[UV__COUNT];
     V4F32     corner_radii;
@@ -310,10 +317,17 @@ void    ui_pop_size_y();
 void    ui_set_next_size_y(UI_Size v);          
 void    ui_pop_single_usage_size_y();
 UI_Size ui_get_size_y();
+//
+void ui_push_padding(F32 v);          
+void ui_pop_padding();      
+void ui_set_next_padding(F32 v);          
+void ui_pop_single_usage_padding();
+F32  ui_get_padding();
 
 #define UI_LayoutAxis(axis2)  DeferLoop(ui_push_layout_axis(axis2),       ui_pop_layout_axis())
-#define UI_SizeX(ui_size)      DeferLoop(ui_push_semantic_size_x(ui_size), ui_pop_semantic_size_x())
-#define UI_SizeY(ui_size)      DeferLoop(ui_push_semantic_size_y(ui_size), ui_pop_semantic_size_y())
+#define UI_SizeX(ui_size)     DeferLoop(ui_push_semantic_size_x(ui_size), ui_pop_semantic_size_x())
+#define UI_SizeY(ui_size)     DeferLoop(ui_push_semantic_size_y(ui_size), ui_pop_semantic_size_y())
+#define UI_Padding(padding)   DeferLoop(ui_push_padding(padding),         ui_pop_padding())
 
 // - Style box settings stacks
 void  ui_push_b_color_uv(UV uv, V4F32 v);     

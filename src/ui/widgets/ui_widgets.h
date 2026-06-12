@@ -688,6 +688,7 @@ struct Edit_box_result {
   B32 is_typing;
   B32 did_change_text;
   B32 escaped;
+  UI_Box* edit_box;
 };
 Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, Str8 placeholder_str, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
@@ -750,8 +751,7 @@ Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_widt
   ui_set_next_size_x(ui_px(edit_box_width));
   ui_set_next_size_y(ui_px(font_height));
   ui_set_next_layout_axis(Axis2__x);
-  ui_set_next_b_color(red());
-  UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__has_background| UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
+  UI_Box* edit_box = ui_box_make(edit_box_id, UI_Box_flag__clip|UI_Box_flag__aply_clip_offset_on_clildren_floating);
   edit_box->clip_data.clip_value[Axis2__x] = new_clip_offset;
   UI_Parent(edit_box)
   {
@@ -844,6 +844,7 @@ Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_widt
   result.is_typing       = ui_is_active_box(edit_box);
   result.did_change_text = did_text_change;
   result.escaped         = escaped;
+  result.edit_box        = edit_box;
   return result;
 }
 

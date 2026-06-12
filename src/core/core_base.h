@@ -860,6 +860,7 @@ V4U8 teal_u()        { return v4u8(0, 128, 128, 255);   }
 V4U8 orange_u()      { return v4u8(252, 102, 0, 255);   }
 V4U8 taupe_u()       { return v4u8(146, 124, 102, 255); }
 V4U8 magenta_u()     { return v4u8(253, 61, 181, 255);  }
+V4U8 nice_green_u()  { return v4u8(120, 171, 128, 255); }
 
 V4U8 change_alpha_u(V4U8 color, U8 new_a) { color.a = new_a; return color; }
 
@@ -877,6 +878,7 @@ V4F32 teal()        { return _U_COLOR_TO_F_COLOR(teal_u());        }
 V4F32 orange()      { return _U_COLOR_TO_F_COLOR(orange_u());      }  
 V4F32 taupe()       { return _U_COLOR_TO_F_COLOR(taupe_u());       }  
 V4F32 magenta()     { return _U_COLOR_TO_F_COLOR(magenta_u());     }  
+V4F32 nice_green()  { return _U_COLOR_TO_F_COLOR(nice_green_u());  }  
 
 V4F32 change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
 
