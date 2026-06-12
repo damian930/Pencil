@@ -90,18 +90,20 @@ void ui_init()
   __ui_g_context->current_parent_box  = &__ui_g_zero_box;
   __ui_g_context->prev_frame_root_box = &__ui_g_zero_box; 
 
-  __ui_g_context->defaults.flags       = UI_Box_flag__NONE;
-  __ui_g_context->defaults.layout_axis = Axis2__y;
-  __ui_g_context->defaults.size_x      = ui_children_sum();
-  __ui_g_context->defaults.size_y      = ui_children_sum();
-  __ui_g_context->defaults.padding     = 0.0f;
-  __ui_g_context->defaults.border      = UI_Border{ 0.0f, transparent() };
-  __ui_g_context->defaults.softness    = 0.0f;
-  __ui_g_context->defaults.font        = {};
-  for EachEnumRange(i, UV, UV__00, UV__COUNT) { 
-    __ui_g_context->defaults.vertex_colors[i]  = transparent(); 
+  __ui_g_context->defaults.flags        = UI_Box_flag__NONE;
+  __ui_g_context->defaults.layout_axis  = Axis2__y;
+  __ui_g_context->defaults.size_x       = ui_children_sum();
+  __ui_g_context->defaults.size_y       = ui_children_sum();
+  __ui_g_context->defaults.border_width  = 0.0f;
+  __ui_g_context->defaults.border_color = transparent();
+  __ui_g_context->defaults.padding      = 0.0f;
+  __ui_g_context->defaults.child_gap    = 0.0f;
+  for EachEnumRange(i, UV, UV__00, UV__COUNT) {
+    __ui_g_context->defaults.vertex_colors[i]  = transparent();
     __ui_g_context->defaults.corner_radii.v[i] = 0.0f;
   }
+  __ui_g_context->defaults.softness     = 0.0f;
+  __ui_g_context->defaults.font         = {};
 }
 
 void ui_release()
@@ -144,39 +146,43 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
   box->padding                 = ui_get_padding();
+  box->child_gap               = ui_get_child_gap();
   
+  {
+    V4F32 border_color = ui_get_border_color();
+    F32 border_width = ui_get_border_width();
+    if (!(flags & UI_Box_flag__has_borders)) { 
+      box->border_color = border_color;
+      box->border_width = border_width;
+    }
+  }
+
   {
     for EachEnumRange(i, UV, UV__00, UV__COUNT) {
       V4F32 vertex_color = ui_get_b_color_uv(i);
       if (!(flags & UI_Box_flag__has_background)) {
         vertex_color = ctx->defaults.vertex_colors[i];
       }
-      box->shape_style.vertex_colors[i] = vertex_color;
+      box->vertex_colors[i] = vertex_color;
     }
-  }
-
-  {
-    UI_Border border = ui_get_border();
-    if (!(flags & UI_Box_flag__has_borders)) { border = ctx->defaults.border; }
-    box->shape_style.border = border;
   }
 
   {
     V4F32 corner_r = ui_get_corner_r();
     if (!(flags & UI_Box_flag__has_rounded_corners)) { corner_r = ctx->defaults.corner_radii; }
-    box->shape_style.corner_radii = corner_r;
+    box->corner_radii = corner_r;
   }
 
-  box->shape_style.softness = ui_get_softness();
+  box->softness = ui_get_softness();
 
   {
     FP_Font font = ctx->defaults.font; 
     if (flags & UI_Box_flag__has_text_contents)
     {
-      box->text_style.text = str8_copy_alloc(ui_get_build_arena(), ui_get_text_part_from_str8(id_and_text));
+      box->text = str8_copy_alloc(ui_get_build_arena(), ui_get_text_part_from_str8(id_and_text));
       font = ui_get_font();
     }
-    box->text_style.font = font;
+    box->font = font;
   }
 
   DllPushBack_Name_NullFunc(ctx->current_parent_box, box, first_child, last_child, next_sibling, prev_sibling, ui_box_is_zero);
@@ -195,7 +201,6 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   ui_pop_single_usage_padding();
   ui_pop_single_usage_b_color();
   ui_pop_single_usage_corner_r();
-  ui_pop_single_usage_border();
   ui_pop_single_usage_softness();
   ui_pop_single_usage_font();
 
@@ -294,16 +299,18 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   UI_Context* ctx = ui_get_context();
   
   // Resetting the prev build state
-  ctx->flags_stack           = {};
-  ctx->layout_axis_stack     = {};
-  ctx->semantic_size_x_stack = {};
-  ctx->semantic_size_y_stack = {};
-  ctx->padding_stack         = {};
-  ctx->corner_radius_stack   = {};
-  ctx->border_style_stack    = {};
-  ctx->softness_stack        = {};
-  ctx->text_font_stack       = {};
-  for EachEnumRange(i, UV, UV__00, UV__COUNT) { ctx->vertex_color_stacks[i] = {}; }
+  __ui_g_context->flags_stack          = {};
+  __ui_g_context->layout_axis_stack    = {};
+  __ui_g_context->semantic_size_x_stack = {};
+  __ui_g_context->semantic_size_y_stack = {};
+  __ui_g_context->border_width_stack    = {};
+  __ui_g_context->border_color_stack   = {};
+  __ui_g_context->padding_stack        = {};
+  __ui_g_context->child_gap_stack      = {};
+  for EachEnumRange(i, UV, UV__00, UV__COUNT) { __ui_g_context->vertex_color_stacks[i] = {}; }
+  __ui_g_context->corner_radius_stack  = {};
+  __ui_g_context->softness_stack       = {};
+  __ui_g_context->text_font_stack      = {};
 
   ctx->prev_frame_root_box = ctx->root_box;
   ctx->root_box            = &__ui_g_zero_box;
@@ -344,13 +351,16 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos)
   ui_push_size_x(ctx->defaults.size_x);
   ui_push_size_y(ctx->defaults.size_y);
   ui_push_padding(ctx->defaults.padding);
+  ui_push_child_gap(ctx->defaults.child_gap);
+  ui_push_border_width(ctx->defaults.border_width);
+  ui_push_border_color(ctx->defaults.border_color);
   ui_push_b_color_uv(UV__00, ctx->defaults.vertex_colors[UV__00]);
   ui_push_b_color_uv(UV__01, ctx->defaults.vertex_colors[UV__01]);
   ui_push_b_color_uv(UV__10, ctx->defaults.vertex_colors[UV__10]);
   ui_push_b_color_uv(UV__11, ctx->defaults.vertex_colors[UV__11]);
   ui_push_corner_r(ctx->defaults.corner_radii);
-  ui_push_border(ctx->defaults.border.width, ctx->defaults.border.color);
   ui_push_softness(ctx->defaults.softness);
+  // TODO: There is no way to push font here since we dont have a default one yet
 
   ui_set_next_size_x(ui_px(window_dims.x));
   ui_set_next_size_y(ui_px(window_dims.y));
@@ -370,15 +380,123 @@ void ui_end_build()
 {
   UI_Context* ctx = ui_get_context();
   ui_pop_parent();
-  ui_layout_box(ctx->root_box, Axis2__x);
-  ui_layout_box(ctx->root_box, Axis2__y);
-
+  __ui_layout_box(ctx->root_box, Axis2__x);
+  __ui_layout_box(ctx->root_box, Axis2__y);
   os_set_cursor(ctx->final_cursor);
 }
 
 ///////////////////////////////////////////////////////////
 // - Layout algorithm
 //
+void __ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
+{
+  switch (root->semantic_size[axis].kind)
+  {
+    default: {} break;
+
+    case UI_Size_kind__px:
+    {
+      // Boxes with pixel sizes dont use any of the padding or gap or border for size calculations.
+      // But just like in web for border-boxes the sume of border and padding are included in size. 
+      // But the sum of those 2 cant be smaller then the size of the box, if it is, then we have the box get bigger.
+      root->final_on_screen_size.v[axis] = Max(2*(root->border_width + root->padding), root->semantic_size[axis].value);
+    } break;
+
+    // note/TODO: do we even need this, might be a good idea to remove this untill i really need this and just use the px and custom draw for labels
+    case UI_Size_kind__text:
+    {
+      // TODO: This dont yet use any of the padding and shit, so not sure about this yet
+      // Boxes with text sizes, which is the same and just pixels sizes dont use any of the padding or gap or border for size calculations
+      V2F32 dims = fp_measure_text(root->text, root->font);
+      root->final_on_screen_size.v[axis] = dims.v[axis];
+    } break;
+  }
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    __ui_do_sizing_for_fixed_sized_box(child, axis);
+  }
+}
+
+void __ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
+{
+  U64 child_index = 0;
+  F32 accumelated_children_sizes = 0.0f;
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling, child_index += 1)
+  {
+    // Floating doesnt have offset from parent
+    if (child->flags & UI_Box_flag__floating_x<<axis) {}
+    else 
+    {
+      child->final_parent_offset.v[axis] = child->final_parent_offset.v[axis] = root->padding + root->border_width; 
+      if (axis == root->layout_axis) {
+        child->final_parent_offset.v[axis] += accumelated_children_sizes + (child_index * root->child_gap); // First child has gap of 0, second has gap of 1, third gap of 2, ....
+        accumelated_children_sizes += child->final_on_screen_size.v[axis];
+      }
+    }
+
+    // Offsetting the boxes based on their parent clip value
+    if (child->flags & UI_Box_flag__floating_x<<axis) {} /*|| (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating)*/
+    else {
+      child->final_parent_offset.v[axis] += root->clip_offset[axis];
+    }
+
+    __ui_do_relative_parent_offsets_for_box(child, axis);
+  }
+}
+
+void __ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip_bbox)
+{
+  static F32 total_offset[Axis2__COUNT] = {};
+
+  // Positioning boxes regardless of clip
+  root->final_on_screen_bbox.min.v[axis] = total_offset[axis] + root->final_parent_offset.v[axis];
+  root->final_on_screen_bbox.max.v[axis] = root->final_on_screen_bbox.min.v[axis] + root->final_on_screen_size.v[axis];
+
+  // Dealing with clip rects
+  root->clip_bbox.min.v[axis] = parent_clip_bbox.min.v[axis]; 
+  root->clip_bbox.max.v[axis] = parent_clip_bbox.max.v[axis]; 
+  //
+  RangeV2F32 new_clip_bbox = parent_clip_bbox;
+  {
+    if (root->flags & UI_Box_flag__clip_x<<axis) {
+      new_clip_bbox = intersect_range_v2f32_on_axis(parent_clip_bbox, root->final_on_screen_bbox, axis);
+    }
+  }
+
+  // Doing children
+  F32 children_size_sum = 0.0f;
+  U64 child_index = 0;
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling, child_index += 1)
+  {
+    if (root->layout_axis == axis) { children_size_sum += child->final_on_screen_size.v[axis] + (child_index * root->child_gap); }
+    else { children_size_sum = Max(children_size_sum, child->final_on_screen_size.v[axis]); }
+
+    F32 prev_total_offset = total_offset[axis]; 
+    total_offset[axis] = root->final_on_screen_bbox.min.v[axis];
+    __ui_do_final_rect_for_box(child, axis, new_clip_bbox);
+    total_offset[axis] = prev_total_offset;
+  }
+  root->inner_content_dims.v[axis] = children_size_sum;
+}
+
+void __ui_layout_box(UI_Box* root, Axis2 axis)
+{ 
+  __ui_do_sizing_for_fixed_sized_box(root, axis);      
+  __ui_do_relative_parent_offsets_for_box(root, axis);
+
+  // TODO: 1000 is a bit too little here
+  RangeV2F32 parent_clip_bbox = range_v2f32(v2f32(-1000.0f, -1000.0f), v2f32(1000.0f, 1000.0f));
+  __ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
+}
+
+// algo:
+// - figure out sizes for each box
+// -- size fixed sized elements
+// - position each box, this is just relative to its parent
+// - create final bounding boxes 
+
+// Prev iteration of the ui system layout algorightm
+/*
 void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 {
   switch (root->semantic_size[axis].kind)
@@ -649,9 +767,9 @@ void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip_b
 
 void ui_layout_box(UI_Box* root, Axis2 axis)
 { 
-  ui_do_sizing_for_fixed_sized_box(root, axis);      /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
-  ui_do_sizing_for_parent_dependant_box(root, axis); /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
-  ui_do_sizing_for_child_dependant_box(root, axis);  /*Some old debug*/ if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_fixed_sized_box(root, axis);      if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_parent_dependant_box(root, axis); if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
+  ui_do_sizing_for_child_dependant_box(root, axis);  if (f32_is_nan(root->final_on_screen_size.x) || f32_is_nan(root->final_on_screen_size.y)) { BP; }
   ui_do_layout_fixing(root, axis);
 
   ui_do_relative_parent_offsets_for_box(root, axis);
@@ -661,6 +779,7 @@ void ui_layout_box(UI_Box* root, Axis2 axis)
   RangeV2F32 parent_clip_bbox = range_v2f32(v2f32(-1000.0f, -1000.0f), v2f32(1000.0f, 1000.0f));
   ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
 }
+*/
 
 ///////////////////////////////////////////////////////////
 // - Box data stuff
@@ -707,7 +826,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
     box_data.is_found           = true; 
     box_data.on_screen_bbox     = box->final_on_screen_bbox; 
     box_data.inner_content_dims = box->inner_content_dims;
-    box_data.clip_offset        = v2f32(box->clip_data.clip_value[Axis2__x], box->clip_data.clip_value[Axis2__y]) ;
+    box_data.clip_offset        = v2f32(box->clip_offset[Axis2__x], box->clip_offset[Axis2__y]) ;
   }
   return box_data;
 }
@@ -927,10 +1046,10 @@ B32 ui_has_active()
 void ui_set_b_color(UI_Box* box, V4F32 color)
 {
   if (ui_box_is_zero(box)) { return; }
-  box->shape_style.vertex_colors[UV__00] = color;
-  box->shape_style.vertex_colors[UV__01] = color;
-  box->shape_style.vertex_colors[UV__10] = color;
-  box->shape_style.vertex_colors[UV__11] = color;
+  box->vertex_colors[UV__00] = color;
+  box->vertex_colors[UV__01] = color;
+  box->vertex_colors[UV__10] = color;
+  box->vertex_colors[UV__11] = color;
 }
 
 void ui_set_cursor(OS_Cursor cursor) 
@@ -985,11 +1104,11 @@ void ui_set_next_flags(UI_Box_flags v) { UI_Context* ctx = ui_get_context(); _UI
 void ui_pop_single_usage_flags()       { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, flags_stack, UI_Box_flags_node) }
 UI_Box_flags ui_get_flags()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, flags_stack, UI_Box_flags_node, flags) }
 
-void ui_push_layout_axis(Axis2 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
+void ui_push_layout_axis(Axis2 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
 void ui_pop_layout_axis()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, layout_axis_stack, UI_Layout_axis_node) }
-void ui_set_next_layout_axis(Axis2 v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
+void ui_set_next_layout_axis(Axis2 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, v) }
 void ui_pop_single_usage_layout_axis() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, layout_axis_stack, UI_Layout_axis_node) }
-Axis2 ui_get_layout_axis()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, layout_axis) }
+Axis2 ui_get_layout_axis()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, layout_axis_stack, UI_Layout_axis_node, layout_axis) }
 
 void ui_push_size_x(UI_Size v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node, v) }
 void ui_pop_size_x()               { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, semantic_size_x_stack, UI_Semantic_size_node) }
@@ -1003,11 +1122,29 @@ void ui_set_next_size_y(UI_Size v) { UI_Context* ctx = ui_get_context(); _UI_Sty
 void ui_pop_single_usage_size_y()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, semantic_size_y_stack, UI_Semantic_size_node) }
 UI_Size ui_get_size_y()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, semantic_size_y_stack, UI_Semantic_size_node, size_y) }
 
+void ui_push_border_width(F32 v)          { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, border_width_stack, UI_Border_width_node, v) }
+void ui_pop_border_width()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_width_stack, UI_Border_width_node) }
+void ui_set_next_border_width(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, border_width_stack, UI_Border_width_node, v) }
+void ui_pop_single_usage_border_width()   { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, border_width_stack, UI_Border_width_node) }
+F32  ui_get_border_width()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_width_stack, UI_Border_width_node, border_width) }
+
+void  ui_push_border_color(V4F32 v)         { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, border_color_stack, UI_Border_color_node, v) }
+void  ui_pop_border_color()                 { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_color_stack, UI_Border_color_node) }
+void  ui_set_next_border_color(V4F32 v)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, border_color_stack, UI_Border_color_node, v) }
+void  ui_pop_single_usage_border_color()    { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, border_color_stack, UI_Border_color_node) }
+V4F32 ui_get_border_color()                 { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_color_stack, UI_Border_color_node, border_color) }
+
 void ui_push_padding(F32 v)        { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, padding_stack, UI_Padding_node, v) }
 void ui_pop_padding()              { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, padding_stack, UI_Padding_node) }
 void ui_set_next_padding(F32 v)    { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, padding_stack, UI_Padding_node, v) }
 void ui_pop_single_usage_padding() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, padding_stack, UI_Padding_node) }
 F32  ui_get_padding()              { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, padding_stack, UI_Padding_node, padding) }
+
+void ui_push_child_gap(F32 v)          { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, child_gap_stack, UI_Child_gap_node, v) }
+void ui_pop_child_gap()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, child_gap_stack, UI_Child_gap_node) }
+void ui_set_next_child_gap(F32 v)      { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, child_gap_stack, UI_Child_gap_node, v) }
+void ui_pop_single_usage_child_gap()   { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, child_gap_stack, UI_Child_gap_node) }
+F32  ui_get_child_gap()                { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, child_gap_stack, UI_Child_gap_node, child_gap) }
 
 ///////////////////////////////////////////////////////////
 // - Style box settings stacks
@@ -1028,12 +1165,6 @@ void ui_pop_corner_r()              { UI_Context* ctx = ui_get_context(); _UI_St
 void ui_set_next_corner_r(V4F32 v)  { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, v) }
 void ui_pop_single_usage_corner_r() { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, corner_radius_stack, UI_Corner_radius_node) }
 V4F32 ui_get_corner_r()             { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, corner_radius_stack, UI_Corner_radius_node, corner_radii) }
-
-void ui_push_border(F32 width, V4F32 color)     { UI_Context* ctx = ui_get_context(); UI_Border v = {}; v.width = width; v.color = color; _UI_StyleStackPush_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_pop_border()                            { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, border_style_stack, UI_Border_style_node) }
-void ui_set_next_border(F32 width, V4F32 color) { UI_Context* ctx = ui_get_context(); UI_Border v = {}; v.width = width; v.color = color; _UI_StyleStackSetNext_Impl(ctx, border_style_stack, UI_Border_style_node, v) }
-void ui_pop_single_usage_border()               { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, border_style_stack, UI_Border_style_node) }
-UI_Border ui_get_border()                       { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, border_style_stack, UI_Border_style_node, border) }
 
 void ui_push_softness(F32 softness)     { UI_Context* ctx = ui_get_context(); _UI_StyleStackPush_Impl(ctx, softness_stack, UI_Softness_node, softness) }
 void ui_pop_softness()                  { UI_Context* ctx = ui_get_context(); _UI_StyleStackPop_Impl(ctx, softness_stack, UI_Softness_node) }
@@ -1073,16 +1204,16 @@ void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
     RangeV2F32 bbox = root->final_on_screen_bbox;
 
     if (root->flags & UI_Box_flag__has_background) {
-      d_draw_rect_pro(rect, root->shape_style.vertex_colors[UV__00], root->shape_style.vertex_colors[UV__01], root->shape_style.vertex_colors[UV__10], root->shape_style.vertex_colors[UV__11], root->shape_style.corner_radii, root->shape_style.softness); 
+      d_draw_rect_pro(rect, root->vertex_colors[UV__00], root->vertex_colors[UV__01], root->vertex_colors[UV__10], root->vertex_colors[UV__11], root->corner_radii, root->softness); 
     }
 
     if (root->flags & UI_Box_flag__has_text_contents) {
-      d_draw_text(root->text_style.text, root->text_style.font, rect_get_origin(rect), white()); 
+      d_draw_text(root->text, root->font, rect_get_origin(rect), white()); 
     }
     
     if (root->flags & UI_Box_flag__has_borders)
     {
-      d_draw_rect_inset_borders(rect, root->shape_style.border.color, root->shape_style.border.width, root->shape_style.corner_radii, root->shape_style.softness);
+      d_draw_rect_inset_borders(rect, root->border_color, root->border_width, root->corner_radii, root->softness);
     }
   
     // Have to scissor ______ (THATS WHAT SHE SAID !!!)

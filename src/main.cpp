@@ -37,14 +37,14 @@ void OutputDebugStringF(const char* fmt, ...);
 #include "font_provider/font_provider.h"
 #include "font_provider/font_provider.cpp"
 
+#include "pencil/pencil.h"
+#include "pencil/pencil.cpp"
+
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
 #include "ui/widgets/ui_widgets.h"
 #include "ui/widgets/ui_widgets.cpp"
-
-#include "pencil/pencil.h"
-#include "pencil/pencil.cpp"
 
 LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM l_param);
 

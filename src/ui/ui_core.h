@@ -29,15 +29,23 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__has_borders         = (1 << 3),
   UI_Box_flag__has_text_contents   = (1 << 4),
 
+  // Floating doesnt add to the size of its parent and is not a part of the normal layout flow
   UI_Box_flag__floating_x = (1 << 5), 
   UI_Box_flag__floating_y = (1 << 6), 
 
+  // Clips the box contents on axis. Clipping is not the same as just not drawing. 
+  // Clipping changes the interactive zone of boxes. 
+  // Not drawing would just not draw a part of the box, but the box would still
+  // act as if it is full sized, so all inputs would still go thought, even thought
+  // a part of the box is not drawn. Clip doesnt allow that. If a box is 
+  // a child of a clip box and if outisde of its parent's on screen bounding box
+  // the inputs to it dont go thought, since they are clipped out, both for the user
+  // on the screen and for the ui logic. 
   UI_Box_flag__clip_x = (1 << 7), 
   UI_Box_flag__clip_y = (1 << 8), 
 
-  UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
-
-  // UI_Box_flag__hoverable = (1 << 10), 
+  // TODO: Commented this out to not deal with this yet while am making a layout algo for this whole thing
+  // UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
 
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
@@ -54,10 +62,18 @@ struct UI_Layout_axis_stack { UI_Layout_axis_node* first; U64 count; B32 pop_aft
 struct UI_Semantic_size_node  { UI_Size v; UI_Semantic_size_node* next; };
 struct UI_Semantic_size_stack { UI_Semantic_size_node* first; U64 count; B32 pop_after_first_use; };
 //
+struct UI_Border_width_node  { F32 v; UI_Border_width_node* next; };
+struct UI_Border_width_stack { UI_Border_width_node* first; U64 count; B32 pop_after_first_use; };
+//
+struct UI_Border_color_node  { V4F32 v; UI_Border_color_node* next; };
+struct UI_Border_color_stack { UI_Border_color_node* first; U64 count; B32 pop_after_first_use; };
+//
 struct UI_Padding_node  { F32 v; UI_Padding_node* next; };
 struct UI_Padding_stack { UI_Padding_node* first; U64 count; B32 pop_after_first_use; };
-
-// - Stacks for styles related to the shape of the box
+//
+struct UI_Child_gap_node  { F32 v; UI_Child_gap_node* next; };
+struct UI_Child_gap_stack { UI_Child_gap_node* first; U64 count; B32 pop_after_first_use; };
+//
 struct UI_Vertex_color_node  { V4F32 v; UI_Vertex_color_node* next; };
 struct UI_Vertex_color_stack { UI_Vertex_color_node* first; U64 count; B32 pop_after_first_use; };
 //
@@ -66,10 +82,6 @@ struct UI_Corner_radius_stack { UI_Corner_radius_node* first; U64 count; B32 pop
 //
 struct UI_Softness_node  { F32 v; UI_Softness_node* next; };
 struct UI_Softness_stack { UI_Softness_node* first; U64 count; B32 pop_after_first_use; };
-//
-struct UI_Border             { F32 width; V4F32 color; };
-struct UI_Border_style_node  { UI_Border v; UI_Border_style_node* next; };
-struct UI_Border_style_stack { UI_Border_style_node* first; U64 count; B32 pop_after_first_use; };
 
 // - Stacks for styles related to text
 struct UI_Text_font_node  { FP_Font v; UI_Text_font_node* next; };
@@ -100,50 +112,47 @@ struct UI_Actions {
 typedef void (*UI_Box_custom_draw_func_type) (UI_Box* box);
 
 struct UI_Box {
-  // Default box settings
+  // Standard box settings
   UI_Box_flags flags;
-  Axis2 layout_axis;
-  UI_Size semantic_size[Axis2__COUNT];
-  B32 _do_grow_out_of_parent_on_p_of_p[Axis2__COUNT];
+  Axis2        layout_axis;
+  UI_Size      semantic_size[Axis2__COUNT];
+  F32          border_width; // TODO: This is new, IMPLEMENT
+  V4F32        border_color;
+  F32          padding;      // TODO: This is new, IMPLEMENT
+  F32          child_gap;    // TODO: This is new, IMPLEMENT
+  V4F32        vertex_colors[UV__COUNT];
+  V4F32        corner_radii; 
+  F32          softness;
 
-  struct {
-    V4F32 vertex_colors[UV__COUNT];
-    V4F32 corner_radii; 
-    UI_Border border;
-    F32 softness;
-  } shape_style;
+  // Text stuff (Bit less common setting for a box)
+  Str8 text;
+  FP_Font font;
 
-  struct {
-    Str8 text;
-    FP_Font font;
-    // F32 font_size;      
-    // V4F32 text_color;
-  } text_style;
-
-  // TODO: Try to have static padding and child_gap as part of the algo, i have having to build them myself
-  F32 padding;
-
+  // Custom draw 
   UI_Box_custom_draw_func_type custom_draw_func;
   void* custom_draw_data;
+
+  // Clip data 
+  // TODO: Document this. Go see the TODO for final_on_screen_bbox to see what you need here
+  F32 clip_offset[Axis2__COUNT]; 
+  RangeV2F32 clip_bbox;
 
   // Per build  
   Str8 id; 
   B32 has_been_updated_this_build;
   UI_Actions actions;
-
-  struct {
-    F32 clip_value[Axis2__COUNT];      // Offset per axis
-    RangeV2F32 clip_bbox;
-  } clip_data;  
-
-  // Intermediate data for ui building (More low level)
+  //
+  // Intermediate data for ui building 
+  // Dont recommend using this outiside the sizing and positioning logic routines
   V2F32 final_on_screen_size; 
   V2F32 final_parent_offset;  
-
-  // Final ui build data (This accounts for everything: float, clip, ...)
-  V2F32 inner_content_dims;
-  RangeV2F32 final_on_screen_bbox;   
-  
+  //
+  // Final ui build data. 
+  V2F32 inner_content_dims;        // Inner contents of a box. Might be larger than a box. Mostly used for clip boxes to figure out scrolling offset and such.
+  RangeV2F32 final_on_screen_bbox; // BB that the user sees on the screen after the ui is drawn
+  // TODO: This doesnt mean that this says it means when we have clipped going on
+  //       Go document this relative to clipped and also document the clipped box stored per each box.
+  //
   // Per build box tree
   UI_Box* first_child;
   UI_Box* last_child;
@@ -151,9 +160,6 @@ struct UI_Box {
   UI_Box* prev_sibling;
   UI_Box* parent;
   U64 children_count;
-
-  // === TESTING SOME NEW ACTIVE THINGS FOR INPUTS
-  // B32 hold_active_after_mouse_up;
 };
 
 struct UI_Box_data {
@@ -195,16 +201,15 @@ struct UI_Context {
   UI_Layout_axis_stack   layout_axis_stack;
   UI_Semantic_size_stack semantic_size_x_stack;
   UI_Semantic_size_stack semantic_size_y_stack;
+  UI_Border_width_stack  border_width_stack;
+  UI_Border_color_stack  border_color_stack;
   UI_Padding_stack       padding_stack;
-  //
-  // Shape style stacks
+  UI_Child_gap_stack     child_gap_stack;
   UI_Vertex_color_stack  vertex_color_stacks[UV__COUNT];
   UI_Corner_radius_stack corner_radius_stack;
-  UI_Border_style_stack  border_style_stack;
   UI_Softness_stack      softness_stack;
   //
   // Text style stacks
-  // UI_Text_color_stack text_color_stack;
   UI_Text_font_stack text_font_stack;
 
   // Some style defaults
@@ -213,12 +218,13 @@ struct UI_Context {
     Axis2        layout_axis;
     UI_Size      size_x;
     UI_Size      size_y;
+    F32          border_width;
+    V4F32        border_color;
     F32          padding;
-
-    V4F32     vertex_colors[UV__COUNT];
-    V4F32     corner_radii;
-    UI_Border border;
-    F32       softness;
+    F32          child_gap;
+    V4F32        vertex_colors[UV__COUNT];
+    V4F32        corner_radii;
+    F32          softness;
 
     FP_Font font;
   } defaults;
@@ -227,7 +233,6 @@ struct UI_Context {
 // - Context variables
 extern UI_Context* __ui_g_context;
 extern UI_Box __ui_g_zero_box;
-// V2F32 _ui_g_text_measuring_stub_f(Str8 text, Font font, U32 font_size);
 
 // - Size makers
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
@@ -235,10 +240,6 @@ UI_Size ui_px(F32 value);
 UI_Size ui_children_sum();                    
 UI_Size ui_text_size();                       
 UI_Size ui_p_of_p(F32 value, F32 strictness); 
-// Just in case if i need these
-// UI_Size ui_px_ex(F32 value, F32 strictness); 
-// UI_Size ui_children_sum_ex(F32 strictness);  
-// UI_Size ui_text_size_ex(F32 strictness);     
 
 // - Context 
 UI_Context* ui_get_context();
@@ -272,13 +273,13 @@ void ui_begin_build(V2F32 window_dims, V2F32 mouse_pos);
 void ui_end_build();
 
 // - UI agothirm
-void ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis);
-void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis);
-void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis);
-void ui_do_layout_fixing(UI_Box* root, Axis2 axis);
-void ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis);
-// void ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
-void ui_layout_box(UI_Box* root, Axis2 axis);
+void __ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis);
+// void ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis);
+// void ui_do_sizing_for_child_dependant_box(UI_Box* root, Axis2 axis);
+// void ui_do_layout_fixing(UI_Box* root, Axis2 axis);
+void __ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis);
+void __ui_do_final_rect_for_box(UI_Box* root, Axis2 axis);
+void __ui_layout_box(UI_Box* root, Axis2 axis);
 
 // - Other box data
 UI_Box* ui_get_box_from_tree(UI_Box* root, Str8 id);
@@ -318,11 +319,29 @@ void    ui_set_next_size_y(UI_Size v);
 void    ui_pop_single_usage_size_y();
 UI_Size ui_get_size_y();
 //
+void ui_push_border_width(F32 v);          
+void ui_pop_border_width();      
+void ui_set_next_border_width(F32 v);          
+void ui_pop_single_usage_border_width();
+F32  ui_get_border_width();
+//
+void  ui_push_border_color(V4F32 v);          
+void  ui_pop_border_color();      
+void  ui_set_next_border_color(V4F32 v);          
+void  ui_pop_single_usage_border_color();
+V4F32 ui_get_border_color();
+//
 void ui_push_padding(F32 v);          
 void ui_pop_padding();      
 void ui_set_next_padding(F32 v);          
 void ui_pop_single_usage_padding();
 F32  ui_get_padding();
+//
+void ui_push_child_gap(F32 v);          
+void ui_pop_child_gap();      
+void ui_set_next_child_gap(F32 v);          
+void ui_pop_single_usage_child_gap();
+F32  ui_get_child_gap();
 
 #define UI_LayoutAxis(axis2)  DeferLoop(ui_push_layout_axis(axis2),       ui_pop_layout_axis())
 #define UI_SizeX(ui_size)     DeferLoop(ui_push_semantic_size_x(ui_size), ui_pop_semantic_size_x())
@@ -346,12 +365,6 @@ void  ui_pop_corner_r();
 void  ui_set_next_corner_r(V4F32 v);
 void  ui_pop_single_usage_corner_r();
 V4F32 ui_get_corner_r();
-
-void      ui_push_border(F32 width, V4F32 color);
-void      ui_pop_border();
-void      ui_set_next_border(F32 width, V4F32 color);
-void      ui_pop_single_usage_border();
-UI_Border ui_get_border();
 
 void ui_push_softness(F32 softness);
 void ui_pop_softness();
