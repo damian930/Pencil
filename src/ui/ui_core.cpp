@@ -388,6 +388,14 @@ void ui_end_build()
 ///////////////////////////////////////////////////////////
 // - Layout algorithm
 //
+// ========
+// | algo:
+// | - figure out sizes for each box
+// |   - size fixed sized boxes
+// |   - size children dependant boxes
+// | - position each box, this is just relative to its parent
+// | - create final bounding boxes 
+
 void __ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 {
   switch (root->semantic_size[axis].kind)
@@ -414,6 +422,29 @@ void __ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
     __ui_do_sizing_for_fixed_sized_box(child, axis);
+  }
+}
+
+void __ui_do_sizing_for_children_dependant_box(UI_Box* root, Axis2 axis)
+{
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+  {
+    __ui_do_sizing_for_children_dependant_box(child, axis);
+  }
+  switch (root->semantic_size[axis].kind)
+  {
+    default: {} break;
+
+    case UI_Size_kind__children_sum:
+    {
+      for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+      {
+        if (root->layout_axis == axis) { root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; }
+        else { root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]); }
+      }
+      root->final_on_screen_size.v[axis] += 2*root->padding + 2*root->border_width;
+      if (root->layout_axis == axis && root->children_count > 0) { root->final_on_screen_size.v[axis] += root->child_gap*(root->children_count-1); }
+    } break;
   }
 }
 
@@ -482,6 +513,7 @@ void __ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip
 void __ui_layout_box(UI_Box* root, Axis2 axis)
 { 
   __ui_do_sizing_for_fixed_sized_box(root, axis);      
+  __ui_do_sizing_for_children_dependant_box(root, axis);      
   __ui_do_relative_parent_offsets_for_box(root, axis);
 
   // TODO: 1000 is a bit too little here
@@ -489,11 +521,6 @@ void __ui_layout_box(UI_Box* root, Axis2 axis)
   __ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
 }
 
-// algo:
-// - figure out sizes for each box
-// -- size fixed sized elements
-// - position each box, this is just relative to its parent
-// - create final bounding boxes 
 
 // Prev iteration of the ui system layout algorightm
 /*

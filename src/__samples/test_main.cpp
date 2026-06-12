@@ -130,18 +130,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     {
       ui_push_font(font);
 
-      ui_set_next_size_x(ui_px(100));
-      ui_set_next_size_y(ui_px(100));
+      ui_set_next_size_x(ui_children_sum());
+      ui_set_next_size_y(ui_children_sum());
       ui_set_next_b_color(blue());
-      ui_set_next_child_gap(5);
+      ui_set_next_child_gap(25);
       UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_background))
       {
         for EachIndex(i, 3)
         {
-          ui_set_next_size_x(ui_px(12));
-          ui_set_next_size_y(ui_px(12));
+          ui_set_next_size_x(ui_px(50));
+          ui_set_next_size_y(ui_px(50));
           ui_set_next_b_color(red());
-          ui_set_next_padding(5);
           ui_box_make(Str8{}, UI_Box_flag__has_background);
         }
       }
