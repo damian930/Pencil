@@ -71,8 +71,8 @@ UI_Actions ui_button_f(const char* fmt, ...)
 //
 void ui_layout_stack_begin(Axis2 axis)
 {
-  ui_set_next_size_x(ui_children_sum());
-  ui_set_next_size_y(ui_children_sum());
+  ui_set_next_size_x(ui_fit());
+  ui_set_next_size_y(ui_fit());
   ui_set_next_layout_axis(axis);
   UI_Box* stack = ui_box_make(Str8{}, 0); 
   ui_push_parent(stack);
@@ -118,8 +118,8 @@ void ui_padded_box_end(UI_Size size, Axis2 final_box_axis)
 //
 void ui_wrapper_begin(Axis2 axis)
 {
-  ui_set_next_size_x(ui_children_sum());
-  ui_set_next_size_y(ui_children_sum());
+  ui_set_next_size_x(ui_fit());
+  ui_set_next_size_y(ui_fit());
   ui_set_next_layout_axis(axis);
   UI_Box* wrapper = ui_box_make(Str8{}, 0);
   ui_push_parent(wrapper);

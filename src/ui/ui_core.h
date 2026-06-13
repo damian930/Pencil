@@ -10,14 +10,15 @@
 
 enum UI_Size_kind {
   UI_Size_kind__px,
-  UI_Size_kind__children_sum,
+  UI_Size_kind__fit,
   UI_Size_kind__text,
-  UI_Size_kind__grow,
+  UI_Size_kind__percent_of_parent, 
 };
 
 struct UI_Size {
   UI_Size_kind kind;
   F32 value;
+  F32 strictness;
 };
 
 enum UI_Box_flag : U32 {
@@ -239,7 +240,7 @@ extern UI_Box __ui_g_zero_box;
 // - Size makers
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
 UI_Size ui_px(F32 value);                     
-UI_Size ui_children_sum();                    
+UI_Size ui_fit();                    
 UI_Size ui_text_size();                      
 
 // - Context 

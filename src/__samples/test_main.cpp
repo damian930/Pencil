@@ -26,8 +26,8 @@
 #include "ui/ui_core.h"
 #include "ui/ui_core.cpp"
 
-// #include "ui/widgets/ui_widgets.h"
-// #include "ui/widgets/ui_widgets.cpp"
+#include "ui/widgets/ui_widgets.h"
+#include "ui/widgets/ui_widgets.cpp"
 
 void OutputDebugStringF(const char* fmt, ...)
 {
@@ -130,21 +130,22 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     {
       ui_push_font(font);
 
-      ui_set_next_size_x(ui_px(100));
-      ui_set_next_size_y(ui_px(100));
-      ui_set_next_b_color(blue());
-      UI_Box* wrapper = ui_box_make(Str8FromC("Wrapper"), UI_Box_flag__has_background);
-      UI_Parent(wrapper)
+      Str8 words[] = { Str8FromC("Aaaaaaaaa"), Str8FromC("Aa"), Str8FromC("Aaaa"), };
+
+      UI_Row()
       {
-        ui_set_next_size_x(ui_grow());
-        ui_set_next_size_y(ui_grow());
-        ui_set_next_b_color(red());
-        UI_Box* growing = ui_box_make(Str8FromC("Grow box"), UI_Box_flag__has_background);
-      
-        ui_set_next_size_x(ui_grow());
-        ui_set_next_size_y(ui_grow());
-        ui_set_next_b_color(green());
-        UI_Box* other_growing = ui_box_make(Str8FromC("Other Grow box"), UI_Box_flag__has_background);
+        ui_spacer(ui_p_of_p(1, 0));
+        ui_set_next_size_x(ui_fit());
+        ui_set_next_size_y({ UI_Size_kind__fit, 0, 1 });
+        ui_set_next_layout_axis(Axis2__y);
+        UI_Box* col_stack = ui_box_make(Str8{}, 0); 
+        UI_Parent(col_stack)
+        {
+          ui_spacer(ui_p_of_p(1, 0));
+          ui_label_f("Label");
+          ui_spacer(ui_p_of_p(1, 0));
+        }
+        ui_spacer(ui_p_of_p(1, 0));
       }
     }
 

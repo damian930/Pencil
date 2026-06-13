@@ -690,6 +690,7 @@ struct Edit_box_result {
   B32 escaped;
   UI_Box* edit_box;
 };
+/*
 Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_width, Str8 placeholder_str, U8* text_buffer, U64* text_buffer_size, U64 buffer_max_count, U64* cursor_pos, U64* section_pos)
 {
   U64 start_size = *text_buffer_size;
@@ -763,7 +764,7 @@ Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_widt
     {
       ui_label(text_buffer_str);
   
-      ui_set_next_size_x(ui_children_sum());
+      ui_set_next_size_x(ui_fit());
       ui_set_next_size_y(ui_px(font_height));
       ui_set_next_layout_axis(Axis2__x);
       UI_Box* cursor_section_box = ui_box_make(edit_box_id, UI_Box_flag__floating);
@@ -847,5 +848,6 @@ Edit_box_result ui_text_edit_box(F32 offset, Str8 edit_box_id, F32 edit_box_widt
   result.edit_box        = edit_box;
   return result;
 }
+*/
 
 #endif

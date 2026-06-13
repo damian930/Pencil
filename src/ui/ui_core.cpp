@@ -9,26 +9,22 @@
 
 #include "ui/ui_core.h"
 
-// todo: Struture this file based on the structure of the .h ui file
-
 UI_Context* __ui_g_context    = 0;
 UI_Box __ui_g_zero_box        = {};
 
-UI_Size ui_size_make(UI_Size_kind kind, F32 value)
+UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness)
 {
   UI_Size size = {};
-  size.kind  = kind;
-  size.value = value; 
+  size.kind       = kind;
+  size.value      = value; 
+  size.strictness = strictness;
   return size;
 }
 
-UI_Size ui_px(F32 value)  { return ui_size_make(UI_Size_kind__px, value); }
-UI_Size ui_children_sum() { return ui_size_make(UI_Size_kind__children_sum, 0.0f); } // note: value is 0.0f there cause it is actually not used by the implementation
-UI_Size ui_text_size()    { return ui_size_make(UI_Size_kind__text, 0.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
-UI_Size ui_grow()         { return ui_size_make(UI_Size_kind__grow, 0.0f); }         // note: value is 0.0f there cause it is actually not used by the implementation
-
-// TODO: Remove this here, testing better names for the api
-UI_Size ui_fit() { return ui_children_sum(); }
+UI_Size ui_px(F32 value)                 { return ui_size_make(UI_Size_kind__px, value, 1.0f); }
+UI_Size ui_fit()                         { return ui_size_make(UI_Size_kind__fit, 0.0f, 0.0f); } 
+UI_Size ui_text_size()                   { return ui_size_make(UI_Size_kind__text, 0.0f, 1.0f); }         
+UI_Size ui_p_of_p(F32 p, F32 strictness) { return ui_size_make(UI_Size_kind__percent_of_parent, p, strictness); }         
 
 UI_Context* ui_get_context()
 {
@@ -95,9 +91,9 @@ void ui_init()
 
   __ui_g_context->defaults.flags        = UI_Box_flag__NONE;
   __ui_g_context->defaults.layout_axis  = Axis2__y;
-  __ui_g_context->defaults.size_x       = ui_children_sum();
-  __ui_g_context->defaults.size_y       = ui_children_sum();
-  __ui_g_context->defaults.border_width  = 0.0f;
+  __ui_g_context->defaults.size_x       = ui_fit();
+  __ui_g_context->defaults.size_y       = ui_fit();
+  __ui_g_context->defaults.border_width = 0.0f;
   __ui_g_context->defaults.border_color = transparent();
   __ui_g_context->defaults.padding      = 0.0f;
   __ui_g_context->defaults.child_gap    = 0.0f;
@@ -395,9 +391,9 @@ void ui_end_build()
 // | algo:
 // | - figure out sizes for each box
 // |   - size fixed sized boxes
+// |   - % of parent
 // |   - size children dependant boxes
-// |   - size for grow boxes
-// |   - size for children dependant boxes
+// |   - layout fixing 
 // | - position each box, this is just relative to its parent
 // | - create final bounding boxes 
 
@@ -409,112 +405,119 @@ void __ui_do_sizing_for_fixed_sized_box(UI_Box* root, Axis2 axis)
 
     case UI_Size_kind__px:
     {
-      // Boxes with pixel sizes dont use any of the padding or gap or border for size calculations.
-      // But just like in web for border-boxes the sume of border and padding are included in size. 
-      // But the sum of those 2 cant be smaller then the size of the box, if it is, then we have the box get bigger.
-      root->final_on_screen_size.v[axis] = Max(2*(root->border_width + root->padding), root->semantic_size[axis].value);
+      root->final_on_screen_size.v[axis] = root->semantic_size[axis].value;
     } break;
 
-    // note/TODO: do we even need this, might be a good idea to remove this untill i really need this and just use the px and custom draw for labels
     case UI_Size_kind__text:
     {
-      // TODO: This dont yet use any of the padding and shit, so not sure about this yet
-      // Boxes with text sizes, which is the same and just pixels sizes dont use any of the padding or gap or border for size calculations
       V2F32 dims = fp_measure_text(root->text, root->font);
       root->final_on_screen_size.v[axis] = dims.v[axis];
     } break;
   }
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
+  
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) {
     __ui_do_sizing_for_fixed_sized_box(child, axis);
+  }
+}
+
+void __ui_do_sizing_for_parent_dependant_box(UI_Box* root, Axis2 axis)
+{
+  if (root->semantic_size[axis].kind == UI_Size_kind__percent_of_parent)
+  {
+    UI_Box* first_non_child_dependant_parent = &__ui_g_zero_box;
+    for (UI_Box* ancestor = root->parent; !ui_box_is_zero(ancestor); ancestor = ancestor->parent) {
+      if (ancestor->semantic_size[axis].kind != UI_Size_kind__fit) {
+        first_non_child_dependant_parent = ancestor;
+        break; 
+      }
+    }
+    Assert(!ui_box_is_zero(first_non_child_dependant_parent)); // The top ui box is fixed sized, so we shoud get this allways
+
+    F32 parent_size = first_non_child_dependant_parent->final_on_screen_size.v[axis];
+    clamp_f32_inplace(&root->semantic_size[axis].value, 0.0f, 1.0f);
+    root->final_on_screen_size.v[axis] = parent_size * root->semantic_size[axis].value;
+  }
+  
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) {
+    __ui_do_sizing_for_parent_dependant_box(child, axis);
   }
 }
 
 void __ui_do_sizing_for_children_dependant_box(UI_Box* root, Axis2 axis)
 {
-  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-  {
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) {
     __ui_do_sizing_for_children_dependant_box(child, axis);
   }
+
   switch (root->semantic_size[axis].kind)
   {
     default: {} break;
 
-    case UI_Size_kind__children_sum:
+    case UI_Size_kind__fit:
     {
       for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
       {
         if (root->layout_axis == axis) { root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; }
         else { root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]); }
       }
-      root->final_on_screen_size.v[axis] += 2*root->padding + 2*root->border_width;
-      if (root->layout_axis == axis && root->children_count > 0) { root->final_on_screen_size.v[axis] += root->child_gap*(root->children_count-1); }
     } break;
   }
 }
 
-void __ui_do_sizing_for_grow_boxes(UI_Box* root, Axis2 axis)
+void __ui_do_layout_size_fixing(UI_Box* root, Axis2 axis)
 {
-  // This sizes the grow box, it has to grow into its parent
-  if (ui_box_is_zero(root->parent) && !str8_match(root->id, Str8FromC("## __UI ROOT ELEMENT ID __"), 0)) { InvalidCodePath(); return; } 
+  // If the inner contents of the root are larger then the root alowes, 
+  // then we make the smaller here based on the strictness if possible.
 
-  if (root->semantic_size[axis].kind == UI_Size_kind__grow) 
+  // todo: For layout axis we make all the children smaller
+  // but for non layout we just make the box smaller
+
+  // if (str8_match(root->id, Str8FromC("Wrapper"), 0)) { BP; }
+
+  if (root->layout_axis == axis)
   {
-    F32 parent_size = root->parent->final_on_screen_size.v[axis];
-    F32 extra_used_space = (root->parent->padding*2) + (root->parent->border_width*2);
-    if (root->parent->layout_axis == axis)
+    F32 total_size_of_children  = 0.0f;
+    F32 strictness_total_budget = 0.0f;
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
-      // here we grow to what we can
-      F32 parent_size_used_by_children = 0.0f;
-      for (UI_Box* child = root->parent->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-      {
-        F32 child_size = child->final_on_screen_size.v[axis];
-        parent_size_used_by_children += child_size;
-      }
-    
-      if (root->parent->children_count > 0) { extra_used_space += (root->parent->children_count-1)*root->parent->child_gap; }
-      
-      F32 size_left_to_grow_into = parent_size - extra_used_space - parent_size_used_by_children;
-      Assert(size_left_to_grow_into >= 0.0f);  
-    
-      // grow fully if not layout axis
-
-      U64 number_of_grow_elements_inside_parent = 0;
-      for (UI_Box* child = root->parent->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-      {
-        if (child->semantic_size[axis].kind == UI_Size_kind__grow && !child->grew_this_build) { number_of_grow_elements_inside_parent += 1; }
-      }
-
-      F32 size_for_single_grow_child = size_left_to_grow_into / number_of_grow_elements_inside_parent;
-
-      root->final_on_screen_size.v[axis] = size_for_single_grow_child;
+      total_size_of_children += child->final_on_screen_size.v[axis];
+      strictness_total_budget += (1.0f - child->semantic_size[axis].strictness);
     }
-    else 
-    {
-      // here we grow to the max size of the parent
-      F32 space_left_for_grow_box = root->parent->final_on_screen_size.v[axis] - extra_used_space;
-      root->final_on_screen_size.v[axis] = space_left_for_grow_box;
-    }
-
-    root->grew_this_build = true;
   
-    // TODO: Dont forget about the min size case wherethe grow will have padding and border
-    //       Or maybe it shoud not have it if it doesnt have th size for it, DONT KNOW
-
-    // TODO: Take care of padding and gap and such things
-
-    // BP;
+    // We have overflow of children here, might need fixing
+    F32 root_size = root->final_on_screen_size.v[axis];
+    if (root_size < total_size_of_children)
+    {
+      for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+      {
+        F32 percentage_of_removable_size    =  1.0f - child->semantic_size[axis].strictness;
+        F32 ratio_relative_to_total_budget  =  percentage_of_removable_size / strictness_total_budget;
+        F32 amount_to_remove                =  (total_size_of_children - root_size) * ratio_relative_to_total_budget;
+        child->final_on_screen_size.v[axis] -= amount_to_remove;
+      }
+    }
+  }
+  else  
+  {
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+    {
+      F32 child_max_legal_size = root->final_on_screen_size.v[axis];
+      F32 child_size = child->final_on_screen_size.v[axis];
+      if (child_size > child_max_legal_size)
+      {
+        F32 removable_budget  = 1.0f - child->semantic_size[axis].strictness;
+        F32 overflow          = child_size - child_max_legal_size;
+        F32 possible_new_size = child->final_on_screen_size.v[axis] - overflow;
+        F32 legal_min_size    = child->final_on_screen_size.v[axis] * child->semantic_size[axis].strictness;
+        child->final_on_screen_size.v[axis] = Max(legal_min_size, possible_new_size);
+      }
+    }
   }
 
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    __ui_do_sizing_for_grow_boxes(child, axis);
+    __ui_do_layout_size_fixing(child, axis);
   }
-
-  // get the size that is left in the box, then find the number of grow boxes, distribute the size for them
-
-  // todo: rpduce final bbox here
-  // todo: Grow the box to the size that is possible
 }
 
 void __ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
@@ -527,18 +530,18 @@ void __ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
     if (child->flags & UI_Box_flag__floating_x<<axis) {}
     else 
     {
-      child->final_parent_offset.v[axis] = child->final_parent_offset.v[axis] = root->padding + root->border_width; 
       if (axis == root->layout_axis) {
-        child->final_parent_offset.v[axis] += accumelated_children_sizes + (child_index * root->child_gap); // First child has gap of 0, second has gap of 1, third gap of 2, ....
+        child->final_parent_offset.v[axis] += accumelated_children_sizes;
         accumelated_children_sizes += child->final_on_screen_size.v[axis];
       }
     }
 
     // Offsetting the boxes based on their parent clip value
-    if (child->flags & UI_Box_flag__floating_x<<axis) {} /*|| (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating)*/
-    else {
-      child->final_parent_offset.v[axis] += root->clip_offset[axis];
-    }
+    // TODO: I have no idea if this works still
+    // if (child->flags & UI_Box_flag__floating_x<<axis) {} /*|| (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating)*/
+    // else {
+    //   child->final_parent_offset.v[axis] += root->clip_offset[axis];
+    // }
 
     __ui_do_relative_parent_offsets_for_box(child, axis);
   }
@@ -582,17 +585,20 @@ void __ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip
 void __ui_layout_box(UI_Box* root, Axis2 axis)
 { 
   // Sizing
-  __ui_do_sizing_for_fixed_sized_box(root, axis);      
+  __ui_do_sizing_for_fixed_sized_box(root, axis);     
+  __ui_do_sizing_for_parent_dependant_box(root, axis); 
   __ui_do_sizing_for_children_dependant_box(root, axis);      
-  __ui_do_sizing_for_grow_boxes(root, axis);
+  
+  // Fixing
+  __ui_do_layout_size_fixing(root, axis);
 
+  // Final positioning
   __ui_do_relative_parent_offsets_for_box(root, axis);
 
   // TODO: 1000 is a bit too little here
   RangeV2F32 parent_clip_bbox = range_v2f32(v2f32(-1000.0f, -1000.0f), v2f32(1000.0f, 1000.0f));
   __ui_do_final_rect_for_box(root, axis, parent_clip_bbox);
 }
-
 
 // Prev iteration of the ui system layout algorightm
 /*
