@@ -131,28 +131,144 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
           Str8FromC("stash"),
       };
 
-      UI_Row() UI_Padded(ui_p_of_p(1, 0))
+      static struct {
+        U64 current_picked_command_index;
+        B32 show_box = true;
+      } ui_state = {};
+
+      if (!ui_state.show_box)
       {
-        ui_size_x(ui_px(350));
-        ui_size_y(ui_px(350));
-        ui_layout_y();
-        ui_b_color(nice_green());
-        ui_border(1, blue());
-        UI_Box* comamnd_list_box = ui_box_make({}, UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
-        UI_Parent(comamnd_list_box)
+        for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
         {
-          for EachIndex(i, 13)
+          if (ev->kind == OS_Event_kind__mouse && ev->mouse_event.button == Mouse_button__left && ev->mouse_event.went_down)
           {
-            ui_size_x(ui_fit());
-            ui_size_y(ui_fit());
-            ui_flags(UI_Box_flag__has_borders);
+            ui_state.show_box = true;
+            os_consume_frame_event(ev);
+            break;
+          }
+        }
+      }
+
+      if (ui_state.show_box)
+      {
+        UI_Row() UI_Padded(ui_p_of_p(1, 0))
+        {
+          UI_Col()
+          {
+            ui_spacer(ui_px(3));
+  
+            ui_size_x(ui_p_of_p(0.5, 1));
+            ui_size_y(ui_p_of_p(0.5, 1));
+            ui_b_color(blue());
             ui_border(1, red());
-            UI_Row() 
+            ui_corner_r(0.15f);
+            ui_layout_y();
+            UI_Box* window_main_box = ui_box_make(Str8FromC("Window main box"), UI_Box_flag__has_background|UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners);
+            UI_Parent(window_main_box) UI_Row() UI_Padded(ui_px(10)) UI_Col() UI_Padded(ui_px(10))
             {
-              ui_spacer(ui_p_of_p(1, 0.0));
-              ui_label(words[i]);
-              ui_spacer(ui_p_of_p(0.25, 0.0));
+              ui_size_x(ui_p_of_p(1, 0));
+              ui_size_y(ui_fit());
+              ui_border(3, magenta());
+              ui_corner_r(0.15f);
+              ui_flags(UI_Box_flag__has_rounded_corners|UI_Box_flag__has_borders);
+              UI_Col() UI_Padded(ui_px(4)) UI_Row() UI_Padded(ui_px(4))
+              {
+                ui_label_f("Text here dude");
+              }
+  
+              ui_spacer(ui_px(5));
+  
+              ui_size_x(ui_p_of_p(1, 0));
+              ui_size_y(ui_p_of_p(1, 0));
+              ui_layout_y();
+              UI_Box* scroll_box_with_commandsui_box_make = ui_box_make(Str8FromC("Clip box with commands"), UI_Box_flag__clip);
+              UI_Parent(scroll_box_with_commandsui_box_make)
+              {
+                for EachIndex(i, ArrayCount(words))
+                {
+                  // Command row box
+                  ui_size_x(ui_p_of_p(1, 0));
+                  ui_size_y(ui_fit());
+                  ui_border(1, white());
+                  ui_corner_r(0.5f);
+                  ui_layout_x();
+                  UI_Box* command_entry_box = ui_box_make_f("Comamnd entry box %lld ", UI_Box_flag__has_background|UI_Box_flag__has_borders|UI_Box_flag__has_rounded_corners, i);
+                  UI_Parent(command_entry_box) UI_Padded(ui_p_of_p(1, 0))
+                  {
+                    ui_label(words[i]);
+                  }
+  
+                  UI_Actions entry_acts = ui_actions_from_box(command_entry_box);
+                  if (ui_state.current_picked_command_index == i) 
+                  {
+                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.5));
+                  }
+                  else if (entry_acts.is_hovered)
+                  {
+                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.25));
+                  }
+
+                  if (entry_acts.is_clicked)
+                  {
+                    ui_state.show_box = false;
+                  }
+
+
+                  ui_spacer(ui_px(5));
+                }
+  
+                //todo: Scroll bar here for the scrolling of the things
+              }
+  
+              UI_Actions scroll_box_acts  = ui_actions_from_box(scroll_box_with_commandsui_box_make);
+              UI_Box_data scroll_box_data = ui_box_data_from_box_prev_frame(scroll_box_with_commandsui_box_make);
+  
+              if (ui_state.show_box)
+              {
+                for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+                {
+                  if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__arrow_down && ev->key_event.went_down || ev->key_event.repeat_down)
+                  {
+                    ui_state.current_picked_command_index += 1;
+                    if (ui_state.current_picked_command_index == ArrayCount(words)) {
+                      ui_state.current_picked_command_index = 0;
+                    }
+                    os_consume_frame_event(ev);
+                  }
+                  if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__arrow_up && ev->key_event.went_down || ev->key_event.repeat_down)
+                  {
+                    os_consume_frame_event(ev);
+                    if (ui_state.current_picked_command_index > 0) { ui_state.current_picked_command_index -= 1; }
+                    else { ui_state.current_picked_command_index = ArrayCount(words) - 1; }
+                  }
+                }
+              }
+
+              F32 new_box_offset = scroll_box_data.clip_offset.y;
+  
+              if (scroll_box_acts.is_hovered)
+              {
+                for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+                {
+                  if (ev->kind == OS_Event_kind__wheel)
+                  {
+                    if (scroll_box_data.is_found)
+                    {
+                      new_box_offset += ev->wheel_event.scroll_data * 10; 
+                      F32 max_offset = scroll_box_data.inner_content_dims.y - range_v2f32_dims(scroll_box_data.on_screen_bbox).y;
+                      max_offset = Max(0.0f, max_offset);
+                      clamp_f32_inplace(&new_box_offset, -max_offset, 0.0f);
+                    }
+  
+                    os_consume_frame_event(ev);
+                    break;
+                  }
+                }
+              }
+  
+              ui_box_set_clip_offset_y(scroll_box_acts.new_box, new_box_offset);
             }
+  
           }
         }
       }

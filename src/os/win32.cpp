@@ -542,7 +542,8 @@ void os_consume_frame_event(OS_Event* event)
   {
     if (test_event == event) { found = true; break; }
   }
-  
+
+  // note: This keeps the links for the event node, but i still dont like the api
   DllPop(&os_get_state()->frame_event_list, event);
   if (found) {
     os_get_state()->frame_event_list.count -= 1;

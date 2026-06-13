@@ -972,7 +972,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
     box_data.is_found           = true; 
     box_data.on_screen_bbox     = box->final_on_screen_bbox; 
     box_data.inner_content_dims = box->inner_content_dims;
-    box_data.clip_offset        = v2f32(box->clip_offset.x, box->clip_offset.y) ;
+    box_data.clip_offset        = box->clip_offset;
   }
   return box_data;
 }
@@ -1341,6 +1341,20 @@ void ui_layout_y() { ui_set_next_layout_axis(Axis2__y); }
 void ui_border(F32 width, V4F32 color) { ui_set_next_border_width(width); ui_set_next_border_color(color); }
 void ui_border_color(V4F32 color) { ui_set_next_border_color(color); }
 void ui_border_width(F32 width) { ui_set_next_border_width(width); }
+void ui_corner_r(F32 r) { ui_set_next_corner_r(v4f32_all(r)); }
+
+V2F32* ui_box_get_clip_offset(UI_Box* box)
+{
+  static V2F32 offset_for_zero_box = {};
+  if (ui_box_is_zero(box)) { return &offset_for_zero_box; }
+  return &box->clip_offset;
+}
+
+void ui_box_set_clip_offset_y(UI_Box* box, F32 offset)
+{
+  if (ui_box_is_zero(box)) { return; }
+  box->clip_offset.y += offset;
+}
 
 // - UI Draw
 void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)

@@ -164,7 +164,7 @@ struct UI_Box_data {
   B32 is_found;
   RangeV2F32 on_screen_bbox;
   V2F32 inner_content_dims;
-  V2F32 clip_offset;
+  V2F32 clip_offset; 
 };
 
 struct UI_Context {
