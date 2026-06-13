@@ -44,9 +44,6 @@ enum UI_Box_flag : U32 {
   UI_Box_flag__clip_x = (1 << 7), 
   UI_Box_flag__clip_y = (1 << 8), 
 
-  // TODO: Commented this out to not deal with this yet while am making a layout algo for this whole thing
-  // UI_Box_flag__aply_clip_offset_on_clildren_floating = (1 << 9), 
-
   UI_Box_flag__floating           = UI_Box_flag__floating_x|UI_Box_flag__floating_y, 
   UI_Box_flag__clip               = UI_Box_flag__clip_x|UI_Box_flag__clip_y, 
 };
@@ -118,8 +115,6 @@ struct UI_Box {
   UI_Size      semantic_size[Axis2__COUNT];
   F32          border_width; // TODO: This is new, IMPLEMENT
   V4F32        border_color;
-  F32          padding;      // TODO: This is new, IMPLEMENT
-  F32          child_gap;    // TODO: This is new, IMPLEMENT
   V4F32        vertex_colors[UV__COUNT];
   V4F32        corner_radii; 
   F32          softness;
@@ -137,8 +132,8 @@ struct UI_Box {
 
   // Clip data 
   // TODO: Document this. Go see the TODO for final_on_screen_bbox to see what you need here
-  F32 clip_offset[Axis2__COUNT]; 
-  RangeV2F32 clip_bbox;
+  V2F32 clip_offset; 
+  RangeV2F32 clip_bbox; // This shoud be documented
 
   // Per build  
   Str8 id; 
@@ -238,10 +233,10 @@ extern UI_Context* __ui_g_context;
 extern UI_Box __ui_g_zero_box;
 
 // - Size makers
-UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
-UI_Size ui_px(F32 value);                     
-UI_Size ui_fit();                    
-UI_Size ui_text_size();                      
+// UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
+// UI_Size ui_px(F32 value);                     
+// UI_Size ui_fit();                    
+// UI_Size ui_text_size();                      
 
 // - Context 
 UI_Context* ui_get_context();

@@ -130,18 +130,20 @@ float4 ps_main(PixelInput pixel_input) : SV_TARGET
 
   if (sdf_pixel_to_rect > 0.0) { discard; }
 
-  if (softness != 0.0)
-  {
-    // This does kind of soften the corners, but does remove the first pixel on the boundary,
-    // i dont really like that.
-    float smoothed = 1.0 - smoothstep(0.5 - softness, 0.5, sdf_pixel_to_rect);
+  // note: no softness right now
+
+  // if (softness != 0.0)
+  // {
+  //   // This does kind of soften the corners, but does remove the first pixel on the boundary,
+  //   // i dont really like that.
+  //   float smoothed = 1.0 - smoothstep(0.5 - softness, 0.5, sdf_pixel_to_rect);
     
-    // This i randomly found out, but it makes sense. This does inside shadowing for a rect.
-    // Maybe not shadowing, but something similar.
-    // float smoothed = 1.0 - smoothstep(0.5 - softness, softness + 0.5, sdf_pixel_to_rect);
+  //   // This i randomly found out, but it makes sense. This does inside shadowing for a rect.
+  //   // Maybe not shadowing, but something similar.
+  //   // float smoothed = 1.0 - smoothstep(0.5 - softness, softness + 0.5, sdf_pixel_to_rect);
     
-    final_color.a *= smoothed;
-  }
+  //   final_color.a *= smoothed;
+  // }
 
   /*
   float rect_outline_smoothing = 1.0f;

@@ -46,30 +46,7 @@ void OutputDebugStringF(const char* fmt, ...)
   #endif
 }
 
-static Str8 commands[] = {
-    Str8FromC("help"),
-    Str8FromC("quit"),
-    Str8FromC("list"),
-    Str8FromC("clear"),
-    Str8FromC("reload"),
-    Str8FromC("status"),
-    Str8FromC("connect"),
-    Str8FromC("disconnect"),
-    Str8FromC("run"),
-    Str8FromC("stop"),
-    Str8FromC("pause"),
-    Str8FromC("resume"),
-    Str8FromC("save"),
-    Str8FromC("load"),
-    Str8FromC("export"),
-    Str8FromC("import"),
-    Str8FromC("config"),
-    Str8FromC("info"),
-    Str8FromC("debug"),
-    Str8FromC("version"),
-};
-
-int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
+int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show) 
 {
   // Layers we allocate for the runtime 
   allocate_thread_context();
@@ -120,6 +97,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
+  static V4F32 b_color_hsva = hsva_from_rgba(black());
+
   for (;!os_window_should_close();)
   {
     os_frame_begin();
@@ -129,27 +108,57 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     DeferInitReleaseLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
     {
       ui_push_font(font);
+      
+      Str8 words[] = {
+          Str8FromC("run"),
+          Str8FromC("test"),
+          Str8FromC("deploy"),
+          Str8FromC("init"),
+          Str8FromC("clean"),
+          Str8FromC("install"),
+          Str8FromC("update"),
+          Str8FromC("sync"),
+          Str8FromC("push"),
+          Str8FromC("pull"),
+          Str8FromC("fetch"),
+          Str8FromC("status"),
+          Str8FromC("log"),
+          Str8FromC("diff"),
+          Str8FromC("commit"),
+          Str8FromC("checkout"),
+          Str8FromC("merge"),
+          Str8FromC("rebase"),
+          Str8FromC("stash"),
+      };
 
-      Str8 words[] = { Str8FromC("Aaaaaaaaa"), Str8FromC("Aa"), Str8FromC("Aaaa"), };
-
-      UI_Row()
+      UI_Row() UI_Padded(ui_p_of_p(1, 0))
       {
-        ui_spacer(ui_p_of_p(1, 0));
-        ui_set_next_size_x(ui_fit());
-        ui_set_next_size_y({ UI_Size_kind__fit, 0, 1 });
-        ui_set_next_layout_axis(Axis2__y);
-        UI_Box* col_stack = ui_box_make(Str8{}, 0); 
-        UI_Parent(col_stack)
+        ui_size_x(ui_px(350));
+        ui_size_y(ui_px(350));
+        ui_layout_y();
+        ui_b_color(nice_green());
+        ui_border(1, blue());
+        UI_Box* comamnd_list_box = ui_box_make({}, UI_Box_flag__has_borders|UI_Box_flag__has_background|UI_Box_flag__clip);
+        UI_Parent(comamnd_list_box)
         {
-          ui_spacer(ui_p_of_p(1, 0));
-          ui_label_f("Label");
-          ui_spacer(ui_p_of_p(1, 0));
+          for EachIndex(i, 13)
+          {
+            ui_size_x(ui_fit());
+            ui_size_y(ui_fit());
+            ui_flags(UI_Box_flag__has_borders);
+            ui_border(1, red());
+            UI_Row() 
+            {
+              ui_spacer(ui_p_of_p(1, 0.0));
+              ui_label(words[i]);
+              ui_spacer(ui_p_of_p(0.25, 0.0));
+            }
+          }
         }
-        ui_spacer(ui_p_of_p(1, 0));
       }
     }
-
-    r_clear_target(window_frame_buffer_target, black());
+  
+    r_clear_target(window_frame_buffer_target, rgba_from_hsva(b_color_hsva));
     ui_draw();
 
     r_submit(window_frame_buffer_target, d_get_batch_list());
@@ -158,7 +167,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     os_frame_end();
 
     r_present(window_frame_buffer_target, true);
-  }
 
+  }
   return 0;
 }

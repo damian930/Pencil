@@ -15,27 +15,14 @@ UI_Actions ui_button(Str8 str_id);
 UI_Actions ui_button_f(const char* fmt, ...); 
 
 // - Layout stack
-void ui_layout_stack_begin(Axis2 axis); // todo: Call these like a layout stack
+void ui_layout_stack_begin(Axis2 axis); 
 void ui_layout_stack_end();
 #define UI_Stack(axis) DeferLoop(ui_layout_stack_begin(axis), ui_layout_stack_end())
 #define UI_Row() UI_Stack(Axis2__x)
 #define UI_Col() UI_Stack(Axis2__y)
 
 // - Padded box
-// todo: I hate this here so much
-void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis);
-void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis);
-void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
-void ui_padded_box_end(UI_Size size, Axis2 final_box_axis);
-void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis);
-void ui_padded_box_end(UI_Size size);
-#define UI_PaddedBox(size, axis)                       DeferLoop(ui_padded_box_begin(size, axis), ui_padded_box_end(size, axis))
-#define UI_PaddedBoxEx(left, right, top, bottom, axis) DeferLoop(ui_padded_box_begin_ex(left, top, axis), ui_padded_box_end_ex(right, bottom, axis))
-
-// - Wrapper
-void ui_wrapper_begin(Axis2 axis);
-void ui_wrapper_end();
-#define UI_Wrapper(axis) DeferLoop(ui_wrapper_begin(axis), ui_wrapper_end())
+#define UI_Padded(size) DeferLoop(ui_spacer(size), ui_spacer(size))
 
 // - Color pickers
 // void ui_color_picker_sv(Str8 id, UI_Size size_x, UI_Size size_y, V4F32 hsv, F32* out_opt_new_sat, F32* out_opt_new_val);

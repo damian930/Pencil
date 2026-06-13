@@ -71,61 +71,13 @@ UI_Actions ui_button_f(const char* fmt, ...)
 //
 void ui_layout_stack_begin(Axis2 axis)
 {
-  ui_set_next_size_x(ui_fit());
-  ui_set_next_size_y(ui_fit());
+  // These use a default size to them if non is specified in the style stacks
   ui_set_next_layout_axis(axis);
   UI_Box* stack = ui_box_make(Str8{}, 0); 
   ui_push_parent(stack);
 }
 
 void ui_layout_stack_end()
-{
-  ui_pop_parent();
-}
-
-///////////////////////////////////////////////////////////
-// - Padded box
-//
-void ui_padded_box_begin_ex(UI_Size left_size, UI_Size top_size, Axis2 final_box_axis)
-{
-  Axis2 outer_axis = axis2_other(final_box_axis);
-  ui_layout_stack_begin(outer_axis);
-  ui_spacer((outer_axis == Axis2__x ? left_size : top_size));
-  ui_layout_stack_begin(final_box_axis);
-  ui_spacer((final_box_axis == Axis2__x ? left_size : top_size));
-}
-
-void ui_padded_box_end_ex(UI_Size right_size, UI_Size bottom_size, Axis2 final_box_axis)
-{
-  ui_spacer((final_box_axis == Axis2__x ? right_size : bottom_size));
-  ui_layout_stack_end();
-  ui_spacer((axis2_other(final_box_axis) == Axis2__x ? right_size : bottom_size));
-  ui_layout_stack_end();
-}
-
-void ui_padded_box_begin(UI_Size size, Axis2 final_box_axis)
-{
-  ui_padded_box_begin_ex(size, size, final_box_axis);
-}
-
-void ui_padded_box_end(UI_Size size, Axis2 final_box_axis)
-{
-  ui_padded_box_end_ex(size, size, final_box_axis);
-}
-
-///////////////////////////////////////////////////////////
-// - Wrapper
-//
-void ui_wrapper_begin(Axis2 axis)
-{
-  ui_set_next_size_x(ui_fit());
-  ui_set_next_size_y(ui_fit());
-  ui_set_next_layout_axis(axis);
-  UI_Box* wrapper = ui_box_make(Str8{}, 0);
-  ui_push_parent(wrapper);
-}
-
-void ui_wrapper_end()
 {
   ui_pop_parent();
 }

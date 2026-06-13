@@ -144,16 +144,16 @@ UI_Box* ui_box_make(Str8 id_and_text, UI_Box_flags flags)
   box->layout_axis             = ui_get_layout_axis();    
   box->semantic_size[Axis2__x] = ui_get_size_x();        
   box->semantic_size[Axis2__y] = ui_get_size_y();        
-  box->padding                 = ui_get_padding();
-  box->child_gap               = ui_get_child_gap();
   
   {
     V4F32 border_color = ui_get_border_color();
-    F32 border_width = ui_get_border_width();
+    F32 border_width   = ui_get_border_width();
     if (!(flags & UI_Box_flag__has_borders)) { 
-      box->border_color = border_color;
-      box->border_width = border_width;
+      border_color = ui_get_border_color();
+      border_width = ui_get_border_width();
     }
+    box->border_color = border_color;
+    box->border_width = border_width;
   }
 
   {
@@ -449,18 +449,59 @@ void __ui_do_sizing_for_children_dependant_box(UI_Box* root, Axis2 axis)
     __ui_do_sizing_for_children_dependant_box(child, axis);
   }
 
-  switch (root->semantic_size[axis].kind)
+  if (root->semantic_size[axis].kind != UI_Size_kind__fit) { return; }
+  
+  for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
   {
-    default: {} break;
-
-    case UI_Size_kind__fit:
+    if (!(child->flags & UI_Box_flag__floating_x<<axis))
     {
-      for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
-      {
-        if (root->layout_axis == axis) { root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; }
-        else { root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]); }
-      }
-    } break;
+      if (root->layout_axis == axis) { root->final_on_screen_size.v[axis] += child->final_on_screen_size.v[axis]; }
+      else { root->final_on_screen_size.v[axis] = Max(root->final_on_screen_size.v[axis], child->final_on_screen_size.v[axis]); }
+    }
+  }
+  
+  // Dynamically calculating strictness based on already calculated children
+  if (root->layout_axis == axis) 
+  {
+    F32 children_size_to_maybe_give_out = 0.0f;
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
+    {
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
+
+      F32 child_size                  =  child->final_on_screen_size.v[axis];
+      F32 p_to_to_keep                =  child->semantic_size[axis].strictness;
+      F32 p_to_give_out               =  1.0f - p_to_to_keep;
+      F32 size_to_give_out            =  child_size * p_to_give_out;
+      children_size_to_maybe_give_out += size_to_give_out;
+    }
+    F32 root_size = root->final_on_screen_size.v[axis];
+    if (root_size != 0.0f)
+    {
+      F32 root_p_to_give_out = children_size_to_maybe_give_out / root_size;
+      root->semantic_size[axis].strictness = 1.0f - root_p_to_give_out;
+    }
+  }
+  else 
+  {
+    F32 max_size_after_possible_fixing = 0.0f;
+    for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling) 
+    {
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
+
+      F32 child_size                = child->final_on_screen_size.v[axis];
+      F32 p_to_to_keep              = child->semantic_size[axis].strictness;
+      F32 p_to_give_out             = 1.0f - p_to_to_keep;
+      F32 size_to_give_out          = child_size * p_to_give_out;
+      F32 child_size_after_give_out = child_size - size_to_give_out;
+      max_size_after_possible_fixing = Max(max_size_after_possible_fixing, child_size_after_give_out);
+    }
+
+    F32 root_size = root->final_on_screen_size.v[axis];
+    if (root_size != 0.0f)
+    {
+      F32 root_p_to_keep = max_size_after_possible_fixing / root_size;
+      root->semantic_size[axis].strictness = root_p_to_keep;
+    }
   }
 }
 
@@ -469,31 +510,33 @@ void __ui_do_layout_size_fixing(UI_Box* root, Axis2 axis)
   // If the inner contents of the root are larger then the root alowes, 
   // then we make the smaller here based on the strictness if possible.
 
-  // todo: For layout axis we make all the children smaller
-  // but for non layout we just make the box smaller
-
-  // if (str8_match(root->id, Str8FromC("Wrapper"), 0)) { BP; }
-
   if (root->layout_axis == axis)
   {
     F32 total_size_of_children  = 0.0f;
     F32 strictness_total_budget = 0.0f;
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
+
       total_size_of_children += child->final_on_screen_size.v[axis];
       strictness_total_budget += (1.0f - child->semantic_size[axis].strictness);
     }
   
-    // We have overflow of children here, might need fixing
-    F32 root_size = root->final_on_screen_size.v[axis];
-    if (root_size < total_size_of_children)
+    if (strictness_total_budget > 0.0f) 
     {
-      for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+      // We have overflow of children here, might need fixing
+      F32 root_size = root->final_on_screen_size.v[axis];
+      if (root_size < total_size_of_children)
       {
-        F32 percentage_of_removable_size    =  1.0f - child->semantic_size[axis].strictness;
-        F32 ratio_relative_to_total_budget  =  percentage_of_removable_size / strictness_total_budget;
-        F32 amount_to_remove                =  (total_size_of_children - root_size) * ratio_relative_to_total_budget;
-        child->final_on_screen_size.v[axis] -= amount_to_remove;
+        for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
+        {
+          if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
+
+          F32 percentage_of_removable_size    =  1.0f - child->semantic_size[axis].strictness;
+          F32 ratio_relative_to_total_budget  =  percentage_of_removable_size / strictness_total_budget;
+          F32 amount_to_remove                =  (total_size_of_children - root_size) * ratio_relative_to_total_budget;
+          child->final_on_screen_size.v[axis] -= amount_to_remove;
+        }
       }
     }
   }
@@ -501,6 +544,8 @@ void __ui_do_layout_size_fixing(UI_Box* root, Axis2 axis)
   {
     for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling)
     {
+      if (child->flags & UI_Box_flag__floating_x<<axis) { continue; }
+
       F32 child_max_legal_size = root->final_on_screen_size.v[axis];
       F32 child_size = child->final_on_screen_size.v[axis];
       if (child_size > child_max_legal_size)
@@ -536,12 +581,8 @@ void __ui_do_relative_parent_offsets_for_box(UI_Box* root, Axis2 axis)
       }
     }
 
-    // Offsetting the boxes based on their parent clip value
-    // TODO: I have no idea if this works still
-    // if (child->flags & UI_Box_flag__floating_x<<axis) {} /*|| (root->flags & UI_Box_flag__aply_clip_offset_on_clildren_floating)*/
-    // else {
-    //   child->final_parent_offset.v[axis] += root->clip_offset[axis];
-    // }
+    // Clip aplies on everything, even floating
+    child->final_parent_offset.v[axis] += root->clip_offset.v[axis];
 
     __ui_do_relative_parent_offsets_for_box(child, axis);
   }
@@ -571,7 +612,7 @@ void __ui_do_final_rect_for_box(UI_Box* root, Axis2 axis, RangeV2F32 parent_clip
   U64 child_index = 0;
   for (UI_Box* child = root->first_child; !ui_box_is_zero(child); child = child->next_sibling, child_index += 1)
   {
-    if (root->layout_axis == axis) { children_size_sum += child->final_on_screen_size.v[axis] + (child_index * root->child_gap); }
+    if (root->layout_axis == axis) { children_size_sum += child->final_on_screen_size.v[axis]; }
     else { children_size_sum = Max(children_size_sum, child->final_on_screen_size.v[axis]); }
 
     F32 prev_total_offset = total_offset[axis]; 
@@ -931,7 +972,7 @@ UI_Box_data ui_box_data_from_box_id_prev_frame(Str8 id)
     box_data.is_found           = true; 
     box_data.on_screen_bbox     = box->final_on_screen_bbox; 
     box_data.inner_content_dims = box->inner_content_dims;
-    box_data.clip_offset        = v2f32(box->clip_offset[Axis2__x], box->clip_offset[Axis2__y]) ;
+    box_data.clip_offset        = v2f32(box->clip_offset.x, box->clip_offset.y) ;
   }
   return box_data;
 }
@@ -989,10 +1030,9 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
     !str8_match(ctx->interacted_with_box_id, prev_frames_box->id, 0) // We are not the box that is interacted with right now
   );
 
-  // TODO: Here only usethe visible rect for boxes 
-  //       This should know to not use the boxes inside clip elements that are clipped of the screen
-  //       Right now this is not done, cause i am taking care of other things and cant test this yet.
-  is_hovered = range_v2f32_within(prev_frames_box->final_on_screen_bbox, ui_get_mouse_pos());
+  RangeV2F32 interactable_bbox = intersect_range_v2f32(prev_frames_box->clip_bbox, prev_frames_box->final_on_screen_bbox);
+
+  is_hovered = range_v2f32_within(interactable_bbox, ui_get_mouse_pos());
 
   // Either there is no active box or we are the active box
   // Since interacted box data is retained across frame boundary, 
@@ -1290,6 +1330,17 @@ void ui_pop_font()               { UI_Context* ctx = ui_get_context(); _UI_Style
 void ui_set_next_font(FP_Font v) { UI_Context* ctx = ui_get_context(); _UI_StyleStackSetNext_Impl(ctx, text_font_stack, UI_Text_font_node, v) }
 void ui_pop_single_usage_font()  { UI_Context* ctx = ui_get_context(); _U_StyleStackPopSigngleUsage_Imp(ctx, text_font_stack, UI_Text_font_node) }
 FP_Font ui_get_font()            { UI_Context* ctx = ui_get_context(); _UI_StyleStackGet_Impl(ctx, text_font_stack, UI_Text_font_node, font) }
+
+// TODO: This is new, just better names to have less code for the api
+void ui_size_x(UI_Size size) { ui_set_next_size_x(size); }
+void ui_size_y(UI_Size size) { ui_set_next_size_y(size); }
+void ui_b_color(V4F32 color) { ui_set_next_b_color(color); }
+void ui_flags(UI_Box_flags flags) { ui_set_next_flags(flags); }
+void ui_layout_x() { ui_set_next_layout_axis(Axis2__x); }
+void ui_layout_y() { ui_set_next_layout_axis(Axis2__y); }
+void ui_border(F32 width, V4F32 color) { ui_set_next_border_width(width); ui_set_next_border_color(color); }
+void ui_border_color(V4F32 color) { ui_set_next_border_color(color); }
+void ui_border_width(F32 width) { ui_set_next_border_width(width); }
 
 // - UI Draw
 void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
