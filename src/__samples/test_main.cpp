@@ -130,29 +130,25 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     {
       ui_push_font(font);
 
-      ui_set_next_size_x(ui_children_sum());
-      ui_set_next_size_y(ui_children_sum());
+      ui_set_next_size_x(ui_px(100));
+      ui_set_next_size_y(ui_px(100));
       ui_set_next_b_color(blue());
-      ui_set_next_child_gap(25);
-      UI_Parent(ui_box_make(Str8{}, UI_Box_flag__has_background))
+      UI_Box* wrapper = ui_box_make(Str8FromC("Wrapper"), UI_Box_flag__has_background);
+      UI_Parent(wrapper)
       {
-        for EachIndex(i, 3)
-        {
-          ui_set_next_size_x(ui_px(50));
-          ui_set_next_size_y(ui_px(50));
-          ui_set_next_b_color(red());
-          ui_box_make(Str8{}, UI_Box_flag__has_background);
-        }
+        ui_set_next_size_x(ui_grow());
+        ui_set_next_size_y(ui_grow());
+        ui_set_next_b_color(red());
+        UI_Box* growing = ui_box_make(Str8FromC("Grow box"), UI_Box_flag__has_background);
+      
+        ui_set_next_size_x(ui_grow());
+        ui_set_next_size_y(ui_grow());
+        ui_set_next_b_color(green());
+        UI_Box* other_growing = ui_box_make(Str8FromC("Other Grow box"), UI_Box_flag__has_background);
       }
-
-      Scratch scratch = get_scratch(0, 0);
-      Str8 str = str8_copy_alloc(scratch.arena, ui_get_context()->navigated_box_id);
-      OutputDebugStringF("Nav id: %s \n", str.data);
-      end_scratch(&scratch);
     }
 
     r_clear_target(window_frame_buffer_target, black());
-    // r_clear_target(window_frame_buffer_target, red());
     ui_draw();
 
     r_submit(window_frame_buffer_target, d_get_batch_list());

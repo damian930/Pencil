@@ -5,6 +5,21 @@
       the user might open up a text edit box and input a command like 
       "Draw" or "Erase" or "Ruler" or "Clear Screen" 
 
+- Prev list of things got too big so i made a new one:
+[ ] - grow box with the ds example
+      NOTES:
+      grow is the type of element that grows to fill the size, or is it parent dependant.
+      so we have to know the parent before we size the grow. But if we have a parent that is child dependant, 
+      then we have a circular dep. In that case we should size the children to produce the size for parent, 
+      then run the grow routine to make sure that grow grow if there is a place for them to.
+      static
+      children dependant
+      grow 
+      when we size the children dependant, we dont have a way for grow to grow, at this point the childrn inside might be either chilren dependatnt
+      or they will be fixes size. For fixes size we know the size, for children dep we get the size. But if they are grow, then we can only size them when we know what they can grow into, so we have to size them first. 
+[ ] - Label that does ... when takes too much space
+[ ] - Multi line text rendering just to see the aglo working
+
 - Current feature working progress:
 [ ] - What if a box is active, but doesnt get spawned for a frame, see if you reset active properly
 [ ] - Todo add a way to specify corner r in pixels and not only in %

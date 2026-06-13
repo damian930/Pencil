@@ -4,7 +4,7 @@
 #include "core/core_include.h"
 #include "font_provider/font_provider.h"
 
-/* todos:
+/* TODOs:
   [ ] - Need to have a default font, right now 0 is used for it
 */
 
@@ -12,13 +12,12 @@ enum UI_Size_kind {
   UI_Size_kind__px,
   UI_Size_kind__children_sum,
   UI_Size_kind__text,
-  UI_Size_kind__percent_of_parent,
+  UI_Size_kind__grow,
 };
 
 struct UI_Size {
   UI_Size_kind kind;
   F32 value;
-  F32 strictness;
 };
 
 enum UI_Box_flag : U32 {
@@ -123,6 +122,9 @@ struct UI_Box {
   V4F32        vertex_colors[UV__COUNT];
   V4F32        corner_radii; 
   F32          softness;
+
+  // TODO: THis is here cause i just need this for testing right now
+  B32 grew_this_build;
 
   // Text stuff (Bit less common setting for a box)
   Str8 text;
@@ -238,8 +240,7 @@ extern UI_Box __ui_g_zero_box;
 UI_Size ui_size_make(UI_Size_kind kind, F32 value, F32 strictness);
 UI_Size ui_px(F32 value);                     
 UI_Size ui_children_sum();                    
-UI_Size ui_text_size();                       
-UI_Size ui_p_of_p(F32 value, F32 strictness); 
+UI_Size ui_text_size();                      
 
 // - Context 
 UI_Context* ui_get_context();
@@ -423,12 +424,12 @@ FP_Font ui_get_font();
 
     TIER 2 — INTERACTIVE ATOMS
     ---------------------------
-    11. [x] - Button                 Primary, secondary, ghost, destructive. Disabled state. Icon slot.
+    11. [ ] - Button                 Primary, secondary, ghost, destructive. Disabled state. Icon slot.
     12. [ ] - Icon Button            Square button with only an icon. Needs tooltip.
     13. [ ] - Link                   Inline or standalone. Underline, hover, visited states.
-    14. [x] - Checkbox               Checked, unchecked, indeterminate. Label slot.
-    15. [x] - Radio                  Single selection from a group. Label slot.
-    16. [+-] - Toggle / Switch        Binary on/off. Animated thumb.
+    14. [ ] - Checkbox               Checked, unchecked, indeterminate. Label slot.
+    15. [ ] - Radio                  Single selection from a group. Label slot.
+    16. [ ] - Toggle / Switch        Binary on/off. Animated thumb.
     17. [ ] - Text Input             Single-line. Placeholder, label, helper, error states.
     18. [ ] - Textarea               Multi-line input. Auto-resize variant.
     19. [ ] - Select / Dropdown      Native or custom. Option list, placeholder, disabled.
@@ -480,36 +481,6 @@ FP_Font ui_get_font();
     53. Calendar View          Month/week/day grid. Event placement, drag to reschedule.
     54. Settings Page          Sectioned form. Sidebar nav, save state, confirmation.
 */
-
-// note: This is great to have the ui be independant.
-//       Though i dont know if i like it. I have seen this used in clay.
-//       I dont know how to just draw like ryan since i dont have 
-//       a separated layer for drawing like i had before with raylib 
-//       or how ryan has it with "D_" layer.
-// ///////////////////////////////////////////////////////////
-// // - Draw stuff for the ui for the ui
-// //
-// struct UI_Draw_command {
-//   Rect rect;
-
-//   V4F32 rect_color;
-//   F32 border_width;
-//   V4F32 border_color;
-
-//   Str8 text;
-
-//   UI_Draw_command* prev;
-//   UI_Draw_command* next;
-// };
-
-// struct UI_Draw_command_list {
-//   UI_Draw_command* first;
-//   UI_Draw_command* last;
-//   U64 count;
-// };
-
-// void ui_draw_command_from_ui_root(UI_Box* root);
-
 
 #endif
 
