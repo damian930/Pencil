@@ -3,49 +3,25 @@
 [ ] - All the features that are possible to be set in settings
       are to be set via commands and optional shortcuts. This way 
       the user might open up a text edit box and input a command like 
-      "Draw" or "Erase" or "Ruler" or "Clear Screen" 
+      "Draw" or "Erase" or "Ruler" or "Clear Screen".
 [ ] - After you have the shortcuts and commands working, add a way fro the user
       to create typedef for commands, this way it might be easier for the user 
       to have their own names. This shoud be easy and not take much. 
       This all might be stored in a big settings file, json shoud be fine.
 
-- Current feature working progress:
-[ ] - What if a box is active, but doesnt get spawned for a frame, see if you reset active properly
-[ ] - Todo add a way to specify corner r in pixels and not only in %
-[ ] - A way to restrict or allow hover of other elements when we are down on some box and we hover another. For this there should be a general logic, either hover is alowed or not, then we just add a way to have a different logic happend. That is why i said "either"
-[ ] - Try to make a list with some buttons that you can hover and click and tab
-[ ] - Directories support from win32
-[ ] - UI might have identical ids, that is not great, in debug might be a good idea to check the ids and report if they are the same and then turn that off for release mode.
-[ ] - Add hot element into the ui core to be able to have navigation traverse the hot elements tree.
-[ ] - Start using hashed instead of Str8 for UI_Box ids.
-[ ] - Add default font to the ui like in raylib or ryan by embedding it into the file
-[ ] - Test your first ever UI Navigation
-[ ] - Fix up borders
-[ ] - Try a different ui algo 
-      [ ] - Have padding as part of the algo
-      [ ] - Have child gap be a part of the algo
-      [ ] - Have border be a part of the aglo
-[ ] - Add support for double down mouse click events
-[ ] - Have the window be full screen. 
-[ ] - Have the app work when the app window gets resized, i guess just redo the pencil state then.
-[ ] - Try the app a bit and if it works then start making the ui for it.
-      [ ] - Command input field.
-            [ ] - Text edit box
-                  [x] - Make it be a normal text input that starts from the left
-                  [x] - Cursor placement
-                  [x] - Selection with cursor like on google
-                  [ ] - Double click select all but the first click deselects stuff
+- Minor thing before to do before release:
+[ ] - Structure the code for every cpp<->h file
+[ ] - Redo core base, right now its all in random order
 
-            [ ] - Box with possible commands
-            [ ] - Have the commands that have shortcuts assigned to them show the shortcuts like in vscode 
-            [ ] - Finish with shortcuts
-                  [ ] - You cant have 2 shortcuts to the same thing at the same time, have to unbound the older one
-                  [ ] - Check for other bug cases, just have the shortcuts be working fine so we can forget about them 
-                        and focus on finish up other things.
-                        
+- Current feature working progress:
+[ ] - Clean up main
+[ ] - Prepare the codebase to work from both the debug build path and the release dir structure
+[ ] - Have the window be full screen. 
+[ ] - When drawing have a pen like in cactus image viewer
+[ ] - Display the fps on the screen to have it be like in raylib  
+[ ] - Write down some ideas to implement for the command line. Stuff like command queue with arrow functional, tab feature to guess a possible command, ...
+
 - Stuff to fix or add next:
-[ ] - extend shortcuts to optionally have more than 1 mod (mod + mod + key)
-[ ] - start having sequences (todo: first look into them again, there is quite a lot of defails about them)
 [ ] - do we need the d3d context to switch for every batch or would it be fine for it to only switch the setting
       that is differnt, might be faster, google and test this when you add a profiler in.
 
@@ -63,23 +39,10 @@
     })
     Its called -> "Designated initializer"
       
-[ ] - When drawing have a pen like in cactus image viewer
-
-[ ] - Display the fps on the screen to have it be like in raylib  
 [ ] - Look into this https://web.archive.org/web/20190913214618/http://www.pjblewis.com/site/posts/2016-04-27-p2-efficient-alpha-blended-windows-directcomposition.html
-[ ] - Start using V memory instead of malloc
 [ ] - https://github.com/mmozeiko/c_d2d_dwrite for DWrite,
       found this in Digital Grove 
 [ ] - Start using wide chars for win32 stuff and not regular asci
-[ ] - Structure the code for core base 
-
-[ ] - Label that does ... when takes too much space
-[ ] - Multi line text rendering just to see the aglo working
-
-
-- Some quick ideas:
-[ ] - The issue with the rounded corners and then their children poking out might be fixed with a little scissor, that all,
-      but that would require the gpu to switch contexts, since we would need to set a different scissor rect per each.
 
 - Other projects to learn from:
 [ ] - WCAP

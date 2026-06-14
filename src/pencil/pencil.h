@@ -51,7 +51,13 @@ struct Draw_record_registration_result {
   X(__Fake_COMMAND_2, Str8FromC("__Fake_COMMAND_2")) \
   X(__Fake_COMMAND_3, Str8FromC("__Fake_COMMAND_3")) \
   X(__Fake_COMMAND_4, Str8FromC("__Fake_COMMAND_4")) \
-  X(__Fake_COMMAND_5, Str8FromC("__Fake_COMMAND_5")) 
+  X(__Fake_COMMAND_5, Str8FromC("__Fake_COMMAND_5"))  \
+  X(__Fake_COMMAND_511, Str8FromC("__Fake_COMMAND_5")) \
+  X(__Fake_COMMAND_51, Str8FromC("__Fake_COMMAND_5")) \
+  X(__Fake_COMMAND_52, Str8FromC("__Fake_COMMAND_5")) \
+  X(__Fake_COMMAND_33, Str8FromC("__Fake_COMMAND_5")) \
+  X(__Fake_COMMAND_54, Str8FromC("__Fake_COMMAND_5")) \
+  X(__Fake_COMMAND_55, Str8FromC("__Fake_COMMAND_5"))
 
 enum Command_id : U32 {
   // Command_id__NONE,
@@ -116,10 +122,6 @@ struct Pencil_state {
   //
   B32 terminate_app;
 
-  struct {
-    B32 open_command_list;
-  } ui_state;
-
   // Signals 
   //
   B32 signal_new_pen_size;
@@ -142,6 +144,21 @@ struct Pencil_state {
   B32 signal_swap_to_draw;
   // 
   B32 signal_toggle_line_fade;
+
+  struct {
+    // TODO: Have this be false when release
+    B32 is_widget_open = true;
+
+    U8 text_entry_buffer[64];
+    U64 text_entry_buffer_count;
+    U64 text_entry_cursor;
+    U64 text_entry_section;
+
+    U64 currently_chosen_command_index;
+    B32 last_frame_navigated_commands_with_arrows;
+
+    V4F32 main_b_color = rgba_from_hex(0x695A09FF);
+  } ui_state;
 
   // Misc
   B32 show_brush_ui_menu;

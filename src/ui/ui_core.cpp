@@ -507,6 +507,15 @@ void __ui_do_sizing_for_children_dependant_box(UI_Box* root, Axis2 axis)
 
 void __ui_do_layout_size_fixing(UI_Box* root, Axis2 axis)
 {
+  // if (str8_match(root->id, Str8FromC("Floaint test id"), 0)) { BP; }
+
+  // Testing this codepath for floating with p of p size
+  if (root->flags & UI_Box_flag__floating<<axis && root->semantic_size[axis].kind == UI_Size_kind__percent_of_parent)
+  {
+    F32 new_size = root->parent->final_on_screen_size.v[axis] * root->semantic_size[axis].value;
+    root->final_on_screen_size.v[axis] = new_size;
+  }
+
   // If the inner contents of the root are larger then the root alowes, 
   // then we make the smaller here based on the strictness if possible.
 
@@ -1352,6 +1361,14 @@ V2F32 ui_box_get_prev_build_clip_offset(UI_Box* box)
   return prev_frame_box->clip_offset;
 }
 
+V2F32 ui_box_id_get_prev_build_clip_offset(Str8 id)
+{
+  if (id.count == 0) { return V2F32{}; }
+  UI_Box* box = ui_get_box_from_tree(ui_get_context()->prev_frame_root_box, id);
+  if (ui_box_is_zero(box)) { return V2F32{}; }
+  return ui_box_get_prev_build_clip_offset(box);
+}
+
 void ui_box_set_clip_offset_y(UI_Box* box, F32 offset)
 {
   if (ui_box_is_zero(box)) { return; }
@@ -1364,6 +1381,21 @@ void ui_box_set_clip_offset_x(UI_Box* box, F32 offset)
   box->clip_offset.x = offset;
 }
 
+void ui_box_id_set_clip_offset_x(Str8 id, F32 offset)
+{
+  if (id.count == 0) { return; }
+  UI_Box* box = ui_get_box_from_tree(ui_get_context()->root_box, id);
+  if (ui_box_is_zero(box)) { return; }
+  ui_box_set_clip_offset_x(box, offset);
+}
+
+void ui_box_id_set_clip_offset_y(Str8 id, F32 offset)
+{
+  if (id.count == 0) { return; }
+  UI_Box* box = ui_get_box_from_tree(ui_get_context()->root_box, id);
+  if (ui_box_is_zero(box)) { return; }
+  ui_box_set_clip_offset_y(box, offset);
+}
 
 // - UI Draw
 void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)

@@ -697,7 +697,7 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
 }
  
 // This shows the text in the buffer and gives the user the means to update the data when they choose to 
-UI_Text_op_list ui_text_edit_box(Arena* arena, UI_Size size_x, U8* text_buffer, U64 text_buffer_size, U64 buffer_max_count, U64 cursor_pos, U64 section_pos, Str8 edit_box_id)
+UI_Text_op_list ui_text_edit_box(Arena* arena, B32 create_updates, UI_Size size_x, U8* text_buffer, U64 text_buffer_size, U64 buffer_max_count, U64 cursor_pos, U64 section_pos, Str8 edit_box_id)
 {
   FP_Font font                 = ui_get_font();
   F32 cursor_size              = 2.0f;
@@ -708,6 +708,17 @@ UI_Text_op_list ui_text_edit_box(Arena* arena, UI_Size size_x, U8* text_buffer, 
 
   Str8 str_before_cursor           = str8_substring(text_buffer_str, 0, cursor_pos);
   F32 str_before_cursor_size_in_px = fp_measure_text(str_before_cursor, font).x;
+
+  // TODO:
+  // [ ] - Slider on the side if we need to scroll
+  // [ ] - Placehlder for the string inside the text edit box
+  // [ ] - Shortcuts next to the command, 
+  //       if the shortcut is too long, use ... for the end of it, 
+  //       do the same for the command name
+  // [ ] - Cursor change for the text edit
+  // [ ] - Cursor change for clip box
+  // [ ] - Cursor change for slider
+  // [ ] - Slider should work from the middle of it
 
   // Figuring out clip offset for this frames edit box
   F32 new_clip_offset = 0.0f;
@@ -780,7 +791,7 @@ UI_Text_op_list ui_text_edit_box(Arena* arena, UI_Size size_x, U8* text_buffer, 
 
       ui_spacer(ui_px(space_before_section_start));
       
-      if (ui_is_active_id(edit_box_id))
+      if (create_updates)
       {
         ui_set_next_size_x(ui_px(section_start == section_end ? cursor_size : space_inside_section + cursor_size));
         ui_set_next_size_y(ui_px(font_height));
@@ -797,49 +808,54 @@ UI_Text_op_list ui_text_edit_box(Arena* arena, UI_Size size_x, U8* text_buffer, 
   }
 
   // Producing data for the user that represents hot to then update the text, cursor, section
+  // ---
+  // "create_updates" is here to allow the user to enforce the logic of when to generate updates.
+  // As a result, this widget doesnt do active or anything like that, the wrapper for it
+  // on the caller side will do that, this is just a flexible building block
   UI_Text_op_list result_text_op_list = {};
-  if (edit_box_actions.is_active)
+  if (create_updates)
   {
-    result_text_op_list = ui_text_op_list_from_os_event_list(arena, os_get_frame_event_list());
-  }
-  else if (edit_box_actions.is_down)
-  {
-    ui_set_active_id(edit_box_id);
-    if (edit_box_data.is_found)
+    if (edit_box_actions.is_down)
     {
-      // Figuring out new cursor and new section position for when the user tried to select text 
-      B32 begin_section_at_new_cursor = false;
-      U64 new_cursor_pos              = cursor_pos;
+      if (edit_box_data.is_found)
       {
-        F32 new_cursor_pos_in_px_in_text = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x - edit_box_data.clip_offset.x;
-        F32 accumulated_offset = 0.0f;
-        for EachIndex(i, text_buffer_str.count)
+        // Figuring out new cursor and new section position for when the user tried to select text 
+        B32 begin_section_at_new_cursor = false;
+        U64 new_cursor_pos              = cursor_pos;
         {
-          F32 char_width       = fp_measure_text(str8_substring(text_buffer_str, i, i + 1), font).x;
-          RangeF32 char_range  = range_f32_make(accumulated_offset, accumulated_offset + char_width);
-          accumulated_offset += char_width;
-          if (range_f32_within(char_range, new_cursor_pos_in_px_in_text))
+          F32 new_cursor_pos_in_px_in_text = ui_get_mouse_pos().x - edit_box_data.on_screen_bbox.min.x - edit_box_data.clip_offset.x;
+          F32 accumulated_offset = 0.0f;
+          for EachIndex(i, text_buffer_str.count)
           {
-            F32 mouse_diff_inside_char = char_range.min - new_cursor_pos_in_px_in_text;
-            F32 ratio = abs_f32(mouse_diff_inside_char) / range_f32_length(char_range);
-            if (0.0f <= ratio && ratio <= 0.5f) { // go to the left
-              new_cursor_pos = i;
-            } else if (0.5f < ratio && ratio <= 1.0f) { // go to the right
-              new_cursor_pos = i + 1;
+            F32 char_width       = fp_measure_text(str8_substring(text_buffer_str, i, i + 1), font).x;
+            RangeF32 char_range  = range_f32_make(accumulated_offset, accumulated_offset + char_width);
+            accumulated_offset += char_width;
+            if (range_f32_within(char_range, new_cursor_pos_in_px_in_text))
+            {
+              F32 mouse_diff_inside_char = char_range.min - new_cursor_pos_in_px_in_text;
+              F32 ratio = abs_f32(mouse_diff_inside_char) / range_f32_length(char_range);
+              if (0.0f <= ratio && ratio <= 0.5f) { // go to the left
+                new_cursor_pos = i;
+              } else if (0.5f < ratio && ratio <= 1.0f) { // go to the right
+                new_cursor_pos = i + 1;
+              }
+              if (!edit_box_actions.was_down) { begin_section_at_new_cursor = true; }
             }
-            if (!edit_box_actions.was_down) { begin_section_at_new_cursor = true; }
           }
         }
+  
+        // Producing text ops for the new cursor and section positions
+        if (new_cursor_pos != cursor_pos)
+        {
+          UI_Text_op* op = ui_text_op_list_push(arena, &result_text_op_list, UI_Text_op_kind__move_cursor);
+          op->move_specifier      = UI_Text_op_move_specifier___move_specific_position;
+          op->cursor_specific_pos = new_cursor_pos;
+          if (!begin_section_at_new_cursor) { op->keep_section_start_after_op = true; } // Only move the section when we begin to select
+        }
       }
-
-      // Producing text ops for the new cursor and section positions
-      if (new_cursor_pos != cursor_pos)
-      {
-        UI_Text_op* op = ui_text_op_list_push(arena, &result_text_op_list, UI_Text_op_kind__move_cursor);
-        op->move_specifier      = UI_Text_op_move_specifier___move_specific_position;
-        op->cursor_specific_pos = new_cursor_pos;
-        if (!begin_section_at_new_cursor) { op->keep_section_start_after_op = true; } // Only move the section when we begin to select
-      }
+    }
+    else {
+      result_text_op_list = ui_text_op_list_from_os_event_list(arena, os_get_frame_event_list());
     }
   }
   return result_text_op_list;

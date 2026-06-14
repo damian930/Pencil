@@ -108,8 +108,6 @@ void pencil_init(Pencil_state* P)
     }
     cJSON_Delete(settings_json);
 
-    P->ui_state.open_command_list = true;
-
     end_scratch(&scratch);
   }
 }
@@ -591,236 +589,339 @@ void pencil_render(const Pencil_state* P)
 
 void pencil_do_command_ui(Pencil_state* P, FP_Font font)
 {
-  if (!P->ui_state.open_command_list) { return; }
-
-  // Just putting this here for now, but this might be a part of 
-  // some ui state needed for the pencil ui
-  static struct {
-    B32 is_widget_open = true;
-    
-    U8 text_entry_buffer[64];
-    U64 text_entry_buffer_count;
-    U64 text_entry_cursor;
-    U64 text_entry_section;
-
-    U64 currently_chosen_command_index;
-
-    V4F32 main_b_color = rgba_from_hex(0x695A09FF);
-  } ui_state = {};
-
-  if (!ui_state.is_widget_open) { return; }
-
+  if (!P->ui_state.is_widget_open) { return; }
+ 
   Scratch scratch = get_scratch(0, 0);
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
   ui_push_font(font);
 
-  // TODO: Put this in a better place
-  static B32 navigated_commands_with_arrows = false;
-
-  // Gathered data from the upcomming widget build 
-  // to then update the state coherently
-  UI_Text_op_list text_entry_ops = {};
-  B32 command_got_chosen         = false;
-  U64 chosen_command_index       = 0;
-
-  // Preparing some data for later use
-  struct Command_data {
-    U64 index;
-    B32 is_filtered_in;
-  };
-  Command_data filtered_command_data[ArrayCount(command_names)] = {};
+  for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
   {
-    Str8 entry_text = str8_manual(ui_state.text_entry_buffer, ui_state.text_entry_buffer_count);
-    for EachIndex(i, ArrayCount(command_names))
+    if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__escape)
     {
-      filtered_command_data[i].index          = i;
-      if (str8_is_substring(command_names[i], entry_text, Str8_match__ignore_case)) 
-      {
-        filtered_command_data[i].is_filtered_in = true;
-      }
+      P->ui_state.is_widget_open = false;
+      os_consume_frame_event(ev);
+      break;
     }
   }
 
-  // Building the widget 
-  ui_layout_x();
-  UI_Row() UI_Padded(ui_p_of_p(1, 0))
+  if (P->ui_state.is_widget_open)
   {
-    ui_width(ui_p_of_p(0.5, 1));
-    ui_height(ui_p_of_p(0.5, 1));
-    ui_b_color(ui_state.main_b_color);
-    ui_layout_x();
-    UI_Box* box = ui_box_make({}, UI_Box_flag__has_background);
-    UI_Parent(box) UI_Padded(ui_px(10)) UI_Col() UI_Padded(ui_px(10))
+    Str8 command_top_widget_id = Str8FromC("Command to widget id");
+  
+    // Gathered data from the upcomming widget build 
+    // to then update the state coherently
+    UI_Text_op_list text_entry_ops = {};
+    B32 command_got_chosen         = false;
+    U64 chosen_command_index       = 0;
+  
+    // Preparing some data for later use
+    struct Command_data {
+      U64 index;
+      B32 is_filtered_in;
+    };
+    Command_data filtered_command_data[ArrayCount(command_names)] = {};
     {
-      Str8 text_entry_str = str8_manual(ui_state.text_entry_buffer, ui_state.text_entry_buffer_count);
-
-      ui_width(ui_p_of_p(1, 0));
-      ui_height(ui_fit());
-      ui_border(1, white());
-      UI_Parent(ui_box_make({}, UI_Box_flag__has_borders)) UI_PaddedAround(ui_px(5))
+      Str8 entry_text = str8_manual(P->ui_state.text_entry_buffer, P->ui_state.text_entry_buffer_count);
+      for EachIndex(i, ArrayCount(command_names))
       {
-        text_entry_ops = ui_text_edit_box(
-          scratch.arena,
-          ui_p_of_p(1, 0),
-          ui_state.text_entry_buffer,
-          ui_state.text_entry_buffer_count,
-          ArrayCount(ui_state.text_entry_buffer),
-          ui_state.text_entry_cursor,
-          ui_state.text_entry_section,
-          Str8FromC("Commands text entry box id")
-        );              
-      }
-
-      ui_spacer(ui_px(5));
-
-      ui_width(ui_p_of_p(1, 0));
-      ui_height(ui_p_of_p(1, 0));
-      ui_border(1, white());
-      UI_Box* clip_box = ui_box_make(Str8FromC("Command list clip box id"), UI_Box_flag__clip|UI_Box_flag__has_borders);
-      UI_Parent(clip_box) UI_PaddedAround(ui_px(5))
-      {
-        for EachIndex(command_index, ArrayCount(filtered_command_data))
+        filtered_command_data[i].index          = i;
+        if (str8_is_substring(command_names[i], entry_text, Str8_match__ignore_case)) 
         {
-          Command_data command_data = filtered_command_data[command_index]; 
-
-          if (command_data.is_filtered_in)
+          filtered_command_data[i].is_filtered_in = true;
+        }
+      }
+    }
+  
+    // Building the widget 
+    ui_layout_x();
+    UI_Parent(ui_box_make(command_top_widget_id, 0)) UI_Padded(ui_p_of_p(1, 0))
+    {
+      ui_width(ui_p_of_p(0.5, 1));
+      ui_height(ui_p_of_p(0.5, 1));
+      ui_b_color(P->ui_state.main_b_color);
+      ui_layout_x();
+      UI_Box* box = ui_box_make({}, UI_Box_flag__has_background);
+      UI_Parent(box) UI_Padded(ui_px(10)) UI_Col() UI_Padded(ui_px(10))
+      {
+        Str8 text_entry_str = str8_manual(P->ui_state.text_entry_buffer, P->ui_state.text_entry_buffer_count);
+  
+        ui_width(ui_p_of_p(1, 0));
+        ui_height(ui_fit());
+        ui_border(1, white());
+        UI_Parent(ui_box_make({}, UI_Box_flag__has_borders)) UI_PaddedAround(ui_px(5))
+        {
+          text_entry_ops = ui_text_edit_box(
+            scratch.arena,
+            true,
+            ui_p_of_p(1, 0),
+            P->ui_state.text_entry_buffer,
+            P->ui_state.text_entry_buffer_count,
+            ArrayCount(P->ui_state.text_entry_buffer),
+            P->ui_state.text_entry_cursor,
+            P->ui_state.text_entry_section,
+            Str8FromC("Commands text entry box id")
+          );     
+        }
+  
+        ui_spacer(ui_px(5));
+  
+        ui_width(ui_p_of_p(1, 0));
+        ui_height(ui_p_of_p(1, 0));
+        UI_Row() 
+        {
+          // Clip box data we need
+          Str8 clip_box_id          = Str8FromC("Command list clip box id");
+          UI_Actions clip_box_acts  = ui_actions_from_id(clip_box_id);
+          UI_Box_data clip_box_data = ui_box_data_from_box_id_prev_frame(clip_box_id);
+  
+          // Scroll bar data we need
+          Str8 scroll_bar_id          = Str8FromC("Command list scroll bar id");
+          UI_Actions scroll_bar_acts  = ui_actions_from_id(scroll_bar_id);
+          UI_Box_data scroll_bar_data = ui_box_data_from_box_id_prev_frame(scroll_bar_id);
+  
+          // Data to set for this new ui build
+          F32 prev_frame_clip_box_scroll_offfset = ui_box_id_get_prev_build_clip_offset(clip_box_id).y;
+          F32 new_clip_offset_for_clip_box       = prev_frame_clip_box_scroll_offfset;
+  
+          // Clip box
+          ui_width(ui_p_of_p(1, 0));
+          ui_height(ui_p_of_p(1, 0));
+          ui_border(1, white());
+          ui_layout_x();
+          UI_Box* clip_box = ui_box_make(clip_box_id, UI_Box_flag__clip|UI_Box_flag__has_borders);
+          UI_Parent(clip_box) UI_PaddedAround(ui_px(5))
           {
+            UI_Col()
+            {
+              for EachIndex(command_index, ArrayCount(filtered_command_data))
+              {
+                Command_data command_data = filtered_command_data[command_index]; 
+      
+                if (command_data.is_filtered_in)
+                {
+                  ui_layout_x();
+                  UI_Box* command_entry_box = ui_box_make_f("Command row entry id __ %lld", UI_Box_flag__has_background, command_data.index);
+                  UI_Parent(command_entry_box)
+                  {
+                    ui_label(command_names[command_data.index]);
+                    ui_spacer(ui_p_of_p(1, 0));
+                  }
+  
+                  ui_spacer(ui_px(3));
+                  
+                  UI_Actions entry_acts = ui_actions_from_box(command_entry_box);
+                  if (entry_acts.is_hovered || P->ui_state.currently_chosen_command_index == command_index) { 
+                    ui_set_b_color(command_entry_box, color_light_up(P->ui_state.main_b_color, 0.25)); 
+                  }
+                  if (entry_acts.is_clicked) { 
+                    command_got_chosen   = true;
+                    chosen_command_index = command_index; 
+                  }
+                }
+              }
+            }
+         
+            // Adjusting the clip offset 
+            if (clip_box_data.is_found)
+            {
+              if (P->ui_state.last_frame_navigated_commands_with_arrows)
+              {
+                Str8 com_index_id             = str8_fmt(scratch.arena, "Command row entry id __ %lld", P->ui_state.currently_chosen_command_index);
+                UI_Box_data chosen_entry_data = ui_box_data_from_box_id_prev_frame(com_index_id);
+                if (chosen_entry_data.is_found)
+                {
+                  RangeF32 visible_clip_box_on_screen_y_range = range_v2f32_y0y1(clip_box_data.on_screen_bbox);
+                  RangeF32 entry_on_screen_y_range            = range_v2f32_y0y1(chosen_entry_data.on_screen_bbox);
+                  if (!range_f32_contains_range(visible_clip_box_on_screen_y_range, entry_on_screen_y_range)) 
+                  {
+                    new_clip_offset_for_clip_box = -1.0f * range_f32_length(entry_on_screen_y_range) * P->ui_state.currently_chosen_command_index;
+                  }
+                }
+              }
+              else 
+              if (clip_box_acts.is_hovered)
+              {
+                for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+                {
+                  if (ev->kind == OS_Event_kind__wheel)
+                  {
+                    new_clip_offset_for_clip_box += ev->wheel_event.scroll_data * 10;
+                    os_consume_frame_event(ev);
+                    break;
+                  }
+                }
+              }
+            }
+          }
+  
+          // Figuring out if we need a scroll bar
+          if (clip_box_data.is_found && clip_box_data.inner_content_dims.y > range_v2f32_dims(clip_box_data.on_screen_bbox).y)
+          {
+            ui_flags(UI_Box_flag__floating);
+            ui_width(ui_p_of_p(1, 0));
+            ui_height(ui_p_of_p(1, 0));
             ui_layout_x();
-            UI_Box* command_entry_box = ui_box_make_f("Command row entry id __ %lld", UI_Box_flag__has_background, command_data.index);
-            UI_Parent(command_entry_box)
+            UI_Row() UI_PaddedAround(ui_px(5))
             {
-              ui_label(command_names[command_data.index]);
               ui_spacer(ui_p_of_p(1, 0));
-            }
-            
-            UI_Actions entry_acts = ui_actions_from_box(command_entry_box);
-            if (entry_acts.is_hovered || ui_state.currently_chosen_command_index == command_index) { 
-              ui_set_b_color(command_entry_box, color_light_up(ui_state.main_b_color, 0.25)); 
-            }
-            if (entry_acts.is_clicked) { 
-              command_got_chosen   = true;
-              chosen_command_index = command_index; 
+  
+              ui_width(ui_px(15));
+              ui_height(ui_p_of_p(1, 0));
+              UI_Box* scroll_bar_box = ui_box_make(scroll_bar_id, 0);
+              UI_Parent(scroll_bar_box) 
+              {
+                // TODO: Scroll bar here
+                // [ ] - Have it move around the screen
+                // [ ] - Spawn it first, update the data for it later
+                // [ ] - Handle thumb here as well
+    
+                Str8 thumb_box_id    = Str8FromC("Scroll bar thumb button id");
+                F32 thumb_offset     = 0.0f;
+                F32 thumb_size       = 0.0f;
+                F32 max_thumb_offset = 0.0f;
+                F32 max_vp_offset    = 0.0f;
+    
+                if (scroll_bar_data.is_found)
+                {
+                  Assert(clip_box_data.is_found);
+    
+                  F32 vp              = range_v2f32_dims(clip_box_data.on_screen_bbox).y;
+                  F32 content_size    = clip_box_data.inner_content_dims.y;
+                  F32 scroll_bar_size = range_v2f32_dims(scroll_bar_data.on_screen_bbox).y;
+                  
+                  thumb_size      = (vp / content_size) * scroll_bar_size;
+                  if (thumb_size < 30.0f) { thumb_size = 30.0f; }
+    
+                  max_thumb_offset  = scroll_bar_size - thumb_size;
+                  max_vp_offset     = content_size - vp;
+    
+                  thumb_offset = (-1.0f * prev_frame_clip_box_scroll_offfset / max_vp_offset) * max_thumb_offset;
+                
+                  OutputDebugStringF("Thumb offset: %f \n", thumb_offset);
+                }
+    
+                if (scroll_bar_acts.is_down)
+                {
+                  // TODO: This doesnt work here since only 1 element per ui might be down
+                  //       since this is float, this here is on top of othe boxed, 
+                  //       specifically the command entry boxes inside clip, 
+                  //       those are build first and therefore when i go down,
+                  //       those become the interacted_with once. This is not a bug, 
+                  //       but rather how it works, thought i have no idea
+                  //       what to do about it.
+                  BP;
+                  F32 scrolL_bar_relative_pos = scroll_bar_data.on_screen_bbox.min.y - ui_get_mouse_y();
+                  F32 new_thumb_offset = scrolL_bar_relative_pos;
+                  if (max_thumb_offset != 0.0f && max_vp_offset != 0.0f) 
+                  {
+                    new_clip_offset_for_clip_box = -1.0f * (new_thumb_offset / max_thumb_offset) * max_vp_offset;
+                  }
+                }
+    
+                ui_height(ui_p_of_p(1, 0));
+                ui_width(ui_p_of_p(1, 0));
+                UI_Col()
+                {
+                  ui_spacer(ui_px(thumb_offset));
+    
+                  // todo: There is a bug here with blending, its like there is alpha blend but not fully correct
+                  ui_width(ui_p_of_p(1, 0));
+                  ui_height(ui_px(thumb_size));
+                  ui_b_color(v4f32(1.0f, 1.0f, 1.0f, 0.15f));
+                  UI_Box* thumb_box = ui_box_make(thumb_box_id, UI_Box_flag__has_background);
+                  
+                  UI_Actions thumb_acts = ui_actions_from_box(thumb_box);
+                  if (thumb_acts.is_hovered || scroll_bar_acts.is_hovered) { ui_set_b_color(thumb_box, v4f32(1.0f, 1.0f, 1.0f, 0.35f)); };            
+                }
+    
+                
+              }
             }
           }
+  
+          // Fixing and setting the new clip offset to the clip box
+          {
+            F32 space_after_vp = clip_box_data.inner_content_dims.y - range_v2f32_dims(clip_box_data.on_screen_bbox).y;
+            if (space_after_vp < 0.0f) { space_after_vp = 0.0f; }
+    
+            if (new_clip_offset_for_clip_box > 0.0f) { 
+              new_clip_offset_for_clip_box = 0.0f; 
+            }
+            else if (new_clip_offset_for_clip_box < -space_after_vp) { 
+              new_clip_offset_for_clip_box = -space_after_vp; 
+            }
+            ui_box_set_clip_offset_y(clip_box, new_clip_offset_for_clip_box);
+          }
+  
         }
       }
-
-      // Updating the ui state 
-      UI_Actions clip_box_acts  = ui_actions_from_box(clip_box);
-      UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);
-
-      // Adjusting the clip offset 
-      F32 clip_offset = ui_box_get_prev_build_clip_offset(clip_box).y;
-      if (clip_box_data.is_found)
+    }
+  
+    // Resseting
+    P->ui_state.last_frame_navigated_commands_with_arrows = false;
+  
+    // Updating data 
+    {
+      ui_aply_text_ops(
+        text_entry_ops, 
+        P->ui_state.text_entry_buffer, 
+        ArrayCount(P->ui_state.text_entry_buffer), 
+        &P->ui_state.text_entry_buffer_count, 
+        &P->ui_state.text_entry_cursor, 
+        &P->ui_state.text_entry_section, 
+        0, 0 
+      );
+  
+      // Cycling over the the filtered commands
+      for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
       {
-        if (navigated_commands_with_arrows)
+        if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_up)
         {
-          Str8 com_index_id             = str8_fmt(scratch.arena, "Command row entry id __ %lld", ui_state.currently_chosen_command_index);
-          UI_Box_data chosen_entry_data = ui_box_data_from_box_id_prev_frame(com_index_id);
-          if (chosen_entry_data.is_found)
+          P->ui_state.last_frame_navigated_commands_with_arrows = true;
+          for EachIndex(i, ArrayCount(filtered_command_data))
           {
-            RangeF32 visible_clip_box_on_screen_y_range = range_v2f32_y0y1(clip_box_data.on_screen_bbox);
-            RangeF32 entry_on_screen_y_range            = range_v2f32_y0y1(chosen_entry_data.on_screen_bbox);
-            if (!range_f32_contains_range(visible_clip_box_on_screen_y_range, entry_on_screen_y_range)) 
-            {
-              if (entry_on_screen_y_range.min < visible_clip_box_on_screen_y_range.min)
-              {
-                // Entry is above the clip box top — snap its top to the clip top
-                clip_offset += entry_on_screen_y_range.min - visible_clip_box_on_screen_y_range.min;
-              }
-              else
-              {
-                // Entry is below the clip box bottom — snap its bottom to the clip bottom
-                clip_offset += entry_on_screen_y_range.max - visible_clip_box_on_screen_y_range.max;
-              }
-            }
-          }
-        }
-        else 
-        if (clip_box_acts.is_hovered)
-        {
-          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-          {
-            if (ev->kind == OS_Event_kind__wheel)
-            {
-              clip_offset += ev->wheel_event.scroll_data * 10;
-              os_consume_frame_event(ev);
+            P->ui_state.currently_chosen_command_index -= 1;
+            clamp_u64_inplace(&P->ui_state.currently_chosen_command_index, 0, ArrayCount(command_names) - 1);
+            if (filtered_command_data[P->ui_state.currently_chosen_command_index].is_filtered_in) {
               break;
             }
           }
+          os_consume_frame_event(ev);
         }
-
-        F32 space_after_vp = clip_box_data.inner_content_dims.y - range_v2f32_dims(clip_box_data.on_screen_bbox).y;
-        if (space_after_vp < 0.0f) { space_after_vp = 0.0f; }
-        if (-clip_offset > space_after_vp) { clip_offset = -space_after_vp; }
-        if (clip_offset > 0.0f) { clip_offset = 0.0f; }
-      }
-      ui_box_set_clip_offset_y(clip_box, clip_offset);
-    }
-  }
-
-  // Resseting
-  navigated_commands_with_arrows = false;
-
-  // Updating data 
-  {
-    ui_aply_text_ops(
-      text_entry_ops, 
-      ui_state.text_entry_buffer, 
-      ArrayCount(ui_state.text_entry_buffer), 
-      &ui_state.text_entry_buffer_count, 
-      &ui_state.text_entry_cursor, 
-      &ui_state.text_entry_section, 
-      0, 0 
-    );
-
-    // Cycling over the the filtered commands
-    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-    {
-      if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_up)
-      {
-        navigated_commands_with_arrows = true;
-        for EachIndex(i, ArrayCount(filtered_command_data))
+        else
+        if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_down)
         {
-          ui_state.currently_chosen_command_index -= 1;
-          clamp_u64_inplace(&ui_state.currently_chosen_command_index, 0, ArrayCount(command_names) - 1);
-          if (filtered_command_data[ui_state.currently_chosen_command_index].is_filtered_in) {
-            break;
+          P->ui_state.last_frame_navigated_commands_with_arrows = true;
+          for EachIndex(i, ArrayCount(filtered_command_data))
+          {
+            P->ui_state.currently_chosen_command_index += 1;
+            if (P->ui_state.currently_chosen_command_index == ArrayCount(command_names)) { P->ui_state.currently_chosen_command_index = 0; }
+            if (filtered_command_data[P->ui_state.currently_chosen_command_index].is_filtered_in) {
+              break;
+            }
           }
+          os_consume_frame_event(ev);
         }
-        os_consume_frame_event(ev);
-      }
-      else
-      if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_down)
-      {
-        navigated_commands_with_arrows = true;
-        for EachIndex(i, ArrayCount(filtered_command_data))
+        else
+        if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__enter)
         {
-          ui_state.currently_chosen_command_index += 1;
-          if (ui_state.currently_chosen_command_index == ArrayCount(command_names)) { ui_state.currently_chosen_command_index = 0; }
-          if (filtered_command_data[ui_state.currently_chosen_command_index].is_filtered_in) {
-            break;
-          }
+          command_got_chosen = true;
+          chosen_command_index = P->ui_state.currently_chosen_command_index;
         }
-        os_consume_frame_event(ev);
       }
-      else
-      if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__enter)
+  
+      if (command_got_chosen)
       {
-        command_got_chosen = true;
-        chosen_command_index = ui_state.currently_chosen_command_index;
+        Str8 command_name = command_names[chosen_command_index];
+        // run_command_from_name(P, command_name);
+        char* cstr = cstr_from_str8(scratch.arena, command_name);
+        OutputDebugStringF("Command: %s \n", cstr);
+        
+        // todo: Reset the state here
       }
     }
 
-    if (command_got_chosen)
-    {
-      Str8 command_name = command_names[chosen_command_index];
-      // run_command_from_name(P, command_name);
-      char* cstr = cstr_from_str8(scratch.arena, command_name);
-      OutputDebugStringF("Command: %s \n", cstr);
-      
-      // todo: Reset the state here
-    }
   }
 
   ui_pop_font();
@@ -1000,12 +1101,6 @@ void command_make_background_blue(Pencil_state* P)
 {
   P->signal_make_b_blue = true;
 }
-
-void command_open_command_list(Pencil_state* P)
-{
-  P->ui_state.open_command_list = true;
-}
-
 
 B32 is_valid_command_name(Str8 command_name)
 {
