@@ -603,14 +603,12 @@ B32 os_window_should_close()
 
 void os_window_maximize()
 {
-  BOOL succ = ShowWindow(os_get_state()->window.handle, SW_MAXIMIZE);
-  Assert(succ);
+  B32 prev_visibility = ShowWindow(os_get_state()->window.handle, SW_MAXIMIZE);
 }
 
 void os_window_minimize()
 {
-  BOOL succ = ShowWindow(os_get_state()->window.handle, SW_MINIMIZE);
-  Assert(succ);
+  B32 prev_visibility = ShowWindow(os_get_state()->window.handle, SW_MINIMIZE);
 }
 
 B32 os_window_is_transparent()
@@ -1095,13 +1093,12 @@ LRESULT win32_proc(
     case WM_NCCALCSIZE:
     {
       #ifdef MAIN_IS_DEBUGGING
-      if (MAIN_IS_DEBUGGING) {
-        result = DefWindowProc(window_handle, message, w_param, l_param);
-      } 
+      // TODO:
+      // if (MAIN_IS_DEBUGGING) {
+        // result = DefWindowProc(window_handle, message, w_param, l_param);
+      // } 
       #endif
-
-      // result = 0;
-      // todo: Get the caption size from the system and only remove the caption size on y.
+      // note: Get the caption size from the system and only remove the caption size on y.
       //       This is needed to have the resize buttons and all that be present.
     } break;
 
@@ -1113,6 +1110,14 @@ LRESULT win32_proc(
     case WM_SIZE: 
     {
 
+    } break;
+
+    case WM_PAINT: 
+    {
+      HWND handle = os_get_state()->window.handle;
+      PAINTSTRUCT ps;
+      HDC hdc = BeginPaint(handle, &ps);
+      EndPaint(handle, &ps);
     } break;
 
     case WM_CLOSE: // For regular windows this is send when the close button it pressed 

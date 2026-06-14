@@ -59,7 +59,7 @@ U8* arena_push_nozero(Arena* arena, U64 size_to_push)
     U64 bytes_we_have_place_for      = (arena->mem_chunck.n_pages_commited * __arena_g_page_size) - arena->bytes_used;
     U64 bytes_we_dont_have_place_for = size_to_push - bytes_we_have_place_for;
 
-    U64 pages_needed        = ((bytes_we_dont_have_place_for + __arena_g_page_size - 1) / __arena_g_page_size) * __arena_g_page_size;
+    U64 pages_needed        = (bytes_we_dont_have_place_for / __arena_g_page_size) + 1;
     U64 pages_we_can_commit = arena->mem_chunck.n_pages_reserved - arena->mem_chunck.n_pages_commited;
 
     B32 succ = false;

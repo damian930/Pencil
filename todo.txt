@@ -12,14 +12,17 @@
 - Minor thing before to do before release:
 [ ] - Structure the code for every cpp<->h file
 [ ] - Redo core base, right now its all in random order
+[ ] - Text drop frame rate from more than 10k to 1k, 
+      what a great pipiline i have here !!!
 
 - Current feature working progress:
-[ ] - Clean up main
-[ ] - Prepare the codebase to work from both the debug build path and the release dir structure
-[ ] - Have the window be full screen. 
 [ ] - When drawing have a pen like in cactus image viewer
-[ ] - Display the fps on the screen to have it be like in raylib  
+[ ] - Have the window be full screen. 
+[ ] - Prepare the codebase to work from both the debug build path and the release dir structure
+[ ] - Have the app fail with win32's MessageBox if something fails to get initialised
+[ ] - Fix the bug with the loading cursor when a window gets spawned 
 [ ] - Write down some ideas to implement for the command line. Stuff like command queue with arrow functional, tab feature to guess a possible command, ...
+[ ] - Add the min version for os at init time
 
 - Stuff to fix or add next:
 [ ] - do we need the d3d context to switch for every batch or would it be fine for it to only switch the setting

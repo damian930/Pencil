@@ -670,7 +670,7 @@ R_Target r_make_texture(U32 width, U32 height)
     //       Thought it seems that it still just puts 0s in there, but i will still keep this since it says that its undefined.
     //       --
     //       It did help after all. When i was uploading a texture to the cpu and had to have it for staging and then be read,
-    //       it would have some weird couple of pixels that would have some brownish color in the top left, after adding the 
+    //       it would have some weird couple of pixels that would have some brownish color in the top left. After adding the 
     //       default data myself that stopped.
     Handle(desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM); // note: Only this is supported right now
     Data_buffer buffer = data_buffer_make(scratch.arena, width * height * 4); 

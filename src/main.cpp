@@ -11,7 +11,7 @@ Will see if its bad on not. If it is, well i will learn about the platform more 
 abstract. 
 */
 
-#define MAIN_IS_DEBUGGING true 
+#define MAIN_IS_DEBUGGING true
 
 #define _CRT_SECURE_NO_WARNINGS
 
@@ -87,16 +87,16 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   //
   {
     win32_state->window.window_class.cbSize        = sizeof(WNDCLASSEXA);
-    win32_state->window.window_class.style         = CS_DBLCLKS; // todo: Look into hredraw and vredraw
-    win32_state->window.window_class.lpfnWndProc   = win32_proc;
+    win32_state->window.window_class.style         = CS_HREDRAW|CS_VREDRAW/*| CS_DBLCLKS*/; // todo: Look into hredraw and vredraw
+    win32_state->window.window_class.lpfnWndProc   = custom_win_proc;
     win32_state->window.window_class.hInstance     = app_instance;
-    win32_state->window.window_class.hIcon         = Null;
-    win32_state->window.window_class.hCursor       = Null;
+    win32_state->window.window_class.hIcon         = LoadIcon(GetModuleHandle(NULL), MAKEINTRESOURCE(1));
+    win32_state->window.window_class.hCursor       = LoadCursorA(0, IDC_ARROW);
     win32_state->window.window_class.hbrBackground = Null;
     win32_state->window.window_class.lpszMenuName  = Null;
     win32_state->window.window_class.lpszClassName = "pencil_app_flopper_class_name";
     win32_state->window.window_class.hIconSm       = Null;
-  
+
     ATOM wc_atom = RegisterClassExA(&win32_state->window.window_class);
     Assert(wc_atom != 0);
     
@@ -105,8 +105,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
       "Pencil",
-      (MAIN_IS_DEBUGGING ? WS_OVERLAPPEDWINDOW : WS_OVERLAPPEDWINDOW & ~(WS_THICKFRAME)),
-      // WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX | WS_MAXIMIZEBOX,
+      WS_OVERLAPPEDWINDOW,
       CW_USEDEFAULT, CW_USEDEFAULT,
       800, 600,
       Null,
@@ -115,16 +114,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       Null
     );
     HandleLater(win32_state->window.handle != 0);
-  
-    if (MAIN_IS_DEBUGGING) {
-      ShowWindow(win32_state->window.handle, SW_SHOW);
-    } else {
-      ShowWindow(win32_state->window.handle, SW_MAXIMIZE);
-    }
-    os_set_cursor(OS_Cursor__arrow);
+    
+    ShowWindow(win32_state->window.handle, SW_MAXIMIZE);
+ 
+    // Using WS_EX_TOOLWINDOW to not have the window shown in the task bar or be selected in the win+tab list of windows.
+    // This has to be done after the maximizing. If maximizing is done first then the windows doest respect the task bar.
+    // This allows the user to draw on the task bar, this is less convinient for the user.
+    LONG ext_styles = GetWindowLong(win32_state->window.handle, GWL_EXSTYLE);
+    SetWindowLong(win32_state->window.handle, GWL_EXSTYLE, ext_styles | WS_EX_TOOLWINDOW);
   }
   
-  { // Making the window be on top all the time
+  { // Making the window be on top of all other windows all the time
     BOOL succ = true;
     if (MAIN_IS_DEBUGGING) {
       succ = SetWindowPos(win32_state->window.handle, HWND_TOP, 0, 0, 0, 0, SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE);
@@ -139,7 +139,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // - Draw mode system wide hot key
   //
   {
-    // Chaning the default winproc to be call withing a custom win proc for how keys
+    // Chaning the default winproc to be called withing a custom win proc for hot keys
     LONG_PTR set_succ_proc = SetWindowLongPtrA(win32_state->window.handle, GWLP_WNDPROC, (LONG_PTR)custom_win_proc);
     Assert(set_succ_proc != 0);
 
@@ -154,19 +154,17 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   P.current_mode = Pencil_mode__draw;
   pencil_init(&P);
   
-  // Testing and working on font provider
-  FP_Font font = {};
-  font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
+  FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));;
 
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
-  F64 prev_frame_duration_sec = 0.0;
+  F64 frame_start_time_in_sec = 0.0;
   for (;!os_window_should_close();)
   {
     if (P.terminate_app) { break; }
 
-    F64 frame_start_time_sec = os_get_time_for_timing_sec();
-    // OutputDebugStringF("FPS: %f \n", 1.0/prev_frame_duration_sec);
+    F64 prev_frame_start_time_in_sec = frame_start_time_in_sec;
+    frame_start_time_in_sec = os_get_time_for_timing_sec();
 
     os_frame_begin();
     r_prepare_canvas(&window_frame_buffer_target);
@@ -181,6 +179,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
       ui_draw();
+
+      U64 fps = (U64)(1.0 / (frame_start_time_in_sec - prev_frame_start_time_in_sec));
+      #if 0
+      d_draw_text_f("FPS: %lld", font, v2f32(0, 0), nice_green(), fps);
+      #endif
     }
 
     r_submit(window_frame_buffer_target, d_get_batch_list());
@@ -188,19 +191,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     d_end_batching();
     os_frame_end();
 
-    r_present(window_frame_buffer_target, true);
-    
-    F64 frame_end_time_sec = os_get_time_for_timing_sec();
-    prev_frame_duration_sec = frame_end_time_sec - frame_start_time_sec;
-
-    #if DEBUG_MODE
-    {
-      // if (os_key_down(Key__shift) && os_key_down(Key__Control) && os_key_went_up(Key__P)) {
-        // __debug_export_current_record_images(&P);
-        // BP;
-      // }
-    }
-    #endif
+    r_present(window_frame_buffer_target, false);
   }
 
   return 0;
@@ -234,7 +225,7 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
   {
     hot_key_activated = true;
     result = TRUE;
-  } 
+  }
   else {
     result = CallWindowProc(win32_proc, window_handle, message, w_param, l_param);
   }
