@@ -201,11 +201,11 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
                   UI_Actions entry_acts = ui_actions_from_box(command_entry_box);
                   if (ui_state.current_picked_command_index == i) 
                   {
-                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.5));
+                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.65));
                   }
                   else if (entry_acts.is_hovered)
                   {
-                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.25));
+                    ui_set_b_color(command_entry_box, v4f32(1.0, 1.0, 1.0, 0.4));
                   }
 
                   if (entry_acts.is_clicked)
@@ -246,6 +246,10 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
               F32 new_box_offset = scroll_box_data.clip_offset.y;
   
+              // todo: Get the id for this thing here and if it is outside of the thing, then just map to it like for text edit coursor
+              // Str8 id_for_picked_command_box = "Comamnd entry box %lld"
+              // if (ui_state.current_picked_command_index)
+
               if (scroll_box_acts.is_hovered)
               {
                 for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)

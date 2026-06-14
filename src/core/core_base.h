@@ -531,15 +531,6 @@ tu_specific B32 range_u64_is_valid(RangeU64 range);
 
 #define Address(var) (U64)(&(var))
 
-struct RangeF32 {
-	F32 min;
-	F32 max;
-};
-tu_specific RangeF32 range_f32_make(F32 min, F32 max);
-tu_specific F32 range_f32_length(RangeF32 range);
-tu_specific B32 range_f32_within(RangeF32 range, F32 v);
-tu_specific B32 range_f32_is_valid(RangeF32 range);
-
 // Thanks to AIG for this awesome text generation ))
 global const U64 bit_0  = (1ULL << 0);
 global const U64 bit_1  = (1ULL << 1);
@@ -621,6 +612,20 @@ tu_specific F32 v2f32_len(V2F32 v) { F32 len = sqrtf(v2f32_len_sq(v)); return le
 
 tu_specific V2F32 v2f32_sub(V2F32 v1, V2F32 v2) { return v2f32(v1.x - v2.x, v1.y - v2.y); }
 
+union RangeF32 {
+	struct {
+		F32 min;
+		F32 max;
+	};
+	V2F32 v2;
+};
+
+tu_specific RangeF32 range_f32_make(F32 min, F32 max);
+tu_specific F32 range_f32_length(RangeF32 range);
+tu_specific B32 range_f32_within(RangeF32 range, F32 v);
+tu_specific B32 range_f32_is_valid(RangeF32 range);
+tu_specific B32 range_f32_contains_range(RangeF32 range, RangeF32 other);
+
 union V3F32 {
 	struct {
 		F32 x;
@@ -665,26 +670,29 @@ tu_specific B32 range_v2u64_is_valid(RangeV2U64 range)
 	return is_valid;
 }
 
-struct Rect {
-	F32 x;
-	F32 y;
-	F32 width;
-	F32 height;
+union Rect {
+	struct {
+		F32 x;
+		F32 y;
+		F32 width;
+		F32 height;
+	};
+
+	struct {
+		V2F32 origin;
+		V2F32 dims;
+	};
 };
 
 tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
 tu_specific Rect rect_from_v(V2F32 pos, V2F32 dims);
 tu_specific Rect rect_from_center(V2F32 center, V2F32 dims);
-tu_specific V2F32 rect_get_origin(Rect rect);
-tu_specific V2F32 rect_get_dims(Rect rect);
 tu_specific V2F32 rect_get_center(Rect rect);
 tu_specific B32 rect_match(Rect r1, Rect r2);
 tu_specific Rect rect_padded(Rect rect, F32 padd);
 tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
 tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
 tu_specific B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end);
-tu_specific Rect intersect_rects_on_axis(Rect rect, Rect other, Axis2 axis);
-tu_specific Rect intersect_rects(Rect rect, Rect other);
 
 struct RangeV2F32 {
 	V2F32 min;
@@ -695,6 +703,8 @@ tu_specific V2F32 range_v2f32_x0y0(RangeV2F32 r) { return v2f32(r.min.x, r.min.y
 tu_specific V2F32 range_v2f32_x1y0(RangeV2F32 r) { return v2f32(r.max.x, r.min.y); }
 tu_specific V2F32 range_v2f32_x0y1(RangeV2F32 r) { return v2f32(r.min.x, r.max.y); }
 tu_specific V2F32 range_v2f32_x1y1(RangeV2F32 r) { return v2f32(r.max.x, r.max.y); } 
+tu_specific RangeF32 range_v2f32_x0x1(RangeV2F32 r) { return range_f32_make(r.min.x, r.max.x); } 
+tu_specific RangeF32 range_v2f32_y0y1(RangeV2F32 r) { return range_f32_make(r.min.y, r.max.y); } 
 
 tu_specific RangeV2F32 range_v2f32(V2F32 min, V2F32 max)
 {
@@ -880,7 +890,17 @@ V4F32 taupe()       { return _U_COLOR_TO_F_COLOR(taupe_u());       }
 V4F32 magenta()     { return _U_COLOR_TO_F_COLOR(magenta_u());     }  
 V4F32 nice_green()  { return _U_COLOR_TO_F_COLOR(nice_green_u());  }  
 
-V4F32 change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
+V4F32 color_change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
+V4F32 color_light_up(V4F32 color, F32 how_much_lighter) 
+{
+	color.r += how_much_lighter;
+	color.g += how_much_lighter; 
+	color.b += how_much_lighter;
+	clamp_f32_inplace(&color.r, 0.0f, 1.0f);	 
+	clamp_f32_inplace(&color.g, 0.0f, 1.0f);	 
+	clamp_f32_inplace(&color.b, 0.0f, 1.0f);	 
+	return color;
+}
 
 F32 f32_round(F32 f) { return roundf(f); }
 F32 f32_floor(F32 f) { return floorf(f); }
@@ -978,6 +998,15 @@ V4F32 rgba_from_hsva(V4F32 hsva)
 {
 	V3F32 rgb = rgb_from_hsv(hsva.hsv);
 	return v4f32(rgb.r, rgb.g, rgb.b, hsva.a);
+}
+
+V4F32 rgba_from_hex(U32 hex)
+{
+	F32 a = (F32)(((U8*)&hex)[0]) / 255.0f;
+	F32 b = (F32)(((U8*)&hex)[1]) / 255.0f;
+	F32 g = (F32)(((U8*)&hex)[2]) / 255.0f;
+	F32 r = (F32)(((U8*)&hex)[3]) / 255.0f;
+	return v4f32(r, g, b, a);
 }
 
 V4F32 purify_rgb(V4F32 rgb)

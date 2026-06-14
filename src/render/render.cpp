@@ -567,10 +567,10 @@ void r_submit(R_Target target, D_Command_batch_list* command_batch_list)
           for (D_Command_node* node = batch->first_command_node; node; node = node->next, i += 1)
           {
             R_Texture_instance_data instance_data = {};
-            instance_data.dest_rect_origin = rect_get_origin(node->command.u.texture_c.dest_rect);
-            instance_data.dest_rect_size   = rect_get_dims(node->command.u.texture_c.dest_rect);
-            instance_data.src_rect_origin  = rect_get_origin(node->command.u.texture_c.src_rect);
-            instance_data.src_rect_size    = rect_get_dims(node->command.u.texture_c.src_rect);
+            instance_data.dest_rect_origin = node->command.u.texture_c.dest_rect.origin; 
+            instance_data.dest_rect_size   = node->command.u.texture_c.dest_rect.dims; 
+            instance_data.src_rect_origin  = node->command.u.texture_c.src_rect.origin; 
+            instance_data.src_rect_size    = node->command.u.texture_c.src_rect.dims;
             instance_data.src_texture_dims = r_get_target_dims(batch->texture);
             instance_data.tint             = node->command.u.texture_c.tint;
             memcpy((R_Texture_instance_data*)mapped.pData + i, &instance_data, sizeof(instance_data));

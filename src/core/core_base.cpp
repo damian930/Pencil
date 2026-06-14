@@ -156,6 +156,12 @@ B32 range_f32_is_valid(RangeF32 range)
   return result;
 }
 
+B32 range_f32_contains_range(RangeF32 range, RangeF32 other)
+{
+	B32 contains = (range.min <= other.min && other.max <= range.max);
+	return contains;
+}
+
 RangeU64 range_u64_make(U64 min, U64 max)
 {
 	RangeU64 range = {};
@@ -205,16 +211,6 @@ Rect rect_from_center(V2F32 center, V2F32 dims)
 	rect.width = dims.x;
 	rect.height = dims.y;
 	return rect;
-}
-
-V2F32 rect_get_origin(Rect rect)
-{
-	return v2f32(rect.x, rect.y);
-}
-
-V2F32 rect_get_dims(Rect rect)
-{
-	return v2f32(rect.width, rect.height);
 }
 
 V2F32 rect_get_center(Rect rect)

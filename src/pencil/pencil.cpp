@@ -578,7 +578,7 @@ void pencil_render(const Pencil_state* P)
       d_draw_rect_inset_borders(ruler_rect, red(), 2.0f, v4f32_all(0.0f), 0.0f);
   
       V2F32 ruler_rect_center = rect_get_center(ruler_rect);
-      V2F32 reler_dims        = rect_get_dims(ruler_rect);
+      V2F32 reler_dims        = ruler_rect.dims;
       FP_Font font            = {};//ui_get_font();
       V2F32 text_pos          = v2f32_sub(ruler_rect_center, v2f32(0.0f, (fp_get_font_height(font) / 2.0f))); 
   
@@ -589,416 +589,241 @@ void pencil_render(const Pencil_state* P)
 
 }
 
-/*
-void pencil_do_ui(Pencil_state* P, FP_Font font)
-{ 
-  V4F32 pen_color_rgba = rgba_from_hsva(P->pen_color_hsva);
-
-  ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
-
-  ui_push_font(font);
-
-  ui_set_next_size_x(ui_p_of_p(1.0f, 1.0f));
-  ui_set_next_size_y(ui_p_of_p(1.0f, 1.0f));
-  ui_set_next_border(20, red());
-  ui_set_next_softness(0.0f);
-  UI_Box* content_inner = ui_box_make(Str8FromC("test id"), UI_Box_flag__has_borders);
-
-  static F32 x_offset = 0.0f;
-  static F32 y_offset = 0.0f;
-  static F32 inside_menu_mouse_rel_x = 0.0f;
-  static F32 inside_menu_mouse_rel_y = 0.0f;
-
-  UI_Parent(content_inner)
-  {
-    UI_Row()
-    {
-      ui_spacer(ui_px(x_offset));
-
-      UI_Col()
-      {
-        ui_spacer(ui_px(y_offset));
-       
-        if (P->show_brush_ui_menu)
-        {
-          ui_set_next_size_x(ui_children_sum());
-          ui_set_next_size_y(ui_children_sum());
-          ui_set_next_b_color(taupe());
-          UI_Box* brush_box = ui_box_make(Str8FromC("Brush box menu id"), UI_Box_flag__has_background);
-  
-          UI_Parent(brush_box)
-          {
-            Str8 menu_name_box_id = Str8FromC("Brush box menu name box id");
-            UI_Actions menu_name_actions = ui_actions_from_id(menu_name_box_id);
-          
-            if (!menu_name_actions.was_down && menu_name_actions.is_down)
-            {
-              UI_Box_data content_inner_data = ui_get_box_data_prev_frame_from_box(content_inner);
-              V2F32 content_inner_p = rect_get_origin(content_inner_data.on_screen_rect);
-    
-              inside_menu_mouse_rel_x = (ui_get_mouse_x() - content_inner_p.x) - x_offset;
-              inside_menu_mouse_rel_y = (ui_get_mouse_y() - content_inner_p.y) - y_offset;
-            }
-            else if (menu_name_actions.is_down)
-            {
-              UI_Box_data content_inner_box = ui_get_box_data_prev_frame_from_box(content_inner);
-              x_offset = ui_get_mouse_x() - content_inner_box.on_screen_rect.x - inside_menu_mouse_rel_x;
-              y_offset = ui_get_mouse_y() - content_inner_box.on_screen_rect.y - inside_menu_mouse_rel_y;
-            }
-            else {
-              inside_menu_mouse_rel_x = 0.0f;
-              inside_menu_mouse_rel_y = 0.0f;
-            }
-  
-            // if (menu_name_actions.is_hovered) { ui_set_cursor(OS_Cursor__hand); }
-            ui_set_next_size_x(ui_px(200));
-            ui_set_next_size_y(ui_px(40));
-            ui_set_next_layout_axis(Axis2__x);
-            if (menu_name_actions.is_hovered) { ui_set_next_b_color(v4f32(0.1f, 0.5f, 0.6f, 1.0f)); } else { ui_set_next_b_color(blue()); }
-            UI_Box* menu_name_box = ui_box_make(Str8FromC("Brush box menu name box id"), UI_Box_flag__has_background);
-  
-  
-            UI_Parent(menu_name_box)
-            {
-              UI_PaddedBoxEx(ui_px(7), ui_px(0), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
-              {
-                ui_label(Str8FromC("Brushes"));
-              }
-            }
-  
-            ui_spacer(ui_px(7));
-            
-            if (!P->is_erasing_mode)  
-            {
-              ui_set_next_size_x(ui_px(200));
-              ui_set_next_size_y(ui_px(40 + 14));
-              ui_set_next_layout_axis(Axis2__x);
-              UI_Box* pen_size_box = ui_box_make(Str8FromC("Box with color change_ui"), 0);
-  
-              UI_Parent(pen_size_box)
-              {
-                UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_p_of_p(1, 0), ui_p_of_p(1, 0), Axis2__x)
-                {
-                  UI_Slider_style slider_style = {};
-                  slider_style.size_x = ui_px(100);//ui_p_of_p(1.0, 0.0);
-                  slider_style.size_y = ui_px(50);//ui_px(40);
-                  slider_style.fmt_str = "%.0f";
-                  slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
-                  slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
-                  slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
-    
-                  F32 new_pen_size = 0.0f;
-                  B32 interacted = ui_slider(Str8FromC("Pen size slider id"), &slider_style, (F32)P->pen_size, 1.0f, 100.0f, &new_pen_size);
-                  if (interacted)
-                  {
-                    P->signal_new_pen_size = true;
-                    P->new_pen_size = (U32)new_pen_size;
-                  }
-  
-                  ui_spacer(ui_px(7));
-                  
-                  ui_label_f("Pen size");
-                }
-              }
-  
-              ui_set_next_size_x(ui_px(200));
-              ui_set_next_size_y(ui_px(200));
-              UI_Box* box_with_color_ui = ui_box_make(Str8FromC("Box with color change_ui"), 0);
-  
-              UI_Parent(box_with_color_ui)
-              UI_PaddedBox(ui_px(7), Axis2__x)
-              {
-                UI_Col()
-                {
-                  UI_Row()
-                  {
-                    F32 new_hsv = 0.0f;
-                    ui_color_picker_h(Str8FromC("Hue picker"), ui_p_of_p(1.0f, 0.1f), ui_p_of_p(1.0f, 0.3f), Axis2__y, P->pen_color_hsva.hue, &new_hsv);
-              
-                    ui_spacer(ui_px(10));
-              
-                    F32 new_sat = 0.0f;
-                    F32 new_val = 0.0f;
-                    ui_color_picker_sv(Str8FromC("SV picker"), ui_p_of_p(1.0f, 0.2f), ui_p_of_p(1.0f, 0.3f), P->pen_color_hsva, &new_sat, &new_val);
-              
-                    V4F32 new_color_hsv = v4f32(new_hsv, new_sat, new_val, P->pen_color_hsva.a);
-                    if (!v4f32_match(new_color_hsv, P->pen_color_hsva))
-                    {
-                      P->signal_new_pen_color_hsva = true;
-                      P->new_pen_color_hsva = new_color_hsv;
-                    }
-            
-                    ui_spacer(ui_px(10));
-            
-                    ui_set_next_size_x(ui_p_of_p(1.0f, 0.2f));
-                    ui_set_next_size_y(ui_p_of_p(1.0f, 0.3f));
-                    ui_set_next_layout_axis(Axis2__y);
-                    UI_Parent(ui_box_make(Str8{}, 0))
-                    {
-                      UI_Slider_style slider_style = {};
-                      slider_style.size_x = ui_p_of_p(1.0f, 0.1f);
-                      slider_style.size_y = ui_p_of_p(1.0f, 0.1f);
-                      slider_style.fmt_str = "%.0f";
-                      slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
-                      slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
-                      slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
-    
-                      V4F32 new_rga_value_0_255 = {};
-                      new_rga_value_0_255.r = pen_color_rgba.r * 255.0f;
-                      new_rga_value_0_255.g = pen_color_rgba.g * 255.0f;
-                      new_rga_value_0_255.b = pen_color_rgba.b * 255.0f;
-                      new_rga_value_0_255.a = pen_color_rgba.a * 255.0f;
-            
-                      B32 interacted = false;
-            
-                      F32 new_r = 0.0f, new_g = 0.0f, new_b = 0.0f, new_a = 0.0f;
-                      
-                      slider_style.fmt_str = "R: %0.0f";
-                      interacted |= ui_slider(Str8FromC("Slider for red color id"),   &slider_style, pen_color_rgba.r * 255.0f, 0.0f, 255.0f, &new_r);
-                      ui_spacer(ui_px(10));
-                      slider_style.fmt_str = "G: %0.0f";
-                      interacted |= ui_slider(Str8FromC("Slider for green color id"), &slider_style, pen_color_rgba.g * 255.0f, 0.0f, 255.0f, &new_g);
-                      ui_spacer(ui_px(10));
-                      slider_style.fmt_str = "B: %0.0f";
-                      interacted |= ui_slider(Str8FromC("Slider for blue color id"),  &slider_style, pen_color_rgba.b * 255.0f, 0.0f, 255.0f, &new_b);
-                      ui_spacer(ui_px(10));
-                      slider_style.fmt_str = "A: %0.0f";
-                      interacted |= ui_slider(Str8FromC("Slider for alpha color id"), &slider_style, pen_color_rgba.a * 255.0f, 0.0f, 255.0f, &new_a);
-            
-                      new_rga_value_0_255.r = new_r;
-                      new_rga_value_0_255.g = new_g;
-                      new_rga_value_0_255.b = new_b;
-                      new_rga_value_0_255.a = new_a;
-            
-                      new_rga_value_0_255.r /= 255.0f;
-                      new_rga_value_0_255.g /= 255.0f;
-                      new_rga_value_0_255.b /= 255.0f;
-                      new_rga_value_0_255.a /= 255.0f;
-            
-                      if (interacted)
-                      {
-                        V4F32 new_hsva = hsva_from_rgba(new_rga_value_0_255);
-                        P->signal_new_pen_color_hsva = true;
-                        P->new_pen_color_hsva = new_hsva;
-                      }        
-                    }
-                  }
-        
-                  ui_spacer(ui_px(10));
-        
-                  ui_set_next_size_x(ui_p_of_p(1.0f, 0.1f));
-                  ui_set_next_size_y(ui_p_of_p(0.05f, 0.0f));
-                  ui_set_next_b_color(pen_color_rgba);
-                  UI_Box* color_rect_box = ui_box_make(Str8{}, UI_Box_flag__has_background);
-                }
-              }
-    
-              UI_PaddedBoxEx(ui_px(7), ui_px(7), ui_px(0), ui_px(0), Axis2__x)
-              {
-                Str8 button_id = Str8FromC("Eraser##Button id");
-                UI_Actions actions = ui_actions_from_id(button_id);
-                if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
-                ui_set_next_corner_r(v4f32_all(0.25f));
-                UI_Box* button_box = ui_box_make(button_id, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
-  
-                UI_Parent(button_box)
-                UI_PaddedBox(ui_px(10), Axis2__x)
-                {
-                  ui_label_f("Eraser");
-                }
-  
-                if (actions.is_clicked)
-                {
-                  P->signal_swap_to_eraser = true;
-                }
-              }
-  
-              ui_spacer(ui_px(7));
-            }
-            else 
-            {
-              UI_PaddedBox(ui_px(7), Axis2__y)
-              {
-                // Eraser size slider + text next to it
-                ui_label_f("Eraser size");
-                
-                ui_spacer(ui_px(3));
-                UI_Slider_style slider_style = {};
-                slider_style.size_x = ui_px(60);
-                slider_style.size_y = ui_px(40);
-                slider_style.fmt_str = "%.0f";
-                slider_style.slided_part_color = v4f32(0.37f, 0.43f, 0.39f, 1.0f);
-                slider_style.no_hover_color = v4f32(0.5f, 0.5f, 0.5f, 1.0f);
-                slider_style.hover_color = v4f32(0.53f, 0.53f, 0.53f, 1.0f);
-  
-                F32 new_eraser_size = 0.0f;
-                B32 interacted = ui_slider(Str8FromC("Slider for eraser size id"), &slider_style, (F32)P->eraser_size, 1.0f, 100.0f, &new_eraser_size);
-                if (interacted)
-                {
-                  P->signal_new_eraser_size = true;
-                  P->new_eraser_size = (U32)new_eraser_size;
-                }
-  
-                ui_spacer(ui_px(7));
-  
-                {
-                  Str8 button_id = Str8FromC("Brush##Button id");
-                  UI_Actions actions = ui_actions_from_id(button_id);
-                  if (actions.is_down)         { ui_set_next_b_color(v4f32(0.573f, 0.169f, 0.129f, 1.0f)); }
-                  else if (actions.is_hovered) { ui_set_next_b_color(v4f32(1.0f, 0.420f, 0.420f, 1.0f)); }
-                  else                         { ui_set_next_b_color(v4f32(0.753f, 0.224f, 0.169f, 1.0f)); }
-                  ui_set_next_corner_r(v4f32_all(0.25f));
-                  UI_Box* button_box = ui_box_make(button_id, UI_Box_flag__has_background|UI_Box_flag__has_rounded_corners);
-  
-                  UI_Parent(button_box)
-                  UI_PaddedBox(ui_px(10), Axis2__x)
-                  {
-                    ui_label_f("Brush");
-                  }
-  
-                  if (actions.is_clicked)
-                  {
-                    P->signal_swap_to_pen = true;
-                  }
-                }
-  
-              }
-            }
-              
-          }
-        }
-
-      }
-    }
-  }
-
-  ui_end_build();
-}
-*/
-
 void pencil_do_command_ui(Pencil_state* P, FP_Font font)
 {
   if (!P->ui_state.open_command_list) { return; }
+
+  // Just putting this here for now, but this might be a part of 
+  // some ui state needed for the pencil ui
+  static struct {
+    B32 is_widget_open = true;
+    
+    U8 text_entry_buffer[64];
+    U64 text_entry_buffer_count;
+    U64 text_entry_cursor;
+    U64 text_entry_section;
+
+    U64 currently_chosen_command_index;
+
+    V4F32 main_b_color = rgba_from_hex(0x695A09FF);
+  } ui_state = {};
+
+  if (!ui_state.is_widget_open) { return; }
 
   Scratch scratch = get_scratch(0, 0);
   ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos());
   ui_push_font(font);
 
-  static struct {
-    U8 buffer[64];
-    U64 buffer_count;
-    U64 cursor_pos;
-    U64 section_pos;
-    U64 current_selected_command_index;
-  } command_edit_box_state = {};
+  // TODO: Put this in a better place
+  static B32 navigated_commands_with_arrows = false;
 
-  Str8 command_list_box_id           = Str8FromC("command_box_wrapper_id");
-  
-  ui_set_next_size_x(ui_px(200));
-  ui_set_next_size_y(ui_px(200));
-  ui_set_next_b_color(nice_green());
-  UI_Box* commands_list_box = ui_box_make(command_list_box_id, UI_Box_flag__has_background);
-  UI_Parent(commands_list_box)
+  // Gathered data from the upcomming widget build 
+  // to then update the state coherently
+  UI_Text_op_list text_entry_ops = {};
+  B32 command_got_chosen         = false;
+  U64 chosen_command_index       = 0;
+
+  // Preparing some data for later use
+  struct Command_data {
+    U64 index;
+    B32 is_filtered_in;
+  };
+  Command_data filtered_command_data[ArrayCount(command_names)] = {};
   {
-    ui_set_next_flags(UI_Box_flag__has_background);
-    ui_set_next_b_color(red());
-    Str8 edit_box_id = Str8FromC("Text edit box for commands");
-    Edit_box_result edit_result = ui_text_edit_box(0.0f, edit_box_id, 200, Str8FromC("Search commands by name"), command_edit_box_state.buffer, &command_edit_box_state.buffer_count, ArrayCount(command_edit_box_state.buffer), &command_edit_box_state.cursor_pos, &command_edit_box_state.section_pos);
-    ui_set_active_box(edit_result.edit_box); 
-
-    Str8 edit_box_str = str8_manual(command_edit_box_state.buffer, command_edit_box_state.buffer_count);
-      
-    ui_spacer(ui_px(5));
-    ui_set_next_size_x(ui_p_of_p(1, 0));
-    ui_set_next_size_y(ui_px(2));
-    ui_set_next_b_color(white());
-    ui_box_make(Str8{}, UI_Box_flag__has_background);
-    ui_spacer(ui_px(5));
-
-    ui_set_next_size_x(ui_px(200));
-    ui_set_next_size_y(ui_px(150));
-    ui_set_next_layout_axis(Axis2__y);
-    ui_set_next_b_color(magenta());
-    UI_Box* command_list_clip_box = ui_box_make(Str8FromC("Command list clip box"), UI_Box_flag__has_background|UI_Box_flag__clip_y);
-    UI_Parent(command_list_clip_box)
+    Str8 entry_text = str8_manual(ui_state.text_entry_buffer, ui_state.text_entry_buffer_count);
+    for EachIndex(i, ArrayCount(command_names))
     {
-      // Creating a list of commands that are usefull to use based on the user text input
-      Str8_list filtered_commands = {};
-      for EachIndex(command_name_index, Command_id__COUNT)
+      filtered_command_data[i].index          = i;
+      if (str8_is_substring(command_names[i], entry_text, Str8_match__ignore_case)) 
       {
-        Str8 command_name = command_names[command_name_index];
-        if (str8_is_front(command_name, edit_box_str, Str8_match__ignore_case))
-        {
-          str8_list_append(scratch.arena, &filtered_commands, command_name);
-        }
+        filtered_command_data[i].is_filtered_in = true;
       }
-  
-      if (edit_result.did_change_text) { command_edit_box_state.current_selected_command_index = 0; }
-  
-      U64 counter = 0;
-      Str8_node* chosen_node_nullable = 0;
-      for (Str8_node* node = filtered_commands.first; node; node = node->next)
+    }
+  }
+
+  // Building the widget 
+  ui_layout_x();
+  UI_Row() UI_Padded(ui_p_of_p(1, 0))
+  {
+    ui_width(ui_p_of_p(0.5, 1));
+    ui_height(ui_p_of_p(0.5, 1));
+    ui_b_color(ui_state.main_b_color);
+    ui_layout_x();
+    UI_Box* box = ui_box_make({}, UI_Box_flag__has_background);
+    UI_Parent(box) UI_Padded(ui_px(10)) UI_Col() UI_Padded(ui_px(10))
+    {
+      Str8 text_entry_str = str8_manual(ui_state.text_entry_buffer, ui_state.text_entry_buffer_count);
+
+      ui_width(ui_p_of_p(1, 0));
+      ui_height(ui_fit());
+      ui_border(1, white());
+      UI_Parent(ui_box_make({}, UI_Box_flag__has_borders)) UI_PaddedAround(ui_px(5))
       {
-        ui_spacer(ui_px(5));
-  
-        if (command_edit_box_state.current_selected_command_index == counter) { 
-          chosen_node_nullable = node;
-          ui_set_next_flags(UI_Box_flag__has_background);
-          ui_set_next_b_color(orange());
-        }
-        UI_Wrapper(Axis2__x)
-        {
-          ui_label(node->str);
-        }
-  
-        counter += 1;
+        text_entry_ops = ui_text_edit_box(
+          scratch.arena,
+          ui_p_of_p(1, 0),
+          ui_state.text_entry_buffer,
+          ui_state.text_entry_buffer_count,
+          ArrayCount(ui_state.text_entry_buffer),
+          ui_state.text_entry_cursor,
+          ui_state.text_entry_section,
+          Str8FromC("Commands text entry box id")
+        );              
       }
+
       ui_spacer(ui_px(5));
-      
-      // Doing some stuff with events
-      for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+
+      ui_width(ui_p_of_p(1, 0));
+      ui_height(ui_p_of_p(1, 0));
+      ui_border(1, white());
+      UI_Box* clip_box = ui_box_make(Str8FromC("Command list clip box id"), UI_Box_flag__clip|UI_Box_flag__has_borders);
+      UI_Parent(clip_box) UI_PaddedAround(ui_px(5))
       {
-        if (ev->kind == OS_Event_kind__key)
+        for EachIndex(command_index, ArrayCount(filtered_command_data))
         {
-          if (ev->key_event.key == Key__enter && ev->key_event.went_down) 
+          Command_data command_data = filtered_command_data[command_index]; 
+
+          if (command_data.is_filtered_in)
           {
-            if (chosen_node_nullable) {
-              Str8 command = chosen_node_nullable->str;
-              if (is_valid_command_name(command))
+            ui_layout_x();
+            UI_Box* command_entry_box = ui_box_make_f("Command row entry id __ %lld", UI_Box_flag__has_background, command_data.index);
+            UI_Parent(command_entry_box)
+            {
+              ui_label(command_names[command_data.index]);
+              ui_spacer(ui_p_of_p(1, 0));
+            }
+            
+            UI_Actions entry_acts = ui_actions_from_box(command_entry_box);
+            if (entry_acts.is_hovered || ui_state.currently_chosen_command_index == command_index) { 
+              ui_set_b_color(command_entry_box, color_light_up(ui_state.main_b_color, 0.25)); 
+            }
+            if (entry_acts.is_clicked) { 
+              command_got_chosen   = true;
+              chosen_command_index = command_index; 
+            }
+          }
+        }
+      }
+
+      // Updating the ui state 
+      UI_Actions clip_box_acts  = ui_actions_from_box(clip_box);
+      UI_Box_data clip_box_data = ui_box_data_from_box_prev_frame(clip_box);
+
+      // Adjusting the clip offset 
+      F32 clip_offset = ui_box_get_prev_build_clip_offset(clip_box).y;
+      if (clip_box_data.is_found)
+      {
+        if (navigated_commands_with_arrows)
+        {
+          Str8 com_index_id             = str8_fmt(scratch.arena, "Command row entry id __ %lld", ui_state.currently_chosen_command_index);
+          UI_Box_data chosen_entry_data = ui_box_data_from_box_id_prev_frame(com_index_id);
+          if (chosen_entry_data.is_found)
+          {
+            RangeF32 visible_clip_box_on_screen_y_range = range_v2f32_y0y1(clip_box_data.on_screen_bbox);
+            RangeF32 entry_on_screen_y_range            = range_v2f32_y0y1(chosen_entry_data.on_screen_bbox);
+            if (!range_f32_contains_range(visible_clip_box_on_screen_y_range, entry_on_screen_y_range)) 
+            {
+              if (entry_on_screen_y_range.min < visible_clip_box_on_screen_y_range.min)
               {
-                run_command_from_name(P, command);
-                ui_reset_active_id(edit_box_id); 
-                P->ui_state.open_command_list = false;
-                command_edit_box_state = {};
+                // Entry is above the clip box top — snap its top to the clip top
+                clip_offset += entry_on_screen_y_range.min - visible_clip_box_on_screen_y_range.min;
+              }
+              else
+              {
+                // Entry is below the clip box bottom — snap its bottom to the clip bottom
+                clip_offset += entry_on_screen_y_range.max - visible_clip_box_on_screen_y_range.max;
               }
             }
           }
-          else 
-          if (ev->key_event.key == Key__arrow_up && ev->key_event.went_down)
+        }
+        else 
+        if (clip_box_acts.is_hovered)
+        {
+          for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
           {
-            if (command_edit_box_state.current_selected_command_index > 0) {
-              command_edit_box_state.current_selected_command_index -= 1;
-            } else if (filtered_commands.node_count > 0) {
-              command_edit_box_state.current_selected_command_index = filtered_commands.node_count - 1;
+            if (ev->kind == OS_Event_kind__wheel)
+            {
+              clip_offset += ev->wheel_event.scroll_data * 10;
+              os_consume_frame_event(ev);
+              break;
             }
           }
-          else 
-          if (ev->key_event.key == Key__arrow_down && ev->key_event.went_down)
-          {
-            command_edit_box_state.current_selected_command_index += 1;
-            if (command_edit_box_state.current_selected_command_index == filtered_commands.node_count) {
-              command_edit_box_state.current_selected_command_index = 0;
-            }
-          } 
         }
+
+        F32 space_after_vp = clip_box_data.inner_content_dims.y - range_v2f32_dims(clip_box_data.on_screen_bbox).y;
+        if (space_after_vp < 0.0f) { space_after_vp = 0.0f; }
+        if (-clip_offset > space_after_vp) { clip_offset = -space_after_vp; }
+        if (clip_offset > 0.0f) { clip_offset = 0.0f; }
+      }
+      ui_box_set_clip_offset_y(clip_box, clip_offset);
+    }
+  }
+
+  // Resseting
+  navigated_commands_with_arrows = false;
+
+  // Updating data 
+  {
+    ui_aply_text_ops(
+      text_entry_ops, 
+      ui_state.text_entry_buffer, 
+      ArrayCount(ui_state.text_entry_buffer), 
+      &ui_state.text_entry_buffer_count, 
+      &ui_state.text_entry_cursor, 
+      &ui_state.text_entry_section, 
+      0, 0 
+    );
+
+    // Cycling over the the filtered commands
+    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+    {
+      if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_up)
+      {
+        navigated_commands_with_arrows = true;
+        for EachIndex(i, ArrayCount(filtered_command_data))
+        {
+          ui_state.currently_chosen_command_index -= 1;
+          clamp_u64_inplace(&ui_state.currently_chosen_command_index, 0, ArrayCount(command_names) - 1);
+          if (filtered_command_data[ui_state.currently_chosen_command_index].is_filtered_in) {
+            break;
+          }
+        }
+        os_consume_frame_event(ev);
+      }
+      else
+      if (ev->kind == OS_Event_kind__key && (ev->key_event.went_down || ev->key_event.repeat_down) && ev->key_event.key == Key__arrow_down)
+      {
+        navigated_commands_with_arrows = true;
+        for EachIndex(i, ArrayCount(filtered_command_data))
+        {
+          ui_state.currently_chosen_command_index += 1;
+          if (ui_state.currently_chosen_command_index == ArrayCount(command_names)) { ui_state.currently_chosen_command_index = 0; }
+          if (filtered_command_data[ui_state.currently_chosen_command_index].is_filtered_in) {
+            break;
+          }
+        }
+        os_consume_frame_event(ev);
+      }
+      else
+      if (ev->kind == OS_Event_kind__key && ev->key_event.went_down && ev->key_event.key == Key__enter)
+      {
+        command_got_chosen = true;
+        chosen_command_index = ui_state.currently_chosen_command_index;
       }
     }
 
-  
+    if (command_got_chosen)
+    {
+      Str8 command_name = command_names[chosen_command_index];
+      // run_command_from_name(P, command_name);
+      char* cstr = cstr_from_str8(scratch.arena, command_name);
+      OutputDebugStringF("Command: %s \n", cstr);
+      
+      // todo: Reset the state here
+    }
   }
 
+  ui_pop_font();
   ui_end_build();
   end_scratch(&scratch);
 }
@@ -1131,6 +956,7 @@ void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_
   }
 }
 
+// TODO: This shoud have a better name for this, this is kind of confusing
 void run_command_from_name(Pencil_state* P, Str8 command_name)
 {
   if (0) {}
@@ -1140,7 +966,6 @@ void run_command_from_name(Pencil_state* P, Str8 command_name)
   else if (str8_match(command_name, command_names[Command_id__toggle_line_fade], Str8_match__ignore_case)) { command_toggle_line_fade(P); }
   else if (str8_match(command_name, command_names[Command_id__swap_to_eraser], Str8_match__ignore_case)) { command_swap_to_eraser(P); }
   else if (str8_match(command_name, command_names[Command_id__make_background_blue], Str8_match__ignore_case)) { command_make_background_blue(P); }
-  else if (str8_match(command_name, command_names[Command_id__open_command_list], Str8_match__ignore_case)) { command_open_command_list(P); }
   else {
     InvalidCodePath();
   }

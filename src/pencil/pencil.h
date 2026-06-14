@@ -47,7 +47,11 @@ struct Draw_record_registration_result {
   X(terminate_app,    Str8FromC("Terminate app")    ) \
   X(toggle_line_fade, Str8FromC("Toggle line fade") ) \
   X(make_background_blue, Str8FromC("Make background blue") ) \
-  X(open_command_list, Str8FromC("Open command list")) \
+  X(__Fake_COMMAND_1, Str8FromC("__Fake_COMMAND_1")) \
+  X(__Fake_COMMAND_2, Str8FromC("__Fake_COMMAND_2")) \
+  X(__Fake_COMMAND_3, Str8FromC("__Fake_COMMAND_3")) \
+  X(__Fake_COMMAND_4, Str8FromC("__Fake_COMMAND_4")) \
+  X(__Fake_COMMAND_5, Str8FromC("__Fake_COMMAND_5")) 
 
 enum Command_id : U32 {
   // Command_id__NONE,
@@ -140,8 +144,6 @@ struct Pencil_state {
   B32 signal_toggle_line_fade;
 
   // Misc
-  // Font font_texture_for_ui;
-  // V2U64 last_screen_dims;
   B32 show_brush_ui_menu;
 };
 

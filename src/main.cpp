@@ -157,21 +157,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   // Testing and working on font provider
   FP_Font font = {};
   font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
-  // {
-  //   Scratch scratch = get_scratch(0, 0);
-  //   Str8 path_to_fonts = os_get_path_to_system_fonts();
-  //   Str8_list path_parts = {};
-  //   str8_list_append_copy(scratch.arena, &path_parts, os_get_path_to_system_fonts());
-  //   if (!str8_match(Str8FromC("\\"), str8_back(path_to_fonts, 1), Str8_match__normalise_slash)) { 
-  //     str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("\\"));
-  //   }
-  //   str8_list_append_copy(scratch.arena, &path_parts, Str8FromC("Arial.ttf"));
-  //   Str8 path_to_font = str8_from_list(scratch.arena, &path_parts);
-  //   font = fp_load_font(path_to_font, 128, range_u64_make(0, (U64)u8_max + 1));
-  //   end_scratch(&scratch);
-  // }
 
-  // R_Target pen_texture = r_load_texture_from_file(Str8FromC("../data/pen.png"));
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
   F64 prev_frame_duration_sec = 0.0;
@@ -186,81 +172,14 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
-    // if (!MAIN_IS_DEBUGGING)
-    // if (hot_key_activated && !P.is_mid_drawing)
-    // {
-    //   hot_key_activated = false;
-    //   os_window_set_mouse_passthrough(ToggleBool(os_window_is_mouse_passthrough()));
-    // }
-
     { // UI and Application update 
-      // pencil_do_ui(&P, font);
       pencil_do_command_ui(&P, font);
       pencil_update(&P, ui_has_active());
     }
 
-    // Test ui for a text edit box
-    /*
-    DeferLoop(ui_begin_build(os_get_client_area_dims(), os_get_mouse_pos()), ui_end_build())
-    { 
-      ui_push_font(font);
-
-      static U8 buffer[64]    = {};
-      static U64 buffer_count = 0;
-      static U64 cursor_pos   = 0;
-      static U64 section_pos  = 0;
-
-      UI_PaddedBox(ui_px(100), Axis2__y)
-      {
-        Str8 edit_box_id = Str8FromC("Text edit box for commnads");
-        
-        ui_spacer(ui_px(50));
-
-        U64 start_pos = buffer_count;
-        ui_set_next_flags(UI_Box_flag__has_background);
-        ui_set_next_b_color(v4f32(0.25, 0.25, 0.25, 1.0));
-        ui_text_edit_box(0.0f, edit_box_id, 200, buffer, &buffer_count, ArrayCount(buffer), &cursor_pos, &section_pos);
-        
-        if (ui_is_id_active(edit_box_id))
-        {
-          Str8 edit_box_str = str8_manual(buffer, buffer_count);
-          DeferInitReleaseLoop(Scratch scratch = get_scratch(0, 0), end_scratch(&scratch))
-          {
-            ui_spacer(ui_px(2));
-          
-            ui_set_next_size_x(ui_p_of_p(1.0f, 0.0f));
-            ui_set_next_size_y(ui_px(2));
-            ui_box_make(Str8{}, UI_Box_flag__has_background);
-
-            // Doing some stuff with events
-            for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
-            {
-              if (ev->kind == OS_Event_kind__key)
-              {
-                if (ev->key_event.key == Key__escape) { 
-                  ui_reset_active_id_match(edit_box_id); 
-                  // buffer_count = 0;
-                  // cursor_pos   = 0;
-                  // section_pos  = 0;
-                }
-                if (ev->key_event.key == Key__enter) {
-                  // run_command_from_name(P, filtered_commands.first->str);
-                }
-              }
-            }
-
-          }
-
-        }              
-      
-      }
-    }
-    */
-
     { // Rendering
       r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
-      // if (!os_window_is_mouse_passthrough()) { ui_draw(); }      
       ui_draw();
     }
 
@@ -321,4 +240,3 @@ LRESULT custom_win_proc(HWND window_handle, UINT message, WPARAM w_param, LPARAM
   }
   return result;
 }
-

@@ -151,6 +151,12 @@ U64 __str8_fmt_count_valist(const char* fmt, va_list valist_)
   return (U64)buffer_size_no_nt;
 }
 
+char* cstr_from_str8(Arena* arena, Str8 str)
+{
+  char* cstr = ArenaPushArr(arena, char, str.count + 1);
+  for EachIndex(i, str.count) { cstr[i] = str.data[i]; }
+  return cstr;
+}
 
 ///////////////////////////////////////////////////////////
 // - string editing 

@@ -1115,8 +1115,6 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   is_active    = str8_match(ctx->active_box_id, this_frames_box->id, 0);
   is_navigated = str8_match(ctx->navigated_box_id, this_frames_box->id, 0);
 
-  result_actions->old_box                 = prev_frames_box;            
-  result_actions->new_box                 = this_frames_box;            
   result_actions->is_hovered              = is_hovered;            
   result_actions->is_down                 = is_down;               
   result_actions->was_down                = was_down;              
@@ -1125,7 +1123,7 @@ UI_Actions ui_actions_from_box(UI_Box* this_frames_box)
   result_actions->went_down               = !was_down && is_down;
   result_actions->went_up                 = was_down && !is_down;  
   result_actions->is_active               = is_active;
-  result_actions->is_navigated            = is_navigated;
+  // result_actions->is_navigated            = is_navigated;
 
   return *result_actions;
 }
@@ -1343,18 +1341,29 @@ void ui_border_color(V4F32 color) { ui_set_next_border_color(color); }
 void ui_border_width(F32 width) { ui_set_next_border_width(width); }
 void ui_corner_r(F32 r) { ui_set_next_corner_r(v4f32_all(r)); }
 
-V2F32* ui_box_get_clip_offset(UI_Box* box)
+void ui_width(UI_Size size) { ui_set_next_size_x(size); }
+void ui_height(UI_Size size) { ui_set_next_size_y(size); }
+
+V2F32 ui_box_get_prev_build_clip_offset(UI_Box* box)
 {
-  static V2F32 offset_for_zero_box = {};
-  if (ui_box_is_zero(box)) { return &offset_for_zero_box; }
-  return &box->clip_offset;
+  if (ui_box_is_zero(box)) { return V2F32{}; }
+  UI_Box* prev_frame_box = ui_get_box_prev_frame(box->id);
+  if (ui_box_is_zero(prev_frame_box)) { return V2F32{}; }
+  return prev_frame_box->clip_offset;
 }
 
 void ui_box_set_clip_offset_y(UI_Box* box, F32 offset)
 {
   if (ui_box_is_zero(box)) { return; }
-  box->clip_offset.y += offset;
+  box->clip_offset.y = offset;
 }
+
+void ui_box_set_clip_offset_x(UI_Box* box, F32 offset)
+{
+  if (ui_box_is_zero(box)) { return; }
+  box->clip_offset.x = offset;
+}
+
 
 // - UI Draw
 void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
@@ -1378,7 +1387,7 @@ void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
     }
 
     if (root->flags & UI_Box_flag__has_text_contents) {
-      d_draw_text(root->text, root->font, rect_get_origin(rect), white()); 
+      d_draw_text(root->text, root->font, rect.origin, white()); 
     }
     
     if (root->flags & UI_Box_flag__has_borders)

@@ -87,9 +87,6 @@ struct UI_Text_font_stack { UI_Text_font_node* first; U64 count; B32 pop_after_f
 struct UI_Box;
 
 struct UI_Actions {
-  UI_Box* old_box;
-  UI_Box* new_box;
-  
   // Lower level actions
   B32 is_hovered;              // This is fine for all the boxes, id is not needed, no state is needed
   B32 is_down;                 // Cross frame state is needed, id to track if the box is the same between frames is needed
@@ -103,7 +100,7 @@ struct UI_Actions {
 
   // Higher level actions
   B32 is_active; 
-  B32 is_navigated;
+  // B32 is_navigated;
 };
 
 typedef void (*UI_Box_custom_draw_func_type) (UI_Box* box);

@@ -65,6 +65,7 @@ tu_specific Str8 str8_fmt(Arena* arena, const char* fmt, ...);
 tu_specific Str8 str8_valist(Arena* arena, const char* fmt, va_list valist);
 tu_specific U64 str8_fmt_count(const char* fmt, ...);
 tu_specific U64 __str8_fmt_count_valist(const char* fmt, va_list valist);
+tu_specific char* cstr_from_str8(Arena* arena, Str8 str);
 
 // - string editing
 tu_specific Str8 str8_substring(Str8 str, U64 start_index, U64 end_index);
