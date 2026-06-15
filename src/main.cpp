@@ -188,6 +188,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       pencil_render(&P);
       ui_draw();
 
+      d_fill_with_color(nice_blue());
+
       // todo: if cursor over the ui then set uis cursor
       //       else if ui is not then set to the pencils cursor
 
