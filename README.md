@@ -1,6 +1,6 @@
 <h1>
 <p align="center">
-  <img src="data/logo_900x900" alt="Logo" width="128" style="border-radius: 24px;">
+  <img src="data/logo_900x900.png" alt="Logo" width="128" style="border-radius: 24px;">
   <br>Pencil
 </h1>
 
