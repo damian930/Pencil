@@ -170,6 +170,14 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     r_prepare_canvas(&window_frame_buffer_target);
     d_begin_batching(window_frame_buffer_target);
 
+    for (OS_Event* ev = os_get_frame_event_list()->first; ev; ev = ev->next)
+    {
+      if (ev->kind == OS_Event_kind__key && ev->key_event.key == Key__q)
+      {
+        return 0;
+      }
+    }
+
     { // UI and Application update 
       pencil_do_command_ui(&P, font);
       pencil_update(&P, ui_has_active());
@@ -179,6 +187,9 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       r_clear_target(window_frame_buffer_target, transparent());
       pencil_render(&P);
       ui_draw();
+
+      // todo: if cursor over the ui then set uis cursor
+      //       else if ui is not then set to the pencils cursor
 
       U64 fps = (U64)(1.0 / (frame_start_time_in_sec - prev_frame_start_time_in_sec));
       #if 0

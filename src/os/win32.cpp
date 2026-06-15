@@ -12,13 +12,13 @@
 extern "C" __declspec(dllimport) LONG WINAPI RtlGetVersion(RTL_OSVERSIONINFOW* lpVersionInformation);
 
 struct OS_Window {
+  // These dont change
   WNDCLASSEXA window_class;
   HWND handle;
-
-  // Has to be specified at window creation and cant be changed later
   B32 is_transparent;
 
   B32 should_close;
+  OS_Cursor frame_cursor;
 
   // Per frame data
   V2F32 dims;
@@ -491,7 +491,7 @@ void os_frame_begin()
   {
     POINT p = {};
     BOOL succ = {};
-    succ |= GetCursorPos(&p); Assert(succ);
+    succ |= GetCursorPos(&p); Assert(succ); // TODO: This asserted on you once, see why and fix this
     succ |= ScreenToClient(os_get_state()->window.handle, &p); Assert(succ);
     Handle(succ); 
     os_state->this_frame_mouse_pos = v2f32((F32)p.x, (F32)p.y);
@@ -518,6 +518,8 @@ void os_frame_begin()
     os_state->start_time_for_prev_frame = os_state->start_time_for_this_frame;
     os_state->start_time_for_this_frame = (F32)os_get_time_for_timing_sec();
   }
+
+  os_state->window.frame_cursor = OS_Cursor__arrow;
 }
 
 void os_frame_end() {}
@@ -1083,6 +1085,14 @@ LRESULT win32_proc(
       is_event_made = true;
     }
 
+    // Sent to a window when cursor moves into it and no mouse button is presses. 
+    // Used to let the window manager set the proper cursor at window enter.
+    case WM_SETCURSOR: 
+    {
+      // We dont set the cursor here, we set it manually       
+      result = TRUE;
+    } break;
+
     case WM_CAPTURECHANGED:
     {
       // note: This is called to use as a callback to let us know that some other window
@@ -1107,18 +1117,15 @@ LRESULT win32_proc(
       result = DefWindowProc(window_handle, message, w_param, l_param);
     } break;
 
-    case WM_SIZE: 
-    {
+    // case WM_SIZE: 
+    // {
 
-    } break;
+    // } break;
 
-    case WM_PAINT: 
-    {
-      HWND handle = os_get_state()->window.handle;
-      PAINTSTRUCT ps;
-      HDC hdc = BeginPaint(handle, &ps);
-      EndPaint(handle, &ps);
-    } break;
+    // case WM_PAINT:
+    // {
+       
+    // } break;
 
     case WM_CLOSE: // For regular windows this is send when the close button it pressed 
     {
@@ -1161,36 +1168,28 @@ Str8 str8_from_wstr(Arena* arena, WCHAR* wstr)
 
 void os_set_cursor(OS_Cursor cursor)
 {
-  StaticAssert(OS_Cursor__COUNT == OS_Cursor__crosshair + 1); // Making sure thet i dont forget to add code to this func if i add a new cursor
-
-  HCURSOR cursor_handle = {};
-  switch (cursor) 
-  {
-    default:                   { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
-    case OS_Cursor__arrow:     { cursor_handle = LoadCursor(Null, IDC_ARROW); } break;
-    case OS_Cursor__hand:      { cursor_handle = LoadCursor(Null, IDC_HAND);  } break;
-    case OS_Cursor__crosshair: { cursor_handle = LoadCursor(Null, IDC_CROSS); } break;
-  }
-  SetCursor(cursor_handle);
+  os_get_state()->window.frame_cursor = cursor;
 }
 
-OS_Cursor os_get_cursor()
-{
-  StaticAssert(OS_Cursor__COUNT == OS_Cursor__crosshair + 1); // Making sure thet i dont forget to add code to this func if i add a new cursor
+// OS_Cursor os_get_cursor()
+// {
+//   StaticAssert(OS_Cursor__COUNT == OS_Cursor__pen + 1); // Making sure thet i dont forget to add code to this func if i add a new cursor
 
-  HCURSOR cursor_handle = GetCursor();
-  Handle(cursor_handle != Null);
+//   HCURSOR cursor_handle = GetCursor();
+//   Handle(cursor_handle != Null);
 
-  HCURSOR win32_arrow = LoadCursor(Null, IDC_ARROW);
-  HCURSOR win32_hand  = LoadCursor(Null, IDC_HAND);
-  HCURSOR win32_cross = LoadCursor(Null, IDC_CROSS);
+//   HCURSOR win32_arrow = LoadCursor(Null, IDC_ARROW);
+//   HCURSOR win32_hand  = LoadCursor(Null, IDC_HAND);
+//   HCURSOR win32_cross = LoadCursor(Null, IDC_CROSS);
+//   HCURSOR win32_pen   = LoadCursor(Null, MAKEINTRESOURCE(32631)); // note: resource id is used here cause WinUser.h does have a predefined macro for it
 
-  OS_Cursor cursor = OS_Cursor__arrow;
-  if      (cursor_handle == win32_arrow) { cursor = OS_Cursor__arrow; }
-  else if (cursor_handle == win32_hand)  { cursor = OS_Cursor__hand; }
-  else if (cursor_handle == win32_cross) { cursor = OS_Cursor__crosshair; }
-  return cursor;
-}
+//   OS_Cursor cursor = OS_Cursor__arrow;
+//   if      (cursor_handle == win32_arrow) { cursor = OS_Cursor__arrow; }
+//   else if (cursor_handle == win32_hand)  { cursor = OS_Cursor__hand; }
+//   else if (cursor_handle == win32_cross) { cursor = OS_Cursor__crosshair; }
+//   else if (cursor_handle == win32_pen)   { cursor = OS_Cursor__pen; }
+//   return cursor;
+// }
 
 void os_show_cursor(B32 show)
 {

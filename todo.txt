@@ -14,9 +14,9 @@
 [ ] - Redo core base, right now its all in random order
 [ ] - Text drop frame rate from more than 10k to 1k, 
       what a great pipiline i have here !!!
+[ ] - Look into cactus image viewer resource file and see why he has so much stuff there and for what.
 
 - Current feature working progress:
-[ ] - When drawing have a pen like in cactus image viewer
 [ ] - Have the window be full screen. 
 [ ] - Prepare the codebase to work from both the debug build path and the release dir structure
 [ ] - Have the app fail with win32's MessageBox if something fails to get initialised

@@ -290,6 +290,7 @@ enum OS_Cursor : U32{
   OS_Cursor__arrow, 
   OS_Cursor__hand,
   OS_Cursor__crosshair,
+  OS_Cursor__pen,
   OS_Cursor__COUNT,
 };
 

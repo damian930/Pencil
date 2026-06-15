@@ -639,6 +639,23 @@ void r_present(R_Target target, B32 vsync)
 {
   if (!__r_is_target_valid_target_chain(target)) { BP; return; }
   
+  if (os_get_state()->window.handle == target.__win32_window_handle_for_assert)
+  {
+    HCURSOR win32_arrow = LoadCursor(Null, IDC_ARROW);
+    HCURSOR win32_hand  = LoadCursor(Null, IDC_HAND);
+    HCURSOR win32_cross = LoadCursor(Null, IDC_CROSS);
+    HCURSOR win32_pen   = LoadCursor(Null, MAKEINTRESOURCE(32631)); // note: resource id is used here cause WinUser.h does have a predefined macro for it
+
+    HCURSOR win32_cursor = win32_arrow;
+    if      (os_get_state()->window.frame_cursor == OS_Cursor__arrow) { win32_cursor = win32_arrow; }
+    else if (os_get_state()->window.frame_cursor == OS_Cursor__hand)  { win32_cursor = win32_hand; }
+    else if (os_get_state()->window.frame_cursor == OS_Cursor__crosshair) { win32_cursor = win32_cross; }
+    else if (os_get_state()->window.frame_cursor == OS_Cursor__pen)   { win32_cursor = win32_pen; }
+
+    SetCursor(win32_cursor);
+
+  } else { InvalidCodePath(); }
+
   target.swap_chain->Present(!!vsync, 0);
   if (os_window_is_transparent()) {
     target.comp_device->Commit();

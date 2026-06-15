@@ -585,6 +585,8 @@ void pencil_render(const Pencil_state* P)
     }
   }
 
+  if (P->current_mode == Pencil_mode__draw) { os_set_cursor(OS_Cursor__pen); }
+  else if (P->current_mode == Pencil_mode__ruler) { os_set_cursor(OS_Cursor__crosshair); }
 }
 
 void pencil_do_command_ui(Pencil_state* P, FP_Font font)

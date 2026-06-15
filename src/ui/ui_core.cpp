@@ -381,7 +381,7 @@ void ui_end_build()
   ui_pop_parent();
   __ui_layout_box(ctx->root_box, Axis2__x);
   __ui_layout_box(ctx->root_box, Axis2__y);
-  os_set_cursor(ctx->final_cursor);
+  // os_set_cursor(ctx->final_cursor);
 }
 
 ///////////////////////////////////////////////////////////
