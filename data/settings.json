@@ -1,33 +1,16 @@
 {
   "shortcuts": [
     {
-      "combination": "Control+R",
-      "command": "Swap to ruller"
-    },
-    {
-      "combination": "Control+W",
+      "combination": "control+w",
       "command": "Terminate app"
     },
     {
-      "combination": "Control+D",
-      "command": "Swap to draw"
-    },
-    {
-      "combination": "Control+F",
-      "command": "Toggle line fade"
-    },
-    {
-      "combination": "Control+E",
-      "command": "Swap to eraser"
-    },
-    {
-      "combination": "Control+P",
-      "command": "Open command list"
+      "combination": "control+p",
+      "command": "Open command line"
     }
   ]
 }
 
-// TODO: doesnt support invaid command or any error yet
 
 
 

@@ -81,7 +81,7 @@ void ui_init()
   __ui_g_context = ArenaPush(arena, UI_Context);
   __ui_g_context->context_arena = arena;
   __ui_g_context->style_stacks_arena = arena_alloc(Megabytes(64), false, 0);
-  for EachArrElement(i, __ui_g_context->build_arenas) { 
+  for EachIndex(i, ArrayCount(__ui_g_context->build_arenas)) { 
     __ui_g_context->build_arenas[i] = arena_alloc(Megabytes(64), true, (i == 0 ? 1 : 44444)); // TODO: The stable address here shoud be removed 
   }
 
@@ -107,7 +107,7 @@ void ui_init()
 
 void ui_release()
 {
-  for EachArrElement(i, __ui_g_context->build_arenas) {
+  for EachIndex(i, ArrayCount(__ui_g_context->build_arenas)) {
     arena_release(&__ui_g_context->build_arenas[i]);
   }
   arena_release(&__ui_g_context->context_arena);
@@ -1435,7 +1435,7 @@ void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
         new_scissor_bbox = intersect_range_v2f32_on_axis(new_scissor_bbox, bbox, axis);
       }
     }
-    if (!range_v2f3_match(new_scissor_bbox, parent_scissor_bbox)) {
+    if (!range_v2f32_match(new_scissor_bbox, parent_scissor_bbox)) {
       d_push_scissor_rect(rect_from_range_v2f32(new_scissor_bbox));
     }
 
@@ -1445,7 +1445,7 @@ void ui_draw_box(UI_Box* root, RangeV2F32 parent_scissor_bbox)
     }
   
     // No longer scissoring
-    if (!range_v2f3_match(new_scissor_bbox, parent_scissor_bbox)) {
+    if (!range_v2f32_match(new_scissor_bbox, parent_scissor_bbox)) {
       d_pop_scissor_rect();
     }
   }

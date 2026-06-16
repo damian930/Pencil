@@ -100,7 +100,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
     ATOM wc_atom = RegisterClassExA(&win32_state->window.window_class);
     Assert(wc_atom != 0);
     
-    win32_state->window.is_transparent = true;
+    win32_state->window.is_transparent = false;
     win32_state->window.handle = CreateWindowExA(
       WS_EX_NOREDIRECTIONBITMAP,
       win32_state->window.window_class.lpszClassName,
@@ -154,7 +154,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   P.current_mode = Pencil_mode__draw;
   pencil_init(&P);
   
-  FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));;
+  FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, rangeu64(0, (U64)u8_max + 1));;
 
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
@@ -188,8 +188,6 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
       pencil_render(&P);
       ui_draw();
 
-      d_fill_with_color(nice_blue());
-
       // todo: if cursor over the ui then set uis cursor
       //       else if ui is not then set to the pencils cursor
 
@@ -206,6 +204,8 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
 
     r_present(window_frame_buffer_target, false);
   }
+
+  // Not releasing anything since who cares, the system will release all the stuff
 
   return 0;
 }

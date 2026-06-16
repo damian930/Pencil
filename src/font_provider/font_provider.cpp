@@ -215,18 +215,18 @@ FP_Font fp_load_font(Str8 ttf_file_path, F32 font_size, RangeU64 unicode_range_t
         // if (codepoint == 'C') { BP; }
 
         codepoint_data->bearing_y = -1.0f * fy0;
-        // InvariantCheck(codepoint_data->bearing_x == fx0);
-        InvariantCheck(glyph_atlas_rect.width == fx1 - fx0);
-        InvariantCheck(glyph_atlas_rect.height == fy1 - fy0);
+        // Assert(codepoint_data->bearing_x == fx0);
+        Assert(glyph_atlas_rect.width == fx1 - fx0);
+        Assert(glyph_atlas_rect.height == fy1 - fy0);
       }
     }
   }
 
-  InvariantCheck(result_font->kerning_entry_count == kerning_table_length);
+  Assert(result_font->kerning_entry_count == kerning_table_length);
   stbtt_kerningentry* stb_kerning_arr = ArenaPushArr(scratch.arena, stbtt_kerningentry, kerning_table_length);
 
   int kernings_written = stbtt_GetKerningTable(&stb_font_info, stb_kerning_arr, kerning_table_length);
-  InvariantCheck(kernings_written == kerning_table_length);
+  Assert(kernings_written == kerning_table_length);
 
   for (S32 i = 0; i < kerning_table_length; i += 1)
   {

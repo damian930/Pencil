@@ -9,7 +9,6 @@
 struct Thread_context {
   B32 is_initialised;
   Arena* scrach_arenas_buffer[3];
-  U64 id;
 };
 
 // todo: What does static do here excatly, if we compile as separate obj files

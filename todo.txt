@@ -15,24 +15,33 @@
 [ ] - Text drop frame rate from more than 10k to 1k, 
       what a great pipiline i have here !!!
 [ ] - Look into cactus image viewer resource file and see why he has so much stuff there and for what.
+[ ] - Fix up the arena code to use less memory and cpu %, might even not run this that much when you have it not updating anything 
+      or some like that
 
 - Current feature working progress:
-[ ] - Have the window be full screen. 
+[ ] - Have a utility to add new shortcuts for later when you will have ui for shortcut recordings
 [ ] - Prepare the codebase to work from both the debug build path and the release dir structure
 [ ] - Have the app fail with win32's MessageBox if something fails to get initialised
-[ ] - Fix the bug with the loading cursor when a window gets spawned 
-[ ] - Write down some ideas to implement for the command line. Stuff like command queue with arrow functional, tab feature to guess a possible command, ...
 [ ] - Add the min version for os at init time
+[ ] - Have the widnow be maximized. 
+      When we have taskbars that hide we get a full screen texture for drawing.
+      What you shoud do is this, just have it be what ever the size of maximized is.
+      Then have a command for the user that will reset the app, this will redo all the stuff in the app
+      with all the textures and their sizes.
+      Then you might also just have a toggle for the app to do that automatically
+      when the size of maximized gets changed mid runtime dur to some
+      weird task bar position change.
+[ ] - The first ever run of the app the user shoud set their own shortcut via some set up ui.
+      That shortcut will be the main shortcut to turn on the app.
+      There might be the case where the user forgets that the app is running, in that case they will run it again,
+      you should have the app get active and show the command line for the user to interact, this might be 
+      really nice for the users that dont have a good handle on the app and the flow of it yet.
 
 - Stuff to fix or add next:
 [ ] - do we need the d3d context to switch for every batch or would it be fine for it to only switch the setting
       that is differnt, might be faster, google and test this when you add a profiler in.
 
 - Minor fixes and additions:
-[ ] - Have a way to create a window inside the win32.h/.cpp,
-      to then be able to create them inside the test_main and
-      test stuff. Right now i cant, since my window is not 
-      a part of the os layer.
 [ ] - The next project shoud be in C. 
       I like this syntax 
       #define dr_rect(...) dr_draw_rect((Rect_Settings){ \

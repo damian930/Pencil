@@ -142,7 +142,7 @@ OS_File_props os_file_get_props(OS_File file)
   result_properties.succ = GetFileInformationByHandle((HANDLE)file.u64, &file_info);
   if (result_properties.succ)
   {
-    result_properties.size = u64_from_2_u32(file_info.nFileSizeHigh, file_info.nFileSizeLow);
+    result_properties.size = U64From2U32(file_info.nFileSizeHigh, file_info.nFileSizeLow);
   }
   return result_properties;
 }
@@ -881,7 +881,7 @@ Readable_time os_get_readable_time()
   time.hour       = (U8)sys_time.wHour;
   time.minute     = (U8)sys_time.wMinute;
   time.second     = (U8)sys_time.wSecond;
-  time.milisecond = sys_time.wMilliseconds;
+  time.millisecond = sys_time.wMilliseconds;
   
   return time;
 }
@@ -1122,10 +1122,29 @@ LRESULT win32_proc(
 
     // } break;
 
-    // case WM_PAINT:
-    // {
-       
-    // } break;
+    case WM_PAINT:
+    {
+      static U64 times_wm_paint_has_been_handles = 0;
+
+      { // Handling WM_PAINT
+        HWND hwnd = os_get_state()->window.handle;
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
+        EndPaint(hwnd, &ps);
+      }
+      times_wm_paint_has_been_handles += 1;
+
+      Assert(times_wm_paint_has_been_handles == 1);
+      // For windows that dont use things like gdi but use d3d 11 and such for rendering 
+      // those apis dont generate wm_paint. But there is still a single time that wm_paint
+      // gets generated. That is when the window is first created to set it up.
+      // That is why i expect the times we handle wm_paint to be == 1.
+      // Assert it to know if i am wrong and it still gets generated in some edge cases.
+      // But it for sure doesnt get generated on submit calls to d3d 11 like DrawInstanced,
+      // nor does it get generated for present calls for d3d like Present for swap chains 
+      // or Commit for dwm IDCompositionDevice 
+    } break;
 
     case WM_CLOSE: // For regular windows this is send when the close button it pressed 
     {
@@ -1160,8 +1179,8 @@ Str8 str8_from_wstr(Arena* arena, WCHAR* wstr)
   U64 str8_len_with_nt = WideCharToMultiByte(CP_UTF8, Null, wstr, -1, 0, 0, Null, Null);
   Str8 str = data_buffer_make(arena, str8_len_with_nt);
   U64 succ = WideCharToMultiByte(CP_UTF8, Null, wstr, -1, (char*)str.data, (int)str.count, Null, Null);
-  InvariantCheck(succ); 
-  InvariantCheck(str.data[str.count - 1] == '\0');
+  Assert(succ); 
+  Assert(str.data[str.count - 1] == '\0');
   str = str8_chop_back_if_match(str, Str8FromC("\0"), 0);
   return str;
 }

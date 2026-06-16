@@ -124,7 +124,7 @@ Str8 str8_valist(Arena* arena, const char* fmt, va_list valist)
 
   Data_buffer buffer = data_buffer_make(arena, buffer_size_no_nt + 1);
   int size_written   = vsprintf((char*)buffer.data, fmt, valist);
-  InvariantCheck(size_written + 1 == buffer.count);
+  Assert(size_written + 1 == buffer.count);
 
   Str8 str_no_nt = str8_chop_back(buffer, 1);
   arena_pop(arena, 1);
@@ -630,8 +630,8 @@ Str8 str8_from_day(Day day)
 	  case Day__tuesday   : { result = Str8FromC("Tuesday"); } break;
 	  case Day__wednesday : { result = Str8FromC("Wednesday"); } break;
 	  case Day__thursday  : { result = Str8FromC("Thursday"); } break;
-	  case Day__frinday   : { result = Str8FromC("Frinday"); } break; 
-	  case Day__saturdan  : { result = Str8FromC("Saturdan"); } break; 
+	  case Day__friday   : { result = Str8FromC("Frinday"); } break; 
+	  case Day__saturday  : { result = Str8FromC("Saturdan"); } break; 
 	  case Day__sunday    : { result = Str8FromC("Suday"); } break;
 	  case Day__COUNT     : {  } break;
   }

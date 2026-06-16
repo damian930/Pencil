@@ -80,8 +80,9 @@ pushd build
 
 if "%glfw_learning%"=="1"  set build_succ=1 && %compile% ../src/__samples/glfw_learning.cpp %linker% /OUT:"glfw_learning.exe"
 if "%test_main%"=="1"      set build_succ=1 && %compile% ../src/__samples/test_main.cpp %linker% /OUT:"test_main.exe"
+if "%ls%"=="1"             set build_succ=1 && %compile% ../src/__samples/ls.cpp %linker% /OUT:"ls.exe"
 if "%pencil%"=="1" (
-  rc /nologo /fo "./logo.res" ../data/logo.rc
+  rc /nologo /fo "../data/logo.res" ../data/logo.rc
   %compile% ../src/main.cpp ../data/logo.res %linker% /OUT:"pencil.exe" 
   set build_succ=1
 ) 

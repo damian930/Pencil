@@ -143,6 +143,7 @@ enum OS_Event_modifier : U32 {
   OS_Event_modifier__NONE    = (1 << 0),
   OS_Event_modifier__shift   = (1 << 1),
   OS_Event_modifier__control = (1 << 2),
+  // todo: Add alt here
 };
 typedef U32 OS_Event_modifiers;
 

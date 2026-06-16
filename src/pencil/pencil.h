@@ -13,7 +13,6 @@ const U32 MIN_PEN_SIZE = 1;
 enum Pencil_mode : U32 {
   Pencil_mode__draw,
   Pencil_mode__ruler,
-  // Pencil_mode__temp_texture,
 };
 
 struct Draw_record {
@@ -40,24 +39,9 @@ struct Draw_record_registration_result {
 };
 
 // note: These are to be sorted
-#define COMMAND_DATA_X_LIST                           \
-  X(swap_to_draw,     Str8FromC("Swap to draw")     ) \
-  X(swap_to_eraser,   Str8FromC("Swap to eraser")   ) \
-  X(swap_to_ruler,    Str8FromC("Swap to ruller")   ) \
-  X(terminate_app,    Str8FromC("Terminate app")    ) \
-  X(toggle_line_fade, Str8FromC("Toggle line fade") ) \
-  X(make_background_blue, Str8FromC("Make background blue") ) \
-  X(__Fake_COMMAND_1, Str8FromC("__Fake_COMMAND_1")) \
-  X(__Fake_COMMAND_2, Str8FromC("__Fake_COMMAND_2")) \
-  X(__Fake_COMMAND_3, Str8FromC("__Fake_COMMAND_3")) \
-  X(__Fake_COMMAND_4, Str8FromC("__Fake_COMMAND_4")) \
-  X(__Fake_COMMAND_5, Str8FromC("__Fake_COMMAND_5"))  \
-  X(__Fake_COMMAND_511, Str8FromC("__Fake_COMMAND_5")) \
-  X(__Fake_COMMAND_51, Str8FromC("__Fake_COMMAND_5")) \
-  X(__Fake_COMMAND_52, Str8FromC("__Fake_COMMAND_5")) \
-  X(__Fake_COMMAND_33, Str8FromC("__Fake_COMMAND_5")) \
-  X(__Fake_COMMAND_54, Str8FromC("__Fake_COMMAND_5")) \
-  X(__Fake_COMMAND_55, Str8FromC("__Fake_COMMAND_5"))
+#define COMMAND_DATA_X_LIST                                    \
+  X( terminate_app, Str8FromC("Terminate app") )               \
+  X( open_command_line, Str8FromC("Open close command line") ) 
 
 enum Command_id : U32 {
   // Command_id__NONE,
@@ -73,12 +57,13 @@ Str8 command_names[Command_id__COUNT] = {
   #undef X
 };
 
-struct Shortcut_chord {
+struct Key_comb {
   OS_Event_modifier mod;
   Key key;
   U8 command_name_buffer[32];
   U8 command_name_buffer_count;
 };
+
 
 struct Pencil_state {
   Arena* frame_arena;
@@ -116,37 +101,11 @@ struct Pencil_state {
   V2F32 ruling_start_pos;
   V2F32 ruling_end_pos;
 
-  #define MAX_CHORD_COUNT 50
-  Shortcut_chord chords[MAX_CHORD_COUNT];
-  U64 chord_count;
-  //
-  B32 terminate_app;
-
-  // Signals 
-  //
-  B32 signal_new_pen_size;
-  U32 new_pen_size;
-  //
-  B32 signal_new_eraser_size;
-  U32 new_eraser_size;
-  // 
-  B32 signal_swap_to_eraser;
-  //
-  B32 signal_make_b_blue;
-  //
-  B32 signal_swap_to_pen;
-  //
-  B32 signal_new_pen_color_hsva;
-  V4F32 new_pen_color_hsva;
-  // 
-  B32 signal_swap_to_ruler;
-  // 
-  B32 signal_swap_to_draw;
-  // 
-  B32 signal_toggle_line_fade;
+  // Shortcuts
+  Key_comb key_combs[128];
+  U64 key_combs_count;
 
   struct {
-    // TODO: Have this be false when release
     B32 is_widget_open = true;
 
     U8 text_entry_buffer[64];
@@ -160,34 +119,44 @@ struct Pencil_state {
     V4F32 main_b_color = rgba_from_hex(0x695A09FF);
   } ui_state;
 
+  struct {
+    B32 terminate_app;
+  } signals;
+
   // Misc
-  B32 show_brush_ui_menu;
+  B32 terminate_app;
 };
+
+extern global OS_File g_pencil_run_log_file; 
 
 // - Main passes
 void pencil_init(Pencil_state* P);
 void pencil_update(Pencil_state* P, B32 is_ui_capturing_mouse);
 void pencil_render(const Pencil_state* P);
-void pencil_do_ui(Pencil_state* P, FP_Font font);
+// TODO: UI pass here 
 
-// - Other
+// - Pencil state stuff
 Draw_record_registration_result register_new_draw_record(Pencil_state* P);
 Draw_record* __get_new_draw_record_from_pool__nullable__private_for__register_new_draw_record(Pencil_state* P);
 void delete_draw_record__invalidates_record(Pencil_state* P, Draw_record* record_to_delete);
-void add_shortcut(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_name);
-void run_command_from_name(Pencil_state* P, Str8 command_name);
-void command_terminate_app(Pencil_state* P);
-void command_swap_to_ruller(Pencil_state* P);
-void command_swap_to_draw(Pencil_state* P);
-void command_toggle_line_fade(Pencil_state* P);
-void command_swap_to_eraser(Pencil_state* P);
-void command_make_background_blue(Pencil_state* P);
-void command_open_command_list(Pencil_state* P);
-B32 is_valid_command_name(Str8 command_name);
-//
-//
-#if DEBUG_MODE
-void __debug_export_current_record_images(const Pencil_state* P);
-#endif
+
+// - Key combos (shortcuts)
+void run_command(Pencil_state* P, Str8 str);
+B32 add_key_combo(Pencil_state* P, OS_Event_modifier mod, Key key, Str8 command_name);
+
+
+
+// --- old code here
+
+
+// void command_terminate_app(Pencil_state* P);
+// void command_swap_to_ruller(Pencil_state* P);
+// void command_swap_to_draw(Pencil_state* P);
+// void command_toggle_line_fade(Pencil_state* P);
+// void command_swap_to_eraser(Pencil_state* P);
+// void command_make_background_blue(Pencil_state* P);
+// void command_open_command_list(Pencil_state* P);
+// B32 is_valid_command_name(Str8 command_name);
+
 
 #endif

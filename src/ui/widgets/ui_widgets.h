@@ -61,9 +61,9 @@ struct UI_Slider_style {
   UI_Size size_y;
   const char* fmt_str;
   
-  V4 hover_color;
-  V4 no_hover_color;
-  V4 slided_part_color;
+  V4F32 hover_color;
+  V4F32 no_hover_color;
+  V4F32 slided_part_color;
   
   // V4 text_color;
   // F32 font_size;
@@ -586,7 +586,7 @@ void ui_aply_text_ops(UI_Text_op_list text_op_list, U8* text_buffer, U64 max_tex
         {
           Scratch scratch          = get_scratch(0, 0);
           // Deleting a part of text
-          RangeU64 range_to_delete = range_u64_make(Min(*cursor_pos, *section_start), Max(*cursor_pos, *section_start));
+          RangeU64 range_to_delete = rangeu64(Min(*cursor_pos, *section_start), Max(*cursor_pos, *section_start));
           Str8 buffer_as_str       = str8_manual(text_buffer, *current_text_size);
           
           Str8_list str_parts         = {};
@@ -732,7 +732,7 @@ UI_Text_op_list ui_text_edit_box(Arena* arena, B32 create_updates, UI_Size size_
     if (str_before_cursor_size_in_px > -1.0f * edit_box_data.clip_offset.x + prev_edit_box_width) 
     {
       // Finding a cursor string substring that fits into the edit box from the end of the cursor string
-      RangeU64 str_range_that_fits = range_u64_make(str_before_cursor.count, str_before_cursor.count);
+      RangeU64 str_range_that_fits = rangeu64(str_before_cursor.count, str_before_cursor.count);
       {
         F32 total_size = 0.0f;
         for (U64 i = str_before_cursor.count; i > 0 ; i -= 1)
@@ -828,12 +828,12 @@ UI_Text_op_list ui_text_edit_box(Arena* arena, B32 create_updates, UI_Size size_
           for EachIndex(i, text_buffer_str.count)
           {
             F32 char_width       = fp_measure_text(str8_substring(text_buffer_str, i, i + 1), font).x;
-            RangeF32 char_range  = range_f32_make(accumulated_offset, accumulated_offset + char_width);
+            RangeF32 char_range  = rangef32(accumulated_offset, accumulated_offset + char_width);
             accumulated_offset += char_width;
-            if (range_f32_within(char_range, new_cursor_pos_in_px_in_text))
+            if (rangef32_within(char_range, new_cursor_pos_in_px_in_text))
             {
               F32 mouse_diff_inside_char = char_range.min - new_cursor_pos_in_px_in_text;
-              F32 ratio = abs_f32(mouse_diff_inside_char) / range_f32_length(char_range);
+              F32 ratio = abs_f32(mouse_diff_inside_char) / rangef32_length(char_range);
               if (0.0f <= ratio && ratio <= 0.5f) { // go to the left
                 new_cursor_pos = i;
               } else if (0.5f < ratio && ratio <= 1.0f) { // go to the right

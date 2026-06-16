@@ -176,7 +176,7 @@ void d_fill_with_color(V4F32 color)
 {
   V4F32 corner_colors[UV__COUNT] = { color, color, color, color };
   R_Target target                = __d_get_current_render_target__defaults();
-  Rect rect                      = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(target));
+  Rect rect                      = rect_make_v(v2f32(0.0f, 0.0f), r_get_target_dims(target));
   d_add_rect_command(rect, corner_colors, {}, {}, {}, {});
 }
 
@@ -219,8 +219,8 @@ void d_draw_circle_inset_border(V2F32 center, F32 r, V4F32 color, F32 thickness,
 void d_draw_texture(R_Target texture, V2F32 pos)
 {
   V2F32 texture_dims = r_get_target_dims(texture);
-  Rect source_rect   = rect_from_v(v2f32(0.0f, 0.0f), r_get_target_dims(texture));
-  Rect dest_rect     = rect_from_v(pos, texture_dims);
+  Rect source_rect   = rect_make_v(v2f32(0.0f, 0.0f), r_get_target_dims(texture));
+  Rect dest_rect     = rect_make_v(pos, texture_dims);
   d_add_texture_command(texture, dest_rect, source_rect, white());
 }
 

@@ -1066,7 +1066,7 @@ Readable_time os_win32_readable_time_from_systemtime(SYSTEMTIME* sys_time)
   time.hour       = (U8)sys_time->wHour;
   time.minute     = (U8)sys_time->wMinute;
   time.second     = (U8)sys_time->wSecond;
-  time.milisecond = sys_time->wMilliseconds;
+  time.millisecond = sys_time->wMilliseconds;
   return time;
 }
 

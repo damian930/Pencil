@@ -9,10 +9,6 @@
 #include "math.h"   // For math
 #include "float.h"  // For FLT_MAX and such
 
-/* todo:
-	[ ] - Remove todos
-*/
-
 /* todo: Maybe use this somewhere if it makes sense, this is a nice way to have this.
 				 This is taken from RadDBG base/core.h file.
 typedef enum Compiler
@@ -57,7 +53,50 @@ Compiler;
 	#define RELEASE_MODE 0
 #endif
 
-// - Compilation sub modes
+// todo: test cpp11 verson +, there it is a part of the standard
+#define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)
+
+#if (!DEBUG_MODE && !RELEASE_MODE)
+	StaticAssert(false, "None of the possible build modes are set. Possible build modes are: Debug, Release.")
+#endif
+#if (DEBUG_MODE && RELEASE_MODE)
+	StaticAssert(false, "More than a single build mode specified.")
+#endif
+// This is just in case
+#if DEBUG_MODE
+	#undef RELEASE_MODE
+	#define RELEASE_MODE 0
+#endif
+
+// - Compiler specific intrinsics
+#define BreakPoint(...)
+#define BreakPointCond(cond, ...) 
+#if COMPILER_MSVC
+	#include "intrin.h"
+	
+	#undef BreakPoint // only works for x86, x64, ARM, ARM64
+	#define BreakPoint(...) do { printf("\n=== BreakPoint() macro fired || FILE: %s, LINE: %d ===\n\n", __FILE__, __LINE__); __debugbreak(); } while (0) 
+
+	#if RELEASE_MODE
+		#undef BreakPoint
+		#define BreakPoint(...) do {} while (0)
+	#endif
+
+#endif
+
+// Asssert:
+// 		Used to merely check and break of false condition in the dev time. Not made for the app to work based on. 
+//	  Invalid conditions that might break or should still be tested via ifs should not rely on this macro. 
+// 
+// HandleLater: 
+//	  This is for lazy developers. Handle later just breaks in the debugger, but unlike regular assert doesnt allow 
+//    compilation in Release builds. This is used for legic cases that should be handled but dont get handled right now
+//    and are left for later for whatever reason. In normal code if those break we just assert, this is that, but
+//    with static_assert in the release build to make sure that all these are gone by the time we do a release build.
+//    There is a special macro that might be defined called DONT_ASSERT_HANDLE_LATER_MACROS. This makes HandleLater 
+//    macros compile in Release builds. Its just there to be able to compile to maybe test compilation or something along those lines,
+//    but should not be used for legit release builds. 
+
 #if defined(DONT_ASSERT_HANDLE_LATER_MACROS)
 	#undef DONT_ASSERT_HANDLE_LATER_MACROS
 	#define DONT_ASSERT_HANDLE_LATER_MACROS 1
@@ -65,30 +104,27 @@ Compiler;
 	#define DONT_ASSERT_HANDLE_LATER_MACROS 0
 #endif
 
-// - Compiler specific intrinsics
-#define BreakPoint(...)
-#define BreakPointCond(cond, ...) 
-#if COMPILER_MSVC
-	#include <intrin.h>
-	
-	// todo: Remove this in release, it crashed the app the same way
-	#undef BreakPoint
-	#define BreakPoint(...) do { printf("\n=== BreakPoint() macro fired ===\n\n"); __debugbreak(); } while (0) 
-
-	#undef BreakPointCond
-	#define BreakPointCond(cond) do { if (!(cond)) { BreakPoint(); } } while(0)  // only works for x86, x64, ARM, ARM64
+// TODO: Check if warning is available
+#if DONT_ASSERT_HANDLE_LATER_MACROS && RELESE_BUILD
+	#warning "Release build with DONT_ASSERT_HANDLE_LATER_MACROS"
 #endif
-#define BP BreakPoint();
 
-// todo: test cpp11 verson +, there it is a part of the standard
-#define StaticAssert(expr, ...) static_assert(expr, __VA_ARGS__)
+#define Assert(expr, ...)      do { if (!(expr)) { BreakPoint(); } } while (0) 
+#define HandleLater(expr, ...) Assert(expr) 
+#if RELEASE_MODE
+	#define Assert(expr, ...)             
 
-#if (!DEBUG_MODE && !RELEASE_MODE)
-	StaticAssert(false, "Both Debug and Release modes are not set. Set one of them before building.")
+	#define HandleLater(expr, ...)      do { StaticAssert(0, __VA_ARGS__); } while (0) 
+	#if DONT_ASSERT_HANDLE_LATER_MACROS
+		#undef HandleLater
+		#define HandleLater(expr, ...)         										
+	#endif
 #endif
-#if (DEBUG_MODE && RELEASE_MODE)
-	StaticAssert(false, "Both Debug and Release modes are set. Only of them at a time is supported.")
-#endif
+
+#define BP                   BreakPoint();     // Quick alias
+#define Handle(expr, ...)    HandleLater(expr) // Quick alias
+#define InvalidCodePath(...) Assert(false)     // Quick alias
+#define NotImplemented()     Assert(false)     // Quick alias
 
 typedef int8_t  S8;
 typedef int16_t S16;
@@ -100,9 +136,6 @@ typedef uint16_t U16;
 typedef uint32_t U32;
 typedef uint64_t U64;
 
-typedef int Int;
-typedef char Char; 
-
 typedef U8  B8;
 typedef U16 B16;
 typedef U32 B32;
@@ -111,29 +144,16 @@ typedef U64 B64;
 typedef float  F32;
 typedef double F64;
 
-// #define static (reatined, persitent)
-#define global // note: This is just to be able to search for globals quickly
-#define Null NULL 
-#define tu_specific static inline // tu -> translation unit  
+#define global                    // Allowes to search for global statics faster
+#define Null NULL                 // I like this more
+#define tu_specific static inline // Translation unit specific
 
 #define per_thread 
 #if COMPILER_MSVC
 	#undef per_thread
-	#define per_thread __declspec(thread)
+	#define per_thread __declspec(thread) // TODO: This is not like really needed, but would be nice to check if this is supported based on the version of the compiler or the language version
 #else
 	StaticAssert(0, "The current compiler doesnt support a per_thread tls allocation at compile time, therefore a \"per_thread\" macro failed to be define.");
-#endif
-
-// #define AtomicCompareExchangeU64(volatile_u64_p__dest, u64_new_value, u64_comparand) // note: returns the initial value of the destination address 
-#define AtomicIncrementS64(volatile_s64_p_value) 															 // note: returns the the new incremented value at the address
-#if COMPILER_MSVC
-	// #undef AtomicCompareExchangeU64
-	#undef AtomicIncrementS64
-	
-	// #define AtomicCompareExchangeU64(volatile_u64_p__dest, u64_new_value, u64_comparand) InterlockedCompareExchange((volatile U64*)volatile_u64_p__dest, (U64)u64_new_value, (U64)u64_comparand)
-	#define AtomicIncrementS64(volatile_s64_p_value)                                     _InterlockedIncrement64(volatile_s64_p_value)
-#else
-	StaticAssert(0, "The current compiler does not support some needed compiler compiler intrinsics for atomic operations for the cpu.");
 #endif
 
 #define __Stringify(x) #x 
@@ -151,51 +171,30 @@ typedef double F64;
 #define Kilobytes(n) 1024 * Bytes(n) 
 #define Megabytes(n) 1024 * Kilobytes(n)
 #define Gigabytes(n) 1024 * Megabytes(n)
-#define Terabytes(n) 1024 * Terabytes(n)
+#define Terabytes(n) 1024 * Gigabytes(n)
 
 #define Thousands(n) 1000ULL * (U64)(n)
 #define Millions(n)  1000ULL * Thousands(n)
 #define Billions(n)  1000ULL * Millions(n)
 
-#define ToggleBool(b) (!(b))
-#define XOR(a, b) ( ((a) && !(b)) || (!(a) && (b)) )
-#define NAND(a, b) ( !!(a) != 1 || !!(b) != 1)       // Nand == Not and
-
-#if RELEASE_MODE
-	#define Assert(expr, ...)                do { (void)(expr); } while (0) 				         	// note: Removing the warning where the value that might only be be used for the assert, but the assert is compiled out in release build, so the warning of an unused variable appears
-	// #define AssertPrint(expr, note_fmt, ...) do { (void)(expr); (void)(note_fmt); } while (0) // 
-	#define HandleLater(expr, ...)           do { StaticAssert(0, __VA_ARGS__); } while (0)   // note: We want all the HandleLater calls to be gone in the release build. HandleLater is used for something like testing os, where there are bunch of thing that might take place, like file open fail. So you put HandleLater in and then use the api, but for the final version tho HandleLater calles shoud be resolved. Therefore a StaticAssert. 
-	#if DONT_ASSERT_HANDLE_LATER_MACROS
-		#undef HandleLater
-		#define HandleLater(expr, ...)         do { (void)(expr); } while (0)										// note: In case we dont want to deal with HandleLaters now, be we want to build in release to have the optimisations working, for example for testing multi threading and stuff.
-	#endif
-#else  
-	#define Assert(expr, ...)                BreakPointCond(expr) // do { if (!(expr)) { U32* p = 0; *p = 69; } } while (0)
-	// #define AssertPrint(expr, note_fmt, ...) do { if (!(expr)) { printf(note_fmt, __VA_ARGS__); U32* p = 0; *p = 69; } } while (0)
-	#define HandleLater(expr, ...)           Assert(expr) 
-#endif
-#define Handle(expr, ...) HandleLater(expr) // Just to not type as much
-#define InvariantCheck(expr, ...) Assert(expr)
-
-#define InvalidCodePath(...) do { Assert(false); } while (0)
-#define NotImplemented(...)  do { Assert(false); } while (0)
+#define ToggleBool(b) ( !(b) )
+#define XOR(a, b)     ( ((a) && !(b)) || (!(a) && (b)) )
+#define NAND(a, b)    ( (!!(a) != 1) || (!!(b) != 1)   ) // Nand == Not AND
 
 #define EachIndex(it, count)                          (U64 it = 0; it < count; it += 1)
-#define EachArrElement(it, static_arr)                (U64 it = 0; i < ArrayCount(static_arr); it += 1)
-#define EachInRange(it, range_min, range_max)         (U64 it = range_min; it < range_max; it += 1)
 #define EachEnumRange(it, Type, min_value, max_value) (Type it = min_value; it < max_value; it = (Type)((U64)it + 1))	
+
+// TODO: I dont like that
 #define EachEnum1ToCount(Type, it) EachEnumRange(it, Type, (Type)1, Type##__COUNT)
 
-/* NOTES:
-  Stack here is a list that only has the "first" node pointer. Nodes only have the "next" pointer.
-  When pushed onto the stack list, the first element is the new node, and the old first is now next for the new node.
-
-  Queue is a list that has the "first" and "last" node pointers.
-  Nodes only store the "next" node pointer.
-
-  Dll is a list with "first" and "last" node pointers.
-  Nodes store the "next" and "prev" node pointers.
-*/
+// Stack is a list that only has the "first" node pointer. Nodes only have the "next" pointer.
+// When pushed onto the stack list, the first element is the new node, and the old first is now next for the new node.
+//
+// Queue is a list that has the "first" and "last" node pointers.
+// Nodes only store the "next" node pointer.
+//
+// Dll is a list with "first" and "last" node pointers.
+// Nodes store the "next" and "prev" node pointers.
 #define StackPush_Name(list, new_node, name_for_first_in_list, name_for_next_in_node) \
             if ((list)->name_for_first_in_list == 0) {     \
                 (list)->name_for_first_in_list = new_node; \
@@ -273,7 +272,7 @@ typedef double F64;
 							list->name_for_last_in_list = 0; \
 						} else { \
 							list->name_for_first_in_list = list->name_for_first_in_list->name_for_next_in_node; \
-							list->name_for_first_in_list->prev = 0; \
+							list->name_for_first_in_list->name_for_prev_in_node = 0; \
 						}
 #define DllPopBack_Name(list, name_for_first_in_list, name_for_last_in_list, name_for_next_in_node, name_for_prev_in_node) \
 						if (list->name_for_first_in_list == list->name_for_last_in_list) { \
@@ -286,7 +285,7 @@ typedef double F64;
 #define DllPop_Name(list, node_to_pop, name_for_first_in_list, name_for_last_in_list, name_for_next_in_node, name_for_prev_in_node) \
 						if (node_to_pop) { \
 							if (list->name_for_first_in_list == 0 && list->name_for_last_in_list == 0) { \
-								InvalidCodePath("This should not happed. Node is given but list is not valid for it."); \
+								InvalidCodePath("This should not happened. Node is given but list is not valid for it."); \
 							} else if (list->name_for_first_in_list == node_to_pop && list->name_for_last_in_list == node_to_pop) { \
 								list->name_for_first_in_list = list->name_for_last_in_list = 0; \
 							} else if (list->name_for_first_in_list == node_to_pop) { \
@@ -322,23 +321,226 @@ typedef double F64;
 						} 
 
 #define StackPush(list, new_node) StackPush_Name((list), (new_node), first, next)
-#define StackPop(list) StackPop_Name((list), first, next)
+#define StackPop(list)            StackPop_Name((list), first, next)
 
 #define QueuePushFront(list, new_node) QueuePushFront_Name((list), (new_node), first, last, next)
 #define QueuePushBack(list, new_node)  QueuePushBack_Name((list), (new_node), first, last, next)
 #define QueuePopFront(list) 				   QueuePopFront_Name((list), first, last, next)
-// Queue cant be popped from the back, since it would require a retraversal from first_node to set the new last as last
+// QueuePopBack: Queue cant be popped from the back, since it would require a retraversal from first_node to set the new last as last
 
 #define DllPushFront(list_p, new_node_p) DllPushFront_Name((list_p), (new_node_p), first, last, next, prev)
 #define DllPushBack(list_p, new_node_p)  DllPushBack_Name((list_p), (new_node_p), first, last, next, prev)
-#define DllPopFront(list_p) DllPopFront_Name((list_p), first, last, next, prev)
-#define DllPopBack(list_p) DllPopBack_Name((list_p), first, last, next, prev)
-#define DllPop(list_p, node_to_pop_p) DllPop_Name((list_p), node_to_pop_p, first, last, next, prev)
+#define DllPopFront(list_p)              DllPopFront_Name((list_p), first, last, next, prev)
+#define DllPopBack(list_p)               DllPopBack_Name((list_p), first, last, next, prev)
+#define DllPop(list_p, node_to_pop_p)    DllPop_Name((list_p), node_to_pop_p, first, last, next, prev)
 
 #define SwapValues(Type, x, y) { Type temp = x; x = y; y = temp; }
 
 #define Min(x, y) (x < y ? x : y)
 #define Max(x, y) (x > y ? x : y)
+
+enum Comparison : U32 {
+  Comparison__NOT_EQUAL,
+  Comparison__equal,
+  Comparison__smaller,
+  Comparison__greater,
+};
+
+// todo: Change this to be 
+// UV__x0y0
+// UV__x1y0
+// UV__x0y1
+// UV__x1y1
+// TODO: The indexing here is off, use different names here
+enum UV : U32 {
+	UV__00,    // Top left
+	UV__10,    // Top right
+	UV__01,    // Bottom left
+	UV__11,    // Bottom right
+	UV__COUNT,
+};
+
+enum Axis2 : U32 {
+	Axis2__x,
+	Axis2__y,
+	Axis2__COUNT,
+};
+tu_specific Axis2 axis2_other(Axis2 axis);
+
+// TODO: Look into this (Claude told you this when you asked if this struct union thing is standardised)
+// 
+// This pattern uses anonymous structs inside a union, and the standardization status differs between C and C++:
+// C
+// Anonymous structs were officially standardized in C11 (§6.7.2.1). So in C11 and later, this is fully conformant.
+// C++
+// Anonymous structs are not part of any C++ standard (C++11/14/17/20/23). The standard only permits anonymous unions, not anonymous structs.
+// However, every major compiler supports it as an extension:
+//
+// MSVC — supported by default
+// GCC — supported with -std=gnu++XX or via -fms-extensions
+// Clang — supported silently as an extension (may warn with -Wpedantic)
+//
+// So in practice this compiles everywhere, but it's technically non-conformant C++.
+//
+// The other issue: type-punning via union
+// Even setting aside anonymous structs, accessing v[0] after writing to x (or vice versa) is type-punning through a union. The rules differ again:
+// StatusCExplicitly legal (C99 TC3 / C11 §6.5.2.3)C++Undefined behavior per the standard
+// In C++, the only standard-compliant way to type-pun is memcpy or std::bit_cast (C++20). In practice, GCC and Clang support union type-punning as an extension even in C++ mode, but it's not guaranteed.
+
+union V2F32 {
+	struct { F32 x; F32 y; };
+	F32 v[2];
+};
+tu_specific V2F32 v2f32       (F32 x, F32 y);             
+tu_specific B32   v2f32_match (V2F32 v1, V2F32 v2); 
+tu_specific F32   v2f32_len_sq(V2F32 v);           
+tu_specific F32   v2f32_len   (V2F32 v);              
+tu_specific V2F32 v2f32_sub   (V2F32 v1, V2F32 v2);   
+
+union V2U16 {
+	struct { U16 x; U16 y; };
+	U16 v[2];
+};
+tu_specific V2U16 v2u16      (U16 x, U16 y);
+tu_specific B32   v2u16_match(V2U16 v1, V2U16 v2);
+
+union V2U32 {
+	struct { U32 x; U32 y; };
+	U32 v[2];
+};
+tu_specific V2U32 v2u32      (U32 x, U32 y);
+tu_specific B32   v2u32_match(V2U32 v1, V2U32 v2);
+
+union V2U64 {
+	struct { U64 x; U64 y; };
+	U64 v[2];
+};
+tu_specific V2U64 v2u64      (U64 x, U64 y);
+tu_specific B32   v2u64_match(V2U64 v1, V2U64 v2);
+
+union V2S8 {
+	struct { S8 x; S8 y; };
+	S8 v[2];
+};
+tu_specific V2S8 v2s8      (S8 x, S8 y);
+tu_specific B32  v2s8_match(V2S8 v1, V2S8 v2);
+
+union V2S16 {
+	struct { S16 x; S16 y; };
+	S16 v[2];
+};
+tu_specific V2S16 v2s16      (S16 x, S16 y);
+tu_specific B32   v2s16_match(V2S16 v1, V2S16 v2);
+
+union V2S32 {
+	struct { S32 x; S32 y; };
+	S32 v[2];
+};
+tu_specific V2S32 v2s32      (S32 x, S32 y);
+tu_specific B32   v2s32_match(V2S32 v1, V2S32 v2);
+
+union V2S64 {
+	struct { S64 x; S64 y; };
+	S64 v[2];
+};
+tu_specific V2S64 v2s64      (S64 x, S64 y);
+tu_specific B32   v2s64_match(V2S64 v1, V2S64 v2);
+
+union V3F32 {
+	struct { F32 x; F32 y; F32 z; };
+	struct { F32 r; F32 g; F32 b; };
+	struct { F32 hue; F32 saturation; F32 value; };
+	F32 v[3];
+};
+tu_specific V3F32 v3f32(F32 x, F32 y, F32 z);
+
+union V4F32 {
+	struct { F32 x; F32 y; F32 z; F32 w; };
+	struct { F32 r; F32 g; F32 b; F32 a; };
+	F32 v[4];
+	
+	struct { V3F32 rgb; F32 a; };
+	struct { V3F32 xyz; F32 w; };
+	struct { V2F32 xy; V2F32 zw; };
+	struct { F32 x; V3F32 yzw; };
+	struct { F32 hue; F32 saturation; F32 value; F32 _; };
+	struct { V3F32 hsv; F32 __; };
+};
+tu_specific V4F32 v4f32      (F32 x, F32 y, F32 z, F32 w);
+tu_specific B32   v4f32_match(V4F32 v1, V4F32 v2);
+tu_specific V4F32 v4f32_all  (F32 x);
+
+union V4U8 {
+	struct { U8 x; U8 y; U8 z; U8 w; };
+	U8 v[4];
+};
+tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w);
+
+// TODO: Need better names here like Range1F32 and range2f32 for v2f32 to have the func names look great with no _ or case change
+struct RangeF32 {
+	F32 min; 
+	F32 max;
+};
+tu_specific RangeF32 rangef32               (F32 min, F32 max);
+tu_specific F32      rangef32_length        (RangeF32 range);
+tu_specific B32      rangef32_within        (RangeF32 range, F32 v);
+tu_specific B32      rangef32_is_valid      (RangeF32 range);
+tu_specific B32      rangef32_contains_range(RangeF32 range, RangeF32 other);
+
+struct RangeS64 {
+	S64 min;
+	S64 max;
+};
+tu_specific RangeS64 ranges64       (S64 start, S64 end);
+tu_specific U64      range_s64_count(RangeS64 range);
+
+struct RangeU64 {
+	U64 min;
+	U64 max;	
+};
+tu_specific RangeU64 rangeu64          (U64 min, U64 max);
+tu_specific U64      range_u64_count   (RangeU64 range);
+tu_specific B32      range_u64_within  (RangeU64 range, U64 v);
+tu_specific B32      range_u64_is_valid(RangeU64 range);
+
+struct RangeV2U64 {
+	V2U64 min;
+	V2U64 max;
+};
+
+struct RangeV2F32;
+union Rect {
+	struct { F32 x; F32 y; F32 width; F32 height; };
+	struct { V2F32 origin; V2F32 dims; };
+};
+tu_specific Rect  rect_make            (F32 x, F32 y, F32 width, F32 height);
+tu_specific Rect  rect_make_v          (V2F32 pos, V2F32 dims);
+tu_specific Rect  rect_from_center     (V2F32 center, V2F32 dims);
+tu_specific Rect  rect_from_range_v2f32(RangeV2F32 range);
+tu_specific V2F32 rect_get_center      (Rect rect);
+tu_specific B32   rect_match           (Rect r1, Rect r2);
+tu_specific Rect  rect_padded          (Rect rect, F32 padd);
+tu_specific B32   is_point_inside_rect (F32 x, F32 y, Rect r);
+tu_specific B32   is_point_inside_rectV(V2F32 v, Rect r);
+
+struct RangeV2F32 {
+	V2F32 min;
+	V2F32 max;
+};
+tu_specific RangeV2F32 range_v2f32                   (V2F32 min, V2F32 max);               
+tu_specific RangeV2F32 range_v2f32_from_rect         (Rect rect);                          
+tu_specific V2F32      range_v2f32_x0y0              (RangeV2F32 r);                       
+tu_specific V2F32      range_v2f32_x1y0              (RangeV2F32 r);                       
+tu_specific V2F32      range_v2f32_x0y1              (RangeV2F32 r);                       
+tu_specific V2F32      range_v2f32_x1y1              (RangeV2F32 r);                       
+tu_specific RangeF32   range_v2f32_x0x1              (RangeV2F32 r);                       
+tu_specific RangeF32   range_v2f32_y0y1              (RangeV2F32 r);                       
+tu_specific RangeV2F32 range_v2f32_as_bb             (V2F32 p1, V2F32 p2);                 
+tu_specific B32        range_v2f32_match             (RangeV2F32 range, RangeV2F32 other); 
+tu_specific B32        range_v2f32_within            (RangeV2F32 range, V2F32 vec);        
+tu_specific V2F32      range_v2f32_dims              (RangeV2F32 range);
+tu_specific RangeV2F32 intersect_range_v2f32_on_axis (RangeV2F32 range, RangeV2F32 other, Axis2 axis);
+tu_specific RangeV2F32 intersect_range_v2f32         (RangeV2F32 range, RangeV2F32 other);
 
 tu_specific F32 abs_f32(F32 x);
 tu_specific F64 abs_f64(F64 x);
@@ -369,102 +571,13 @@ tu_specific void clamp_u16_inplace(U16* value, U16 min, U16 max);
 tu_specific void clamp_u32_inplace(U32* value, U32 min, U32 max);
 tu_specific void clamp_u64_inplace(U64* value, U64 min, U64 max);
 
-// todo: Remove this 
-union V2F32;
-union V3F32;
-union V4F32;
-tu_specific F32 lerp_f32(F32 v0, F32 v1, F32 t);
-tu_specific F64 lerp_f64(F64 v0, F64 v1, F64 t);
+tu_specific F32   lerp_f32  (F32 v0, F32 v1, F32 t);
+tu_specific F64   lerp_f64  (F64 v0, F64 v1, F64 t);
 tu_specific V2F32 lerp_v2f32(V2F32 v0, V2F32 v1, F32 t);
 tu_specific V3F32 lerp_v3f32(V3F32 v0, V3F32 v1, F32 t);
 tu_specific V4F32 lerp_v4f32(V4F32 v0, V4F32 v1, F32 t);
-tu_specific F32 lerp(F32 v0, F32 v1, F32 t);
 
 tu_specific F32 reverse_lerp_f32(F32 min, F32 max, F32 value);
-
-tu_specific U64 u64_from_2_u32(U32 high_order_word, U32 low_order_word);
-
-enum Day : U8 { 
-	Day__monday,
-	Day__tuesday,
-	Day__wednesday,
-	Day__thursday,
-	Day__frinday, 
-	Day__saturdan, 
-	Day__sunday,
-	Day__COUNT,
-};	
-
-enum Month : U8 {
-	Month__january,
-	Month__february, 
-	Month__march,
-	Month__april,
-	Month__may,
-	Month__june,
-	Month__july,
-	Month__august,
-	Month__september,
-	Month__october,
-	Month__november,
-	Month__december,
-	Month__COUNT,
-};
-
-struct Readable_time {
-  U64 year;       // [0, 18,446,744,073,709,551,615]
-  Month month;       // [0, 11]
-  U8 day;         // [1, 31]
-  U8 hour;        // [0, 24)
-  U8 minute;      // [0, 60)
-  U8 second;      // [0, 60)
-  U16 milisecond; // [0, 1000)
-};
-typedef U64 Time; // This is used as just a value from Readable_time, it has to connections to any relative point. 
-
-// todo: Not sure yet which ones of these i would like to keep
-// note: i definatelly like the function like approach here --> MsFromSec(sec)
-#define MsInSec 1000
-#define SecInMin 60
-#define MinInH 60
-#define HoursInDay 24
-#define MsFromSec(sec) (sec * MsInSec)
-
-tu_specific Time time_from_readable_time(Readable_time* r_time);
-tu_specific Readable_time readable_time_from_time(Time time);
-
-enum Comparison : U32 {
-  Comparison__NOT_EQUAL,
-  Comparison__equal,
-  Comparison__smaller,
-  Comparison__greater,
-};
-
-enum Axis2 : U32 {
-	Axis2__x,
-	Axis2__y,
-	Axis2__COUNT,
-};
-
-// todo: Change this to be 
-// UV__x0y0
-// UV__x1y0
-// UV__x0y1
-// UV__x1y1
-enum UV : U32 {
-	UV__00,    // Top left
-	UV__10,    // Top right
-	UV__01,    // Bottom left
-	UV__11,    // Bottom right
-	UV__COUNT,
-};
-
-tu_specific Axis2 axis2_other(Axis2 axis) { return (axis == Axis2__x ? Axis2__y : Axis2__x); }
-
-// todo: Have the const values just be macros, this way you dont need cosnt
-// 		   But then have the functions that dont have to be macros, like MsFromSec and stuff be functions
-//	     If you really want to have them be macros to not generate function jumps, then just have them be 
-//	     inlined, either way, i would assume the compiler to do it eitherway or not do at all 
 
 #pragma warning(push)
 #pragma warning(disable: 4309)
@@ -477,8 +590,9 @@ global const F32 f32_max_decimal = FLT_MAX;
 tu_specific F32 f32_inf();
 tu_specific F32 f32_neg_inf();
 tu_specific F32 f32_nan();
-tu_specific B32 f32_is_nan(F32 f);
+tu_specific B32 f32_is_nan(F32 f); // Comparisons with nan result in false, even if its nan with nan. So we cant just do the ==, we have to do the byte comparison, for that we need a func.
 
+// TODO: Fuck that, use std lib values here
 global const S64 s64_min = 0x8000000000000000;
 global const S64 s64_max = 0x7fffffffffffffff;
 StaticAssert((S64)~s64_min == s64_max, "s64_max and s64_min are not right.");
@@ -513,26 +627,76 @@ StaticAssert((U8)~u8_min == u8_max, "u8_max and u8_min are not right.");
 
 #pragma warning(pop)
 
-struct RangeS64 {
-	S64 min;
-	S64 max;
-};
-tu_specific RangeS64 range_s64_make(S64 start, S64 end);
-tu_specific U64 range_s64_count(RangeS64 range);
+// - Colors 
+// TODO: These shoud be macros since then you wont have to step into them in the debugger
+tu_specific V4U8 transparent_u(); 
+tu_specific V4U8 black_u();       
+tu_specific V4U8 white_u();       
+tu_specific V4U8 red_u();         
+tu_specific V4U8 green_u();       
+tu_specific V4U8 blue_u();        
+tu_specific V4U8 yellow_u();      
+tu_specific V4U8 pink_u();        
+tu_specific V4U8 teal_u();        
+tu_specific V4U8 orange_u();      
+tu_specific V4U8 taupe_u();       
+tu_specific V4U8 magenta_u();     
+tu_specific V4U8 nice_green_u();  
+tu_specific V4U8 nice_blue_u();   
+  
+tu_specific V4U8 change_alpha_u(V4U8 color, U8 new_a);
 
-struct RangeU64 {
-	U64 min;
-	U64 max;	
-};
-tu_specific RangeU64 range_u64_make(U64 min, U64 max);
-tu_specific U64 range_u64_count(RangeU64 range);
-tu_specific B32 range_u64_within(RangeU64 range, U64 v);
-tu_specific B32 range_u64_is_valid(RangeU64 range);
+#define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.x/255.0f, (F32)uc.y/255.0f, (F32)uc.z/255.0f, (F32)uc.w/255.0f)
 
-#define Address(var) (U64)(&(var))
+// TODO: These shoud be macros since then you wont have to step into them in the debugger
+tu_specific V4F32 transparent(); 
+tu_specific V4F32 black();       
+tu_specific V4F32 white();       
+tu_specific V4F32 red();         
+tu_specific V4F32 green();       
+tu_specific V4F32 blue();        
+tu_specific V4F32 yellow();      
+tu_specific V4F32 pink();        
+tu_specific V4F32 teal();        
+tu_specific V4F32 orange();      
+tu_specific V4F32 taupe();       
+tu_specific V4F32 magenta();     
+tu_specific V4F32 nice_green();  
+tu_specific V4F32 nice_blue();   
+
+tu_specific V4F32 color_change_alpha(V4F32 color, F32 new_a);
+tu_specific V4F32 color_light_up(V4F32 color, F32 how_much_lighter);
+
+tu_specific V4F32 rgba_from_rgb(V3F32 rgb, F32 a);
+tu_specific V3F32 rgb_from_rgba(V4F32 rgba);
+
+tu_specific V3F32 hsv_from_rgb(V3F32 rgb);
+tu_specific V3F32 rgb_from_hsv(V3F32 hsv);
+
+tu_specific V4F32 hsva_from_rgba(V4F32 rgba);
+tu_specific V4F32 rgba_from_hsva(V4F32 hsva);
+
+tu_specific V4F32 rgba_from_hex(U32 hex);
+
+tu_specific V4F32 purify_rgb(V4F32 rgb);
+
+// - Memory 
+#define U16From2U8(top, bottom)  (((U16)(top) << 8)  | (U16)(bottom)) 
+#define U32From2U16(top, bottom) (((U32)(top) << 16) | (U32)(bottom)) 
+#define U64From2U32(top, bottom) (((U64)(top) << 32) | (U64)(bottom)) 
+
+tu_specific B32 __is_memory_zero(U8* p, U64 size);
+#define IsMemZero(var)    __is_memory_zero((U8*)&(var), sizeof((var))) 
+#define IsZeroStruct(var) IsMemZero(var)
+
+#define MemCopySafe(dest, src) \
+	do { \
+		StaticAssert(sizeof(dest) == sizeof(src), "Cant copy memory safely, the sizes of dest and src variables are not the equal."); \
+		memcpy(&dest, &src, sizeof(dest)); \
+	} while(0)
 
 // Thanks to AIG for this awesome text generation ))
-global const U64 bit_0  = (1ULL << 0);
+global const U64 bit_0  = (1ULL << 0); // TODO: Should you start with 0 or 1
 global const U64 bit_1  = (1ULL << 1);
 global const U64 bit_2  = (1ULL << 2);
 global const U64 bit_3  = (1ULL << 3);
@@ -597,428 +761,57 @@ global const U64 bit_61 = (1ULL << 61);
 global const U64 bit_62 = (1ULL << 62);
 global const U64 bit_63 = (1ULL << 63);
 
-union V2F32 {
-	struct {
-		F32 x;
-		F32 y;
-	};
-	F32 v[2];
+// - Misc
+// TODO: Structure these in the file better
+enum Day : U8 { 
+	Day__monday,
+	Day__tuesday,
+	Day__wednesday,
+	Day__thursday,
+	Day__friday, 
+	Day__saturday, 
+	Day__sunday,
+	Day__COUNT,
+};	
+
+enum Month : U8 {
+	Month__january,
+	Month__february, 
+	Month__march,
+	Month__april,
+	Month__may,
+	Month__june,
+	Month__july,
+	Month__august,
+	Month__september,
+	Month__october,
+	Month__november,
+	Month__december,
+	Month__COUNT,
 };
 
-tu_specific V2F32 v2f32(F32 x, F32 y) { V2F32 v = { x, y }; return v; }
-tu_specific B32 v2f32_match(V2F32 v1, V2F32 v2) { B32 b = (v1.x == v2.x && v1.y == v2.y); return b; }
-tu_specific F32 v2f32_len_sq(V2F32 v) { F32 len = (v.x * v.x) + (v.y * v.y); return len; }
-tu_specific F32 v2f32_len(V2F32 v) { F32 len = sqrtf(v2f32_len_sq(v)); return len; }
-
-tu_specific V2F32 v2f32_sub(V2F32 v1, V2F32 v2) { return v2f32(v1.x - v2.x, v1.y - v2.y); }
-
-union RangeF32 {
-	struct {
-		F32 min;
-		F32 max;
-	};
-	V2F32 v2;
+struct Readable_time {
+  U64 year;        // [0, 18,446,744,073,709,551,615]
+  Month month;     // [0, 11]
+  U8 day;          // [1, 31]
+  U8 hour;         // [0, 24)
+  U8 minute;       // [0, 60)
+  U8 second;       // [0, 60)
+  U16 millisecond; // [0, 1000)
 };
+typedef U64 Time; // This is used as just a value from Readable_time, it has to connections to any relative point. 
 
-tu_specific RangeF32 range_f32_make(F32 min, F32 max);
-tu_specific F32 range_f32_length(RangeF32 range);
-tu_specific B32 range_f32_within(RangeF32 range, F32 v);
-tu_specific B32 range_f32_is_valid(RangeF32 range);
-tu_specific B32 range_f32_contains_range(RangeF32 range, RangeF32 other);
+// todo: Not sure yet which ones of these i would like to keep
+// note: i definatelly like the function like approach here --> MsFromSec(sec)
+#define MsInSec 1000
+#define SecInMin 60
+#define MinInH 60
+#define HoursInDay 24
+#define MsFromSec(sec) (sec * MsInSec)
 
-union V3F32 {
-	struct {
-		F32 x;
-		F32 y;
-		F32 z;
-	};
-	struct {
-		F32 r;
-		F32 g;
-		F32 b;
-	};
-	struct {
-		F32 hue;
-		F32 saturation;
-		F32 value;
-	};
-	F32 v[3];
-};
+tu_specific Time time_from_readable_time(Readable_time* r_time);
+tu_specific Readable_time readable_time_from_time(Time time);
 
-tu_specific V3F32 v3f32(F32 x, F32 y, F32 z) { V3F32 v = { x, y, z }; return v; }
-
-struct V2U64 {
-	struct {
-		U64 x;
-		U64 y;
-	};
-	U64 v[2];
-};
-tu_specific V2U64 v2u64(U64 x, U64 y) { V2U64 v = { x, y }; return v; }
-tu_specific B32 v2u64_match(V2U64 v1, V2U64 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
-
-struct RangeV2U64 {
-	V2U64 min;
-	V2U64 max;
-};
-
-tu_specific B32 range_v2u64_is_valid(RangeV2U64 range) 
-{
-	B32 is_valid = true;
-	if      (range.min.x > range.max.x) { is_valid = false; }
-	else if (range.min.y > range.max.y) { is_valid = false; }
-	return is_valid;
-}
-
-union Rect {
-	struct {
-		F32 x;
-		F32 y;
-		F32 width;
-		F32 height;
-	};
-
-	struct {
-		V2F32 origin;
-		V2F32 dims;
-	};
-};
-
-tu_specific Rect rect_make(F32 x, F32 y, F32 width, F32 height);
-tu_specific Rect rect_from_v(V2F32 pos, V2F32 dims);
-tu_specific Rect rect_from_center(V2F32 center, V2F32 dims);
-tu_specific V2F32 rect_get_center(Rect rect);
-tu_specific B32 rect_match(Rect r1, Rect r2);
-tu_specific Rect rect_padded(Rect rect, F32 padd);
-tu_specific B32 is_point_inside_rect(F32 x, F32 y, Rect r);
-tu_specific B32 is_point_inside_rectV(V2F32 v, Rect r);
-tu_specific B32 is_point_inside_line(V2F32 point, V2F32 line_start, V2F32 line_end);
-
-struct RangeV2F32 {
-	V2F32 min;
-	V2F32 max;
-};
-
-tu_specific V2F32 range_v2f32_x0y0(RangeV2F32 r) { return v2f32(r.min.x, r.min.y); } 
-tu_specific V2F32 range_v2f32_x1y0(RangeV2F32 r) { return v2f32(r.max.x, r.min.y); }
-tu_specific V2F32 range_v2f32_x0y1(RangeV2F32 r) { return v2f32(r.min.x, r.max.y); }
-tu_specific V2F32 range_v2f32_x1y1(RangeV2F32 r) { return v2f32(r.max.x, r.max.y); } 
-tu_specific RangeF32 range_v2f32_x0x1(RangeV2F32 r) { return range_f32_make(r.min.x, r.max.x); } 
-tu_specific RangeF32 range_v2f32_y0y1(RangeV2F32 r) { return range_f32_make(r.min.y, r.max.y); } 
-
-tu_specific RangeV2F32 range_v2f32(V2F32 min, V2F32 max)
-{
-	RangeV2F32 range = {};
-	range.min = min;
-	range.max = max;
-	return range;
-}
-
-tu_specific RangeV2F32 range_v2f32_as_bb(V2F32 p1, V2F32 p2);
-tu_specific RangeV2F32 range_v2f32_from_rect(Rect rect);
-tu_specific Rect rect_from_range_v2f32(RangeV2F32 range);
-
-tu_specific RangeV2F32 intersect_range_v2f32_on_axis(RangeV2F32 range, RangeV2F32 other, Axis2 axis);
-tu_specific RangeV2F32 intersect_range_v2f32(RangeV2F32 range, RangeV2F32 other);
-
-tu_specific V2F32 range_v2f32_dims(RangeV2F32 range)
-{
-	V2F32 dims = {};
-	dims.x = range.max.x - range.min.x;
-	dims.y = range.max.y - range.min.y;
-	Assert(dims.x >= 0.0f && dims.y >= 0.0f);
-	return dims;
-}
-
-tu_specific B32 range_v2f3_match(RangeV2F32 range, RangeV2F32 other)
-{
-	return (v2f32_match(range.min, other.min) && v2f32_match(range.max, other.max));
-}
-
-tu_specific B32 range_v2f32_within(RangeV2F32 range, V2F32 vec)
-{
-	return (
-		range.min.x <= vec.x && vec.x < range.max.x
-		&&
-		range.min.y <= vec.y && vec.y < range.max.y
-	);
-}
-
-// note: this is static inline just cause i didnt care to move it to cpp file
-tu_specific B32 __is_memory_zero(U8* p, U64 size)
-{
-	B32 is_zero = true;
-	for (U64 i = 0; i < size; i += 1)
-	{
-		if (p[i] != 0) {
-			is_zero = false;
-			break;
-		}
-	}
-	return is_zero;
-}
-#define IsMemZero(var)    __is_memory_zero((U8*)&(var), sizeof((var))) 
-#define IsZeroStruct(var) IsMemZero(var)
-
-#define MemCopySafe(dest, src) \
-	do { \
-		StaticAssert("Cant copy memory safely, the sizes of dest and src variables are not the eqaul."); \
-		memcpy(&dest, &src, sizeof(dest)); \
-	} while(0)
-
-// tu_specific B32 __mem_compare(U8* m1, U64 size1, U8* m2, U64 size2)
-// {
-// 	if (size1 != size2) { return false; }
-// 	B32 result = true;
-// 	for EachIndex(i, size1)
-// 	{
-// 		if (m1[i] != m2[i]) { result = false; break; }
-// 	}
-// 	return result;
-// }
-
-// #define MemComapare(var1, size1, var2, size2) __mem_compare((U8*)&var1, sizeof(var1), (U8*)&var2, sizeof(var2))
-
-union V4U64 {
-	struct { U64 x; U64 y; U64 z; U64 w; };
-	struct { U64 r; U64 P; U64 b; U64 a; };
-};
-tu_specific V4U64 v4u64(U64 x, U64 y, U64 z, U64 w) { V4U64 v = { x, y, z, w }; return v; }
-
-union V4U8 {
-	struct { U8 x; U8 y; U8 z; U8 w; };
-	struct { U8 r; U8 g; U8 b; U8 a; };
-};
-tu_specific V4U8 v4u8(U8 x, U8 y, U8 z, U8 w) { V4U8 v = { x, y, z, w }; return v; }
-
-union V4F32 {
-	struct { F32 x; F32 y; F32 z; F32 w; };
-	struct { F32 r; F32 g; F32 b; F32 a; };
-	F32 v[4];
-	
-	struct { V3F32 rgb; F32 a; };
-	struct { V3F32 xyz; F32 w; };
-	struct { V2F32 xy; V2F32 zw; };
-	struct { F32 x; V3F32 yzw; };
-	struct { F32 hue; F32 saturation; F32 value; F32 _; };
-	struct { V3F32 hsv; F32 __; };
-};
-typedef V4F32 Vec4;
-typedef V4F32 V4;
-
-// todo: Might be nice to use a macro to have the double to float conversion not be a warning but me a part of macro
-//       i could use cpp func overload, but i for some reason dont like that that much
-tu_specific V4F32 v4f32(F32 x, F32 y, F32 z, F32 w) { V4F32 v = { x, y, z, w }; return v; }
-tu_specific V4F32 v4f32_all(F32 x) { return v4f32(x, x, x, x); }
-tu_specific B32 v4f32_match(V4F32 v1, V4F32 v2)
-{
-	B32 result = (
-		v1.r == v2.r &&
-		v1.g == v2.g &&
-		v1.b == v2.b &&
-		v1.a == v2.a 
-	);
-	return result;
-}
-
-struct ArrU64 {
-  U64* data;
-  U64  count;
-};
-
-#define U16_FROM_BYTES(top_byte, bottom_byte) (((U16)(top_byte) << 8) | (U16)(bottom_byte)) 
-
-// #define COLOR_MACROS_PREFIX Color
-// const V4_F32 COLOR_MACROS_PREFIX##Blue v4_f32_make(0.0f, 255.0f, 0.0f, 255.0f)
-
-tu_specific U64 u64_divide_and_ceil(U64 v, U64 divisor)
-{
-	U64 _v = (U64)((v + divisor - 1) / divisor);
-	return _v;
-}
-
-// tu_specific U64 u64_divide_and_floor(U64 v, U64 divisor)
-// {
-// 	U64 result = 0;
-// 	if (v % divisor == 0) { result = v / divisor; }
-// 	else { result =  }
-// 	v / divisor;
-// 	U64 _v = (U64)((v + divisor - 1) / divisor);
-// 	return _v;
-// }
-
-struct V2S32 {
-	struct {
-		S32 x;
-		S32 y;
-	};
-	S32 v[2];
-};
-tu_specific V2S32 v2s32(S32 x, S32 y) { V2S32 v = { x, y }; return v; }
-tu_specific B32 v2s32_match(V2S32 v1, V2S32 v2) { B32 is_match = (v1.x == v2.x && v1.y == v2.y); return is_match; }
-
-// - Colors 
-V4U8 transparent_u() { return v4u8(0, 0, 0, 0);         }
-V4U8 black_u()       { return v4u8(0, 0, 0, 255);       }
-V4U8 white_u()       { return v4u8(255, 255, 255, 255); }
-V4U8 red_u()         { return v4u8(255, 0, 0, 255);     }
-V4U8 green_u()       { return v4u8(0, 255, 0, 255);     }
-V4U8 blue_u()        { return v4u8(0, 0, 255, 255);     }
-V4U8 yellow_u()      { return v4u8(255, 255, 0, 255);   }
-V4U8 pink_u()        { return v4u8(255, 0, 255, 255);   }
-V4U8 teal_u()        { return v4u8(0, 128, 128, 255);   }
-V4U8 orange_u()      { return v4u8(252, 102, 0, 255);   }
-V4U8 taupe_u()       { return v4u8(146, 124, 102, 255); }
-V4U8 magenta_u()     { return v4u8(253, 61, 181, 255);  }
-V4U8 nice_green_u()  { return v4u8(120, 171, 128, 255); }
-V4U8 nice_blue_u()   { return v4u8(97, 175, 239, 255 ); }
-  
-V4U8 change_alpha_u(V4U8 color, U8 new_a) { color.a = new_a; return color; }
-
-#define _U_COLOR_TO_F_COLOR(uc) v4f32((F32)uc.r/255.0f, (F32)uc.g/255.0f, (F32)uc.b/255.0f, (F32)uc.a/255.0f)
-
-V4F32 transparent() { return _U_COLOR_TO_F_COLOR(transparent_u()); } 
-V4F32 black()       { return _U_COLOR_TO_F_COLOR(black_u());       } 
-V4F32 white()       { return _U_COLOR_TO_F_COLOR(white_u());       } 
-V4F32 red()         { return _U_COLOR_TO_F_COLOR(red_u());         }
-V4F32 green()       { return _U_COLOR_TO_F_COLOR(green_u());       }
-V4F32 blue()        { return _U_COLOR_TO_F_COLOR(blue_u());        }
-V4F32 yellow()      { return _U_COLOR_TO_F_COLOR(yellow_u());      } 
-V4F32 pink()        { return _U_COLOR_TO_F_COLOR(pink_u());        }  
-V4F32 teal()        { return _U_COLOR_TO_F_COLOR(teal_u());        }  
-V4F32 orange()      { return _U_COLOR_TO_F_COLOR(orange_u());      }  
-V4F32 taupe()       { return _U_COLOR_TO_F_COLOR(taupe_u());       }  
-V4F32 magenta()     { return _U_COLOR_TO_F_COLOR(magenta_u());     }  
-V4F32 nice_green()  { return _U_COLOR_TO_F_COLOR(nice_green_u());  }  
-V4F32 nice_blue()   { return _U_COLOR_TO_F_COLOR(nice_blue_u());   }
-
-V4F32 color_change_alpha(V4F32 color, F32 new_a) { color.a = new_a; return color; }
-V4F32 color_light_up(V4F32 color, F32 how_much_lighter) 
-{
-	color.r += how_much_lighter;
-	color.g += how_much_lighter; 
-	color.b += how_much_lighter;
-	clamp_f32_inplace(&color.r, 0.0f, 1.0f);	 
-	clamp_f32_inplace(&color.g, 0.0f, 1.0f);	 
-	clamp_f32_inplace(&color.b, 0.0f, 1.0f);	 
-	return color;
-}
-
-F32 f32_round(F32 f) { return roundf(f); }
-F32 f32_floor(F32 f) { return floorf(f); }
-
-V4F32 rgba_from_rgb(V3F32 rgb, F32 a) { return v4f32(rgb.r, rgb.g, rgb.b, a); }
-V3F32 rgb_from_rgba(V4F32 rgba) { return v3f32(rgba.r, rgba.g, rgba.b); }
-
-V3F32 hsv_from_rgb(V3F32 rgb) // Claude did this
-{
-	V3F32 hsv = v3f32(0.0f, 0.0f, 0.0f);
-
-	F32 max = rgb.v[0];
-	F32 min = rgb.v[0];
-	U64 max_channel_index = 0;
-	for (U64 i = 1; i < 3; i += 1)
-	{
-		if (rgb.v[i] > max) {
-					max = rgb.v[i];
-					max_channel_index = i;
-			}
-
-			if (rgb.v[i] < min) {
-					min = rgb.v[i];
-			}
-	}
-	F32 delta = max - min;
-	
-	hsv.value = max;
-	if (max == 0.0f || delta == 0.0f) { return hsv; }
-	hsv.saturation = delta / max;
-
-	if      (max_channel_index == 0) { hsv.hue = (rgb.g - rgb.b) / delta;     }
-	else if (max_channel_index == 1) { hsv.hue = (rgb.b - rgb.r) / delta + 2; }
-	else if (max_channel_index == 2) { hsv.hue = (rgb.r - rgb.g) / delta + 4; }
-
-	hsv.hue /= 6.0f;
-	if (hsv.hue < 0.0f) { hsv.hue += 1.0f; }
-
-	return hsv;
-}
-V3F32 rgb_from_hsv(V3F32 hsv) // This might be from the raddbg codebase
-{
-	F32 h = fmodf(hsv.hue * 360.f, 360.f);
-  F32 s = hsv.saturation;
-  F32 v = hsv.value;
-  
-  F32 c = v*s;
-  F32 x = c*(1.f - abs_f32(fmodf(h/60.f, 2.f) - 1.f));
-  F32 m = v - c;
-  
-  F32 r = 0;
-  F32 g = 0;
-  F32 b = 0;
-  
-  if ((h >= 0.f && h < 60.f) || (h >= 360.f && h < 420.f)){
-    r = c;
-    g = x;
-    b = 0;
-  }
-  else if (h >= 60.f && h < 120.f){
-    r = x;
-    g = c;
-    b = 0;
-  }
-  else if (h >= 120.f && h < 180.f){
-    r = 0;
-    g = c;
-    b = x;
-  }
-  else if (h >= 180.f && h < 240.f){
-    r = 0;
-    g = x;
-    b = c;
-  }
-  else if (h >= 240.f && h < 300.f){
-    r = x;
-    g = 0;
-    b = c;
-  }
-  else if ((h >= 300.f && h <= 360.f) || (h >= -60.f && h <= 0.f)){
-    r = c;
-    g = 0;
-    b = x;
-  }
-  
-  V3F32 rgb = v3f32(r + m, g + m, b + m);
-  return rgb;
-}
-V4F32 hsva_from_rgba(V4F32 rgba)
-{
-	V3F32 hsv = hsv_from_rgb(rgba.rgb);
-	return v4f32(hsv.hue, hsv.saturation, hsv.value, rgba.a);
-}
-V4F32 rgba_from_hsva(V4F32 hsva)
-{
-	V3F32 rgb = rgb_from_hsv(hsva.hsv);
-	return v4f32(rgb.r, rgb.g, rgb.b, hsva.a);
-}
-
-V4F32 rgba_from_hex(U32 hex)
-{
-	F32 a = (F32)(((U8*)&hex)[0]) / 255.0f;
-	F32 b = (F32)(((U8*)&hex)[1]) / 255.0f;
-	F32 g = (F32)(((U8*)&hex)[2]) / 255.0f;
-	F32 r = (F32)(((U8*)&hex)[3]) / 255.0f;
-	return v4f32(r, g, b, a);
-}
-
-V4F32 purify_rgb(V4F32 rgb)
-{
-	V4F32 hsv      = hsva_from_rgba(rgb);
-	hsv.saturation = 1.0f;
-	hsv.value      = 1.0f;
-	V4F32 pure_rgb = rgba_from_hsva(hsv);
-	return pure_rgb;
-}
 
 #endif
 

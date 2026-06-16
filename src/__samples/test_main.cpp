@@ -94,7 +94,7 @@ int WinMain(HINSTANCE app_instance, HINSTANCE __not_used__, LPSTR cmd, int show)
   
   os_set_cursor(OS_Cursor__arrow);
 
-  FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, range_u64_make(0, (U64)u8_max + 1));
+  FP_Font font = fp_load_font(Str8FromC("../data/Roboto.ttf"), 32, rangeu64(0, (U64)u8_max + 1));
   R_Target window_frame_buffer_target = r_attach_window(win32_state->window);
 
   static V4F32 b_color_hsva = hsva_from_rgba(black());
